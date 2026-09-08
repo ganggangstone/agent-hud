@@ -1,0 +1,277 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="Claude HUD" width="100%">
+</p>
+
+<p align="center">A local dashboard for Claude Code plugin, marketplace, instruction, and permission state.</p>
+
+<p align="center">Claude Code의 플러그인·마켓플레이스·지침·권한 상태를 보여주는 로컬 대시보드</p>
+
+<p align="center">
+  <img src="assets/screenshot.png" alt="Claude HUD screenshot" width="560">
+</p>
+
+## The problem / 배경
+
+Claude Code's configuration is split across several files. `~/.claude/settings.json`
+holds which plugins are enabled. `~/.claude/plugins/` holds what's installed and
+where it came from. Each project's `CLAUDE.md` and `.claude/settings.json` hold
+instructions and permission overrides. `.claude/agents/*.md` holds subagent
+definitions. None of it is visible in one place while you work, and plugin
+enable state doesn't distinguish "on for this kind of work" from "on everywhere."
+
+Claude HUD reads all of it live and renders it as a small always-on status page.
+No accounts, no external services. It's a local HTTP server reading local files.
+
+> Claude Code의 설정은 여러 파일에 나뉘어 있다. `~/.claude/settings.json`은 어떤
+> 플러그인이 켜져 있는지 담고, `~/.claude/plugins/`는 무엇이 설치돼 있고 어디서
+> 왔는지 담는다. 프로젝트별 `CLAUDE.md`와 `.claude/settings.json`은 지침과 권한
+> 오버라이드를, `.claude/agents/*.md`는 서브에이전트 정의를 담는다. 이 상태는
+> 작업 중엔 한 곳에 보이지 않는다. 플러그인 활성 여부만으로는 "이 작업에는
+> 켜고 저 작업에는 끈다"는 구분도 안 된다.
+>
+> Claude HUD는 이 정보를 전부 실시간으로 읽어서 작은 상시 상태 페이지로
+> 보여준다. 계정도 외부 서비스도 없다. 로컬 파일을 읽는 로컬 HTTP 서버다.
+
+## What it shows / 화면 구성
+
+Three tabs, one panel at a time.
+
+- **Plugins**: installed plugins, where each came from, on/off state, and the
+  skills inside each one. Two independent controls per plugin row
+- **Groups**: saved plugin sets. Activating one turns its plugins on and all
+  others off, in one click
+- **Instructions & agents**: global and per-project `CLAUDE.md`, registered subagents
+
+Dark mode by default (☀/☾ toggle) and an EN/한국어 toggle, both persisted to
+`localStorage`.
+
+> 탭 세 개로 나뉘어 한 번에 한 패널만 보여준다.
+>
+> - **플러그인**: 설치된 플러그인, 각각의 출처, on/off 상태, 그 안에 든 스킬
+>   목록까지 한 화면에 나온다. 플러그인 행마다 서로 독립된 두 개의 컨트롤이 있다
+> - **그룹**: 저장해둔 플러그인 묶음. 하나를 활성화하면 그 안의 플러그인은 켜지고
+>   나머지는 전부 꺼진다
+> - **지침 · 에이전트**: 전역·프로젝트별 `CLAUDE.md`, 등록된 서브에이전트
+>
+> 기본값은 다크모드(☀/☾ 토글)이고 EN/한국어 토글도 있다. 둘 다 `localStorage`에 저장된다.
+
+<p align="center">
+  <img src="assets/screenshot-groups.png" alt="Groups tab" width="560">
+  <img src="assets/screenshot-instructions.png" alt="Instructions tab" width="560">
+</p>
+
+## Concepts / 개념
+
+These are Claude Code's own structure, not Claude HUD's, except where noted.
+
+> 아래 항목은 표시된 것을 제외하면 Claude HUD가 만든 개념이 아니라 Claude Code
+> 자체의 구조다.
+
+**Plugin**: an installable bundle of skills, agents, and commands, published to
+a marketplace and installed with `claude plugin install`. You enable or disable
+the whole plugin per machine, with `claude plugin enable|disable`, not per
+project. The plugin dot in Claude HUD controls this. A change here applies
+from the next session.
+
+> **플러그인(Plugin)**: 마켓플레이스에 배포되고 `claude plugin install`로
+> 설치하는 스킬·에이전트·커맨드 묶음이다. 플러그인 전체를 `claude plugin
+> enable|disable`로 머신 단위로 켜고 끈다. 프로젝트 단위가 아니다. Claude HUD의
+> 플러그인 점(dot)이 이걸 제어한다. 여기서 바꾼 건 다음 세션부터 적용된다.
+
+**Marketplace**: the source a plugin comes from, a git repo or a local path,
+registered with `claude marketplace add`. Each plugin row shows its
+marketplace's source path directly, so there's no separate marketplace list to
+cross-reference. Claude HUD only displays this. It doesn't add or manage
+marketplaces. Trusting a source is a deliberate, manual decision you make with
+the `claude` CLI, not something a dashboard should do on your behalf.
+
+> **마켓플레이스(Marketplace)**: 플러그인의 출처다. git 저장소나 로컬 경로이며
+> `claude marketplace add`로 등록한다. 각 플러그인 행에 그 마켓플레이스의 출처
+> 경로가 바로 표시되므로 따로 대조할 목록이 필요 없다. Claude HUD는 이걸
+> 보여주기만 한다. 마켓플레이스를 추가하거나 관리하지는 않는다. 어떤 출처를
+> 신뢰할지는 `claude` CLI로 직접 내리는 판단이어야지, 대시보드가 대신할 일이
+> 아니다.
+
+**Skill**: a capability defined by a `SKILL.md` file, bundled inside a plugin.
+Claude Code's plugin system enables or disables a whole plugin at once, it has
+no separate "skill toggle." Individual skills are controlled a different way:
+see permission override below. Click a plugin's name in Claude HUD to expand
+its skill list, each with its description read from `SKILL.md`.
+
+> **스킬(Skill)**: 플러그인 안에 `SKILL.md`로 정의된 개별 기능이다. Claude
+> Code의 플러그인 시스템은 플러그인 전체를 한 번에 켜고 끌 뿐, 스킬 하나만
+> 따로 켜고 끄는 기능은 없다. 스킬 단위 제어는 다른 방식으로 이뤄진다. 아래
+> 권한 오버라이드를 보라. Claude HUD에서 플러그인 이름을 클릭하면 스킬
+> 목록이 펼쳐지고, `SKILL.md`에서 읽어온 설명이 각각 붙어 있다.
+
+**Permission override**: a project-local `.claude/settings.json` entry under
+`permissions.deny`, for example `"Skill(some-plugin:some-skill)"`. This is
+Claude Code's actual mechanism for turning off one specific skill without
+touching the rest of its plugin, and it's scoped to a single project rather
+than the whole machine. The skill dot in Claude HUD writes this entry
+directly, so blocking or allowing a skill applies immediately, unlike plugin
+enable/disable.
+
+> **권한 오버라이드(Permission override)**: 프로젝트 로컬
+> `.claude/settings.json`의 `permissions.deny`에 들어가는
+> `"Skill(플러그인:스킬)"` 같은 항목이다. 이게 바로 Claude Code가 스킬 하나만
+> 끄는 실제 메커니즘이다. 그 플러그인의 나머지 스킬은 건드리지 않고, 머신
+> 전체가 아니라 프로젝트 하나에만 적용된다. Claude HUD의 스킬 점이 이 항목을
+> 직접 쓰고 지운다. 그래서 플러그인 enable/disable과 달리 차단·허용이 즉시
+> 반영된다.
+
+**Group**: Claude HUD's own addition. Claude Code has no such concept. It's a
+named set of plugins meant to be enabled together, for example "writing" versus
+"video." Stored in `modes.json`. Edit the file directly, or use the `+` button
+and group tags on each plugin row in the dashboard.
+
+> **그룹(Group)**: Claude HUD가 추가한 개념이다. Claude Code엔 없다. 같이 켜고
+> 끄고 싶은 플러그인 묶음에 붙인 이름이다. 예를 들면 "글쓰기"와 "영상"을
+> 구분한다. `modes.json`에 저장되며, 파일을 직접 고치거나 대시보드에서 각
+> 플러그인 행의 `+` 버튼과 그룹 태그로 관리한다.
+
+**Instructions (`CLAUDE.md`)**: global (`~/.claude/CLAUDE.md`) and per-project
+(`<project>/CLAUDE.md`) markdown. Claude Code reads it as standing instructions
+every session.
+
+> **지침(`CLAUDE.md`)**: 전역(`~/.claude/CLAUDE.md`)과 프로젝트별
+> (`<프로젝트>/CLAUDE.md`) 마크다운이다. Claude Code가 매 세션 상시 지침으로
+> 읽는다.
+
+## Setting up groups / 그룹 설정하기
+
+A group is just a named set of plugins. In the Groups tab, click "+ create a new
+group", give it a name, and pick which plugin it starts with. Click INACTIVE on a
+group to switch to it: every plugin in that group turns on, every plugin not in it
+turns off, in one action.
+
+You can skip the UI and edit `modes.json` directly instead:
+
+> 그룹은 그냥 이름 붙인 플러그인 묶음이다. Groups 탭에서 "+ 새 그룹"을 누르고 이름을
+> 정한 다음 시작할 플러그인 하나를 고르면 된다. 그룹의 "비활성" 표시를 클릭하면 그
+> 그룹으로 전환된다. 그룹 안 플러그인은 켜지고 나머지는 전부 꺼진다.
+>
+> UI 대신 `modes.json`을 직접 편집해도 된다:
+
+```json
+{
+  "dev": ["some-plugin@some-marketplace", "another-plugin@another-marketplace"],
+  "video": ["video-tools@local"]
+}
+```
+
+Plugin names have to match what shows up in the Plugins tab exactly, including
+the `@marketplace` part. The dashboard picks the file up on its next poll, no
+restart needed.
+
+> 플러그인 이름은 Plugins 탭에 나오는 이름과 `@마켓플레이스` 부분까지 정확히 일치해야
+> 한다. 저장하면 대시보드가 다음 폴링 때 알아서 반영한다. 재시작할 필요 없다.
+
+## Install (macOS) / 설치
+
+```bash
+git clone <this-repo> claude-hud && cd claude-hud
+./install.sh
+```
+
+Running the installer copies `server.py` to `~/.claude/tools/claude-hud/`,
+seeds `modes.json` from the example, and registers a `launchd` service. From
+then on the dashboard keeps running independently of any terminal or Claude
+Code session, and restarts automatically if it dies.
+
+It prints, but does not apply, a hook snippet for `~/.claude/settings.json` so
+each Claude Code session registers its project directory with the dashboard.
+Merge it in by hand. The installer won't touch a settings file that may
+already hold hooks of your own.
+
+This packaging needs `launchd`, so it's macOS-only. `server.py` itself has no
+OS-specific code. On Linux, point a `systemd --user` unit's `ExecStart` at it
+instead of running `install.sh`.
+
+> 설치 스크립트를 실행하면 `server.py`가 `~/.claude/tools/claude-hud/`에
+> 복사되고, 예제로 `modes.json`이 만들어지고, `launchd` 서비스로 등록된다.
+> 이후 대시보드는 터미널이나 Claude Code 세션과 무관하게 계속 떠 있고, 죽으면
+> 자동으로 다시 켜진다.
+>
+> `~/.claude/settings.json`에 추가할 훅 스니펫은 화면에 출력만 된다. 직접
+> 적용되지는 않는다. 이미 다른 훅이 들어 있을 수 있는 설정 파일을 스크립트가
+> 함부로 덮어쓰지 않기 위해서다. 출력된 내용을 손으로 병합해 넣으면 된다.
+>
+> `launchd`가 필요해서 이 패키징은 macOS 전용이다. `server.py` 자체엔 OS
+> 종속 코드가 없다. 리눅스에서는 `install.sh` 대신 `systemd --user` 유닛의
+> `ExecStart`가 `server.py`를 가리키게 하면 된다.
+
+## Behavior across projects and sessions / 여러 프로젝트·세션에서의 동작
+
+One server process serves every project on the machine. When a session
+starts, its hook checks whether a server is already running. If one is, it
+just registers the current project path. It starts a new one only if none is
+running. Opening and closing terminals in the same project doesn't start or
+stop the server, and doesn't change its port. With two or more known projects,
+the relevant panels show a dropdown to switch between them.
+
+> 서버 프로세스 하나가 이 머신의 모든 프로젝트를 상대한다. 세션이 시작되면
+> 훅이 이미 떠 있는 서버가 있는지 확인한다. 있으면 현재 프로젝트 경로만
+> 등록하고, 없을 때만 새로 하나 띄운다. 같은 프로젝트에서 터미널을 열고 닫는
+> 동작은 서버를 시작하거나 멈추지 않고 포트도 바꾸지 않는다. 알려진 프로젝트가
+> 2개 이상이면 관련 패널에 드롭다운이 생겨 전환할 수 있다.
+
+## Managing the service / 서비스 관리
+
+```bash
+launchctl list | grep claude-hud                               # status
+launchctl kickstart -k gui/$(id -u)/com.claude-hud             # restart after editing server.py
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.claude-hud.plist  # stop
+tail -f ~/.claude/tools/claude-hud/launchd.err.log             # logs
+```
+
+Setting `CLAUDE_HUD_DISABLE=1` before a session's hook runs skips starting a
+new server. It has no effect on one already running.
+
+> 세션 훅이 실행되기 전에 `CLAUDE_HUD_DISABLE=1`을 설정하면 새 서버를 띄우지
+> 않는다. 이미 떠 있는 서버에는 영향이 없다.
+
+## Update checks / 업데이트 확인
+
+The dashboard checks GitHub Releases for a newer tag every 12 hours, in a
+background thread, and shows a banner when one exists. It never downloads or
+installs anything. You update by running `git pull` in your clone and
+restarting the service. Set `UPDATE_REPO` in `server.py` to the repo you
+publish to; until then the check quietly does nothing.
+
+> 대시보드는 12시간마다 백그라운드 스레드에서 GitHub Releases의 최신 태그를
+> 확인하고, 새 버전이 있으면 배너를 띄운다. 다운로드나 설치는 하지 않는다.
+> 업데이트는 클론에서 `git pull` 후 서비스를 재시작하면 된다. `server.py`의
+> `UPDATE_REPO`를 배포할 저장소로 맞춰두면 되고, 그전까지는 조용히 아무 일도
+> 하지 않는다.
+
+## Extend / 확장하기
+
+- New panel: write `def collect_x(ctx) -> dict` and add it to `PANELS`.
+- New plugin group: edit `modes.json`, or use the "+" button in the Groups tab.
+
+> - 새 패널: `def collect_x(ctx) -> dict` 함수를 작성해서 `PANELS`에 추가
+> - 새 플러그인 그룹: `modes.json`을 직접 편집하거나 Groups 탭의 "+" 버튼 사용
+
+## Feedback / 피드백
+
+Bug reports and suggestions go to [Issues](../../issues). The dashboard's
+"report an issue" link opens a short form with the version already filled in.
+Write in English or Korean, whichever is easier.
+
+> 버그 제보와 제안은 [Issues](../../issues)로 받는다. 대시보드의 "문제 신고하기"
+> 링크를 누르면 버전이 미리 채워진 짧은 폼이 열린다. 영어든 한국어든 편한 쪽으로
+> 쓰면 된다.
+
+## Why it's built this way / 설계 근거
+
+Decisions with real alternatives — the single-file/no-dependency choice, why
+reads go straight to the config files but plugin toggles go through the `claude`
+CLI, why polling instead of websockets — are recorded in [docs/ADR.md](docs/ADR.md).
+
+> 대안이 있었던 결정들(의존성 없는 단일 파일, 읽기는 설정 파일 직접·플러그인 토글은
+> `claude` CLI 경유인 이유, 웹소켓 대신 폴링인 이유)은 [docs/ADR.md](docs/ADR.md)에 있다.
+
+## License / 라이선스
+
+MIT. See [LICENSE](LICENSE).

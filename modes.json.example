@@ -1,0 +1,4 @@
+{
+  "dev": ["some-plugin@some-marketplace"],
+  "video": ["another-plugin@local"]
+}

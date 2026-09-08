@@ -1,0 +1,56 @@
+name: Feedback / 피드백
+description: Something broke, was confusing, or you wish it did something / 안 되는 것, 헷갈린 것, 있었으면 하는 것
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in English or 한국어, whichever is easier. Nothing here has to be technical.
+
+        영어든 한국어든 편한 쪽으로 쓰시면 됩니다. 기술적으로 쓰실 필요 없습니다.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of thing is this? / 어떤 이야기인가요?
+      options:
+        - Something is broken / 뭔가 안 됩니다
+        - Something is confusing / 헷갈립니다
+        - I wish it did something / 이런 게 있었으면 합니다
+        - Other / 그 밖에
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where? / 어디에서요?
+      options:
+        - Plugins tab / 플러그인 탭
+        - Groups tab / 그룹 탭
+        - Instructions & agents tab / 지침·에이전트 탭
+        - Installing it / 설치 과정
+        - Somewhere else / 그 밖에
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / 무슨 일이 있었나요?
+      description: |
+        What you were trying to do, and what happened instead. A screenshot helps — you can drag one in.
+        무엇을 하려고 했고 대신 무슨 일이 일어났는지 적어주세요. 스크린샷을 끌어다 놓으셔도 됩니다.
+      placeholder: |
+        I clicked ... and expected ... but ...
+        ...를 눌렀더니 ...가 될 줄 알았는데 ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / 버전
+      description: The dashboard link fills this in for you. / 대시보드 링크로 오셨으면 이미 채워져 있습니다.
+    validations:
+      required: false
