@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude HUD: live status dashboard for a local Claude Code setup.
+"""Agent HUD: live status dashboard for a local Claude Code setup.
 
 Extensibility: add a new panel by writing one function of shape
     def collect_x(ctx) -> dict   and appending it to PANELS.
@@ -19,7 +19,7 @@ PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this 
 
 VERSION = "0.1.0"
 # TODO: 실제로 push하는 저장소로 확정되면 이 값을 바꾼다.
-UPDATE_REPO = "ganggangstone/claude-hud"
+UPDATE_REPO = "ganggangstone/agent-hud"
 UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 12 * 60 * 60
 
@@ -70,7 +70,7 @@ def _fetch_latest_release():
     import urllib.request
     req = urllib.request.Request(
         f"https://api.github.com/repos/{UPDATE_REPO}/releases/latest",
-        headers={"Accept": "application/vnd.github+json", "User-Agent": "claude-hud"},
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "agent-hud"},
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
         data = json.loads(resp.read())
@@ -345,7 +345,7 @@ def build_state(project_dir=None):
 
 
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
-<title>Claude HUD</title>
+<title>Agent HUD</title>
 <style>
 :root{
   --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
@@ -407,7 +407,7 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 #ts{color:var(--dim);font-size:11px;margin-top:16px}
 </style></head><body>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
-  <h1 id="h1title">Claude HUD</h1>
+  <h1 id="h1title">Agent HUD</h1>
   <span style="display:flex;gap:8px">
     <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
@@ -506,7 +506,7 @@ const T = {
     feedback_open: '문제 신고하기 ↗',
   },
 };
-let lang = localStorage.getItem('claude-hud-lang') || 'en';
+let lang = localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
 function renderLangToggle(){
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
@@ -514,7 +514,7 @@ function renderLangToggle(){
 }
 function setLang(l){
   lang = l;
-  localStorage.setItem('claude-hud-lang', lang);
+  localStorage.setItem('agent-hud-lang', lang);
   renderLangToggle();
   document.getElementById('applyBanner').innerHTML = t().banner;
   renderTabs();
@@ -525,7 +525,7 @@ document.getElementById('langKo').onclick = () => setLang('ko');
 renderLangToggle();
 document.getElementById('applyBanner').innerHTML = t().banner;
 
-let theme = localStorage.getItem('claude-hud-theme') || 'dark';
+let theme = localStorage.getItem('agent-hud-theme') || 'dark';
 function renderTheme(){
   document.documentElement.setAttribute('data-theme', theme);
   document.getElementById('themeLight').classList.toggle('active', theme === 'light');
@@ -533,7 +533,7 @@ function renderTheme(){
 }
 function setTheme(th){
   theme = th;
-  localStorage.setItem('claude-hud-theme', theme);
+  localStorage.setItem('agent-hud-theme', theme);
   renderTheme();
 }
 document.getElementById('themeLight').onclick = () => setTheme('light');
@@ -541,7 +541,7 @@ document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
 const TITLE_MAP = { Groups: 'title_groups', Plugins: 'title_plugins', 'Instructions & agents (read-only)': 'title_instructions' };
 const TABS = ['Plugins', 'Groups', 'Instructions & agents (read-only)'];
-let activeTab = localStorage.getItem('claude-hud-tab') || 'Plugins';
+let activeTab = localStorage.getItem('agent-hud-tab') || 'Plugins';
 function renderTabs(){
   const bar = document.getElementById('tabs');
   bar.innerHTML = '';
@@ -549,13 +549,13 @@ function renderTabs(){
     const el = document.createElement('span');
     el.className = 'tab-opt' + (activeTab === tabKey ? ' active' : '');
     el.textContent = t()[TITLE_MAP[tabKey]];
-    el.onclick = () => { activeTab = tabKey; localStorage.setItem('claude-hud-tab', tabKey); renderTabs(); tick(); };
+    el.onclick = () => { activeTab = tabKey; localStorage.setItem('agent-hud-tab', tabKey); renderTabs(); tick(); };
     bar.appendChild(el);
   }
 }
 renderTabs();
 let polling = true;
-let selectedProject = localStorage.getItem('claude-hud-project') || '';
+let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
 const skillsOpen = {};
@@ -731,7 +731,7 @@ async function tick(){
           if(pr === p.project_dir) opt.selected = true;
           sel.appendChild(opt);
         }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('claude-hud-project', sel.value); tick(); };
+        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); tick(); };
         c.appendChild(sel);
       } else {
         const note = document.createElement('div'); note.className = 'note';
@@ -786,7 +786,7 @@ async function tick(){
           if(pr === p.project_dir) opt.selected = true;
           sel.appendChild(opt);
         }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('claude-hud-project', sel.value); tick(); };
+        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); tick(); };
         c.appendChild(sel);
       } else {
         const note = document.createElement('div'); note.className = 'note';

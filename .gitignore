@@ -7,7 +7,7 @@ __pycache__/
 *.pyc
 
 # 이관용 백업 번들 — 저장소에 넣지 않는다
-claude-hud.bundle
+agent-hud.bundle
 
 # 개인 작업 노트 — 공개하지 않는다
 CLAUDE.md
