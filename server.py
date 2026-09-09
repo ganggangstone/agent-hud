@@ -350,17 +350,10 @@ def collect_skills(ctx):
     rows = sorted(found.values(), key=lambda r: (len(r["agents"]), r["name"]))
     for r in rows:
         r["missing"] = [a for a in SKILL_AGENTS if a not in r["agents"]]
-    # 플러그인이 제공하는 스킬은 Claude Code 밖으로 못 나간다. 141개를 낱개로 늘어놓으면
-    # 표가 묻히므로 개수만 센다.
-    plugin_count = 0
-    for base, dirs, files in os.walk(os.path.join(CLAUDE_DIR, "plugins")):
-        if "SKILL.md" in files:
-            plugin_count += 1
     return {
         "title": "Skills (who can see them)",
         "skills": rows,
         "agents": SKILL_AGENTS,
-        "plugin_skill_count": plugin_count,
         "project_dir": project_dir,
         "known_projects": known_projects(),
     }
@@ -566,9 +559,8 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 const T = {
   en: {
     banner: '⚠ Plugin changes apply <b>starting next session</b>. Skill overrides apply immediately.',
-    title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents (read-only)', title_skills: 'Skills (who can see them)',
+    title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents', title_skills: 'Skills',
   skills_note: 'The SKILL.md format is a shared standard, but each agent looks in different folders. A skill is only usable by the agents that read the folder it sits in.',
-  skills_plugin_note: n => `Plus ${n} skills from Claude Code plugins -- those stay Claude Code only.`,
   no_skills: 'No skills found in any known folder.',
     active: 'ACTIVE', activate: 'INACTIVE', activate_hover: 'SWITCH →',
     active_tip: 'this group is the current working set (all its plugins on, everything else off)',
@@ -610,9 +602,8 @@ const T = {
   },
   ko: {
     banner: '⚠ 플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 스킬 permission override는 즉시 적용됩니다.',
-    title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트 (읽기 전용)', title_skills: '스킬 (누가 볼 수 있나)',
+    title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트', title_skills: '스킬',
   skills_note: 'SKILL.md 형식은 공통 표준이지만 도구마다 보는 폴더가 다릅니다. 스킬은 그 폴더를 읽는 에이전트만 쓸 수 있습니다.',
-  skills_plugin_note: n => `이 밖에 Claude Code 플러그인이 제공하는 스킬 ${n}개가 있고, 그것들은 Claude Code 전용입니다.`,
   no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
     active: '활성', activate: '비활성', activate_hover: '전환하기 →',
     active_tip: '현재 활성 그룹입니다 (이 그룹의 플러그인은 켜지고 나머지는 꺼진 상태)',
@@ -901,11 +892,6 @@ async function tick(){
         const e = document.createElement('div'); e.className='empty';
         e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
         c.appendChild(e);
-      }
-      if(p.plugin_skill_count){
-        const pn = document.createElement('div'); pn.className='note'; pn.style.marginTop='12px';
-        pn.textContent = t().skills_plugin_note(p.plugin_skill_count);
-        c.appendChild(pn);
       }
     } else if(p.files){
       c.appendChild(h);
