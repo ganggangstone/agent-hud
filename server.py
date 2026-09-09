@@ -581,12 +581,16 @@ function renderTabs(){
     const el = document.createElement('span');
     el.className = 'tab-opt' + (activeTab === tabKey ? ' active' : '');
     el.textContent = t()[TITLE_MAP[tabKey]];
-    el.onclick = () => { activeTab = tabKey; localStorage.setItem('agent-hud-tab', tabKey); renderTabs(); tick(); };
+    el.onclick = () => { activeTab = tabKey; localStorage.setItem('agent-hud-tab', tabKey); renderTabs(); rerender(); };
     bar.appendChild(el);
   }
 }
 renderTabs();
 let polling = true;
+// tick()은 polling=false면 즉시 반환한다(파일 내용을 펼쳐두면 그렇게 된다).
+// 사용자가 직접 일으킨 재렌더는 그 가드를 넘어가야 한다 -- 재렌더가 열린 박스를
+// 어차피 지우므로 여기서 polling도 같이 되살린다.
+function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
@@ -763,7 +767,7 @@ async function tick(){
           if(pr === p.project_dir) opt.selected = true;
           sel.appendChild(opt);
         }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); tick(); };
+        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
         c.appendChild(sel);
       } else {
         const note = document.createElement('div'); note.className = 'note';
@@ -818,7 +822,7 @@ async function tick(){
           if(pr === p.project_dir) opt.selected = true;
           sel.appendChild(opt);
         }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); tick(); };
+        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
         c.appendChild(sel);
       } else {
         const note = document.createElement('div'); note.className = 'note';
@@ -843,7 +847,7 @@ async function tick(){
         label.title = hasSkills ? t().show_skills_tip : t().no_skills_tip;
         if(hasSkills){
           el.classList.add('clickable');
-          el.onclick = (e) => { if(e.target === el || e.target === label || label.contains(e.target)){ skillsOpen[row.name] = !skillsOpen[row.name]; tick(); } };
+          el.onclick = (e) => { if(e.target === el || e.target === label || label.contains(e.target)){ skillsOpen[row.name] = !skillsOpen[row.name]; rerender(); } };
         }
         const left = document.createElement('span');
         left.appendChild(sw); left.appendChild(label);
