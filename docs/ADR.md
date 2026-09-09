@@ -208,3 +208,60 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
   GitHub Pages 프로젝트 사이트 URL. 이 저장소는 둘 다 쓰지 않는다.
 - **함정**: 이름을 바꾼 뒤 **옛 이름으로 새 저장소를 만들면 리다이렉트가 끊긴다** —
   *"do not reuse the original name of the renamed repository."*
+
+---
+
+## 10. 프로젝트별 스킬 on/off를 다른 에이전트에서도 할 수 있는가 (2026-09-09 조사)
+
+**목적**: 이 도구를 만든 이유가 "프로젝트마다 여러 스킬·플러그인을 묶어서 켜고 끄는 것"이다.
+그게 Claude Code 밖에서도 되는지 확인했다.
+
+**결론: 설정으로는 안 되고, 폴더 배치로는 된다.**
+
+### 확인한 것 (각 도구 공식 문서, 2026-09)
+
+- **스킬 형식은 공개 표준이다.** `SKILL.md` 폴더 규격은 Anthropic이 2025-12 개방했고
+  Agentic AI Foundation이 관리한다(agentskills.io). 40여 제품이 같은 형식을 읽는다.
+  **변환 없이 폴더째 이식된다.**
+- **그런데 명세가 탐색 경로를 정하지 않는다.** 문서 페이지 9개 중 배포·설치·레지스트리
+  관련이 하나도 없다. 그래서 위치가 도구마다 갈린다:
+
+  | 도구 | 프로젝트 | 사용자 |
+  |---|---|---|
+  | Claude Code | `.claude/skills/` **만** | `~/.claude/skills/` |
+  | Codex | `.agents/skills/` | `~/.agents/skills/` |
+  | Cursor | `.agents/skills/`, `.cursor/skills/` (+호환 `.claude/`, `.codex/`) | 동일 |
+  | VS Code·Copilot | `.github/skills/`, `.claude/skills/`, `.agents/skills/` | `~/.copilot/`, `~/.claude/`, `~/.agents/` |
+
+  **`.agents/skills`로 수렴하는데 Claude Code만 그걸 읽지 않는다.**
+
+- **프로젝트별 on/off 설정은 Claude Code에만 있다.**
+  - Claude Code: 프로젝트 `.claude/settings.json`의 `Skill(plugin:skill)` deny (이 도구가 쓰는 것)
+  - Codex: `~/.codex/config.toml`의 `[[skills.config]] enabled = false` — **사용자 전역만**,
+    프로젝트 단위 없음, 묶음 토글 없음
+  - Cursor: **없음.** frontmatter의 `paths`·`disable-model-invocation`뿐이고 그건 스킬 자체의
+    성질이지 프로젝트별 스위치가 아니다
+  - VS Code·Copilot: **없음.** `chat.agentSkillsLocations`로 폴더를 더할 수만 있다
+
+- **묶음(플러그인) 개념은 표준에 없다.** Claude 플러그인은 스킬+커맨드+훅+서브에이전트+MCP를
+  한 묶음으로 배포하지만, 표준이 정의하는 단위는 스킬 폴더 하나뿐이다. **훅·슬래시 커맨드·
+  서브에이전트는 이식 대상이 아니다.**
+- 배포 층은 생태계가 따로 만들었다: `skills.sh` 레지스트리와 `npx skills` CLI(Vercel).
+  `skills add <owner/repo> -a '*'`가 여러 에이전트 디렉터리에 **기본 심볼릭 링크로** 설치하고,
+  `skills-lock.json`으로 복원한다. 즉 **설치·공유는 이미 풀린 문제다.**
+
+### 그래서 방향
+
+**켜고 끄는 것을 설정 파일로 표현하면 도구마다 형식이 달라 어댑터가 4개 필요하고, 그중 셋은
+애초에 그런 설정이 없다.** 반면 **모든 도구가 공통으로 하는 일은 폴더를 훑는 것**이다.
+따라서 **"스킬이 프로젝트 스킬 폴더 안에 있으면 켜짐"**이 유일한 도구 공통 스위치다.
+
+- 그룹 = 스킬 이름 목록 (지금 `modes.json`이 플러그인에 대해 하는 것과 같은 발상)
+- 켜기 = 그 스킬들을 프로젝트의 `.claude/skills/`와 `.agents/skills/`에 심볼릭 링크
+- 끄기 = 링크 제거 (원본은 사용자 디렉터리에 그대로 남는다)
+
+**미확인**: 각 에이전트가 심볼릭 링크된 스킬 폴더를 실제로 따라가는지는 확인하지 못했다.
+`npx skills`가 기본을 심볼릭 링크로 쓰는 것이 방증이지만 방증일 뿐이다. **만들기 전에
+도구별로 링크 하나 걸고 세션을 새로 띄워 실제로 목록에 뜨는지 봐야 한다.**
+또 프로젝트 안에 링크를 만들면 git에 잡히므로 `.gitignore` 처리(개인 설정) 또는 커밋
+(팀 공유) 중 어느 쪽인지 정해야 한다.
