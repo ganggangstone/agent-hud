@@ -228,17 +228,18 @@ READABLE_PATHS = set()  # populated by collect_instructions, checked by /api/con
 
 # Instruction files other agent tools read. Claude Code reads CLAUDE.md only;
 # AGENTS.md is the de-facto standard for ~everything else, hence the drift.
+# (상대경로, 이 파일을 읽는 도구) -- 배지로 그대로 보여준다.
 OTHER_INSTRUCTION_FILES = [
-    "AGENTS.md",
-    ".clinerules",
-    ".cursorrules",
-    ".windsurfrules",
-    "GEMINI.md",
-    os.path.join(".github", "copilot-instructions.md"),
+    ("AGENTS.md", "Codex · Cursor · Cline +"),
+    (".clinerules", "Cline"),
+    (".cursorrules", "Cursor"),
+    (".windsurfrules", "Windsurf"),
+    ("GEMINI.md", "Gemini CLI"),
+    (os.path.join(".github", "copilot-instructions.md"), "Copilot"),
 ]
 
 
-def _file_row(label, path):
+def _file_row(label, path, tool="Claude Code"):
     exists = os.path.isfile(path)
     st = os.stat(path) if exists else None
     if exists:
@@ -249,6 +250,7 @@ def _file_row(label, path):
         "size": st.st_size if st else 0,
         "mtime": int(st.st_mtime) if st else 0,
         "path": path,
+        "tool": tool,
     }
 
 
@@ -259,15 +261,15 @@ def collect_instructions(ctx):
         _file_row(f"Project CLAUDE.md ({project_dir})", os.path.join(project_dir, "CLAUDE.md")),
     ]
     # only shown when present -- a row per tool the user doesn't use is noise
-    for rel in OTHER_INSTRUCTION_FILES:
-        row = _file_row(rel, os.path.join(project_dir, rel))
+    for rel, tool in OTHER_INSTRUCTION_FILES:
+        row = _file_row(rel, os.path.join(project_dir, rel), tool)
         if row["exists"]:
             rows.append(row)
     rules_dir = os.path.join(project_dir, ".cursor", "rules")
     if os.path.isdir(rules_dir):
         for fn in sorted(os.listdir(rules_dir)):
             if fn.endswith((".md", ".mdc")):
-                rows.append(_file_row(os.path.join(".cursor", "rules", fn), os.path.join(rules_dir, fn)))
+                rows.append(_file_row(os.path.join(".cursor", "rules", fn), os.path.join(rules_dir, fn), "Cursor"))
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -429,6 +431,7 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 .content.open{display:block}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .dim{color:var(--dim);font-size:13px}
+.tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:8px;white-space:nowrap}
 .tag{font-size:11px;color:var(--dim);padding:1px 0;margin-left:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .tag.danger{cursor:pointer}
 .tag.danger:hover{color:#f04452}
@@ -475,6 +478,7 @@ const T = {
     no_project: 'no project seen yet. start a Claude Code session inside a project folder and it will appear here automatically',
     project_label: 'project: ',
     click_to_open: 'click to open', not_found: 'not found',
+  agents_claude_only: 'Subagents below are Claude Code only.',
     no_subagents: 'no subagents registered',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'toggle failed: ', group_update_failed: 'group update failed: ',
@@ -515,6 +519,7 @@ const T = {
     no_project: '아직 감지된 프로젝트가 없습니다. 프로젝트 폴더 안에서 Claude Code 세션을 시작하면 자동으로 여기 나타납니다',
     project_label: '프로젝트: ',
     click_to_open: '클릭해서 열기', not_found: '없음',
+  agents_claude_only: '아래 서브에이전트는 Claude Code 전용입니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '토글 실패: ', group_update_failed: '그룹 수정 실패: ',
@@ -780,7 +785,7 @@ async function tick(){
         const caret = document.createElement('span');
         caret.textContent = f.exists ? '▸ ' : '';
         left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${f.name}`);
+        left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${f.name}<span class="tooltag">${f.tool}</span>`);
         const sizeSpan = document.createElement('span'); sizeSpan.className = 'dim';
         sizeSpan.textContent = f.exists ? f.size + 'B · ' + fmtTime(f.mtime) : t().not_found;
         el.appendChild(left); el.appendChild(sizeSpan);
@@ -788,6 +793,11 @@ async function tick(){
         const box = document.createElement('div'); box.className = 'content';
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
+      }
+      if((p.agents||[]).length){
+        const an = document.createElement('div'); an.className='note'; an.style.marginTop='12px';
+        an.textContent = t().agents_claude_only;
+        c.appendChild(an);
       }
       for(const a of (p.agents||[])){
         const el = document.createElement('div'); el.className = 'row clickable';
