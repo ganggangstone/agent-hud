@@ -299,6 +299,73 @@ def _instruction_rows(project_dir):
     return rows
 
 
+# 스킬은 SKILL.md 형식이 공개 표준(agentskills.io)이라 폴더째 이식된다. 그런데 명세는
+# **탐색 경로를 정하지 않아서**, 어디에 두느냐가 곧 어느 에이전트가 보느냐가 된다.
+# Claude Code만 `.agents/skills`를 읽지 않는다는 게 이 표의 요점이다.
+# 출처(2026-09 공식 문서): code.claude.com/docs/en/skills,
+# learn.chatgpt.com/docs/build-skills, cursor.com/docs/context/skills,
+# code.visualstudio.com/docs/copilot/customization/agent-skills
+SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot"]
+
+SKILL_ROOTS_PROJECT = [
+    (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot"]),
+    (".cursor/skills", ["Cursor"]),
+    (".codex/skills", ["Cursor"]),
+    (".github/skills", ["Copilot"]),
+]
+
+SKILL_ROOTS_HOME = [
+    (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot"]),
+    (".cursor/skills", ["Cursor"]),
+    (".codex/skills", ["Cursor"]),
+    (".copilot/skills", ["Copilot"]),
+]
+
+
+def _scan_skill_root(root, label, agents, found):
+    """같은 이름의 스킬은 한 행으로 합친다 -- 두 곳에 두면 보는 도구가 늘어난다."""
+    if not os.path.isdir(root):
+        return
+    for name in sorted(os.listdir(root)):
+        md = os.path.join(root, name, "SKILL.md")
+        if not os.path.isfile(md):
+            continue
+        row = found.setdefault(name, {"name": name, "agents": [], "roots": [], "path": md})
+        row["roots"].append(label)
+        for a in agents:
+            if a not in row["agents"]:
+                row["agents"].append(a)
+        READABLE_PATHS.add(md)
+
+
+def collect_skills(ctx):
+    project_dir = default_project_dir(ctx)
+    found = {}
+    for rel, agents in SKILL_ROOTS_PROJECT:
+        _scan_skill_root(os.path.join(project_dir, rel.replace("/", os.sep)), rel, agents, found)
+    for rel, agents in SKILL_ROOTS_HOME:
+        _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, agents, found)
+    rows = sorted(found.values(), key=lambda r: (len(r["agents"]), r["name"]))
+    for r in rows:
+        r["missing"] = [a for a in SKILL_AGENTS if a not in r["agents"]]
+    # 플러그인이 제공하는 스킬은 Claude Code 밖으로 못 나간다. 141개를 낱개로 늘어놓으면
+    # 표가 묻히므로 개수만 센다.
+    plugin_count = 0
+    for base, dirs, files in os.walk(os.path.join(CLAUDE_DIR, "plugins")):
+        if "SKILL.md" in files:
+            plugin_count += 1
+    return {
+        "title": "Skills (who can see them)",
+        "skills": rows,
+        "agents": SKILL_AGENTS,
+        "plugin_skill_count": plugin_count,
+        "project_dir": project_dir,
+        "known_projects": known_projects(),
+    }
+
+
 def collect_instructions(ctx):
     project_dir = default_project_dir(ctx)
     rows = [
@@ -328,7 +395,7 @@ def read_content(path):
         return None, str(e)
 
 
-PANELS = [collect_groups, collect_plugins, collect_instructions, collect_update]
+PANELS = [collect_groups, collect_plugins, collect_skills, collect_instructions, collect_update]
 
 
 def known_plugin_names():
@@ -466,6 +533,9 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 .content.open{display:block}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .dim{color:var(--dim);font-size:13px}
+.agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;white-space:nowrap}
+.agenttag.yes{color:var(--text)}
+.agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
 .tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:8px;white-space:nowrap}
 .tag{font-size:11px;color:var(--dim);padding:1px 0;margin-left:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .tag.danger{cursor:pointer}
@@ -496,7 +566,10 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 const T = {
   en: {
     banner: '⚠ Plugin changes apply <b>starting next session</b>. Skill overrides apply immediately.',
-    title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents (read-only)',
+    title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents (read-only)', title_skills: 'Skills (who can see them)',
+  skills_note: 'The SKILL.md format is a shared standard, but each agent looks in different folders. A skill is only usable by the agents that read the folder it sits in.',
+  skills_plugin_note: n => `Plus ${n} skills from Claude Code plugins -- those stay Claude Code only.`,
+  no_skills: 'No skills found in any known folder.',
     active: 'ACTIVE', activate: 'INACTIVE', activate_hover: 'SWITCH →',
     active_tip: 'this group is the current working set (all its plugins on, everything else off)',
     activate_tip: 'click to switch to this group: turns ON its plugins and OFF all others (takes effect next session)',
@@ -537,7 +610,10 @@ const T = {
   },
   ko: {
     banner: '⚠ 플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 스킬 permission override는 즉시 적용됩니다.',
-    title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트 (읽기 전용)',
+    title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트 (읽기 전용)', title_skills: '스킬 (누가 볼 수 있나)',
+  skills_note: 'SKILL.md 형식은 공통 표준이지만 도구마다 보는 폴더가 다릅니다. 스킬은 그 폴더를 읽는 에이전트만 쓸 수 있습니다.',
+  skills_plugin_note: n => `이 밖에 Claude Code 플러그인이 제공하는 스킬 ${n}개가 있고, 그것들은 Claude Code 전용입니다.`,
+  no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
     active: '활성', activate: '비활성', activate_hover: '전환하기 →',
     active_tip: '현재 활성 그룹입니다 (이 그룹의 플러그인은 켜지고 나머지는 꺼진 상태)',
     activate_tip: '클릭하면 이 그룹으로 전환됩니다: 이 그룹 플러그인은 켜지고 나머지는 전부 꺼집니다 (다음 세션부터 적용)',
@@ -611,8 +687,8 @@ document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-const TITLE_MAP = { Groups: 'title_groups', Plugins: 'title_plugins', 'Instructions & agents (read-only)': 'title_instructions' };
-const TABS = ['Plugins', 'Groups', 'Instructions & agents (read-only)'];
+const TITLE_MAP = { Groups: 'title_groups', Plugins: 'title_plugins', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
+const TABS = ['Plugins', 'Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
 let activeTab = localStorage.getItem('agent-hud-tab') || 'Plugins';
 function renderTabs(){
   const bar = document.getElementById('tabs');
@@ -796,6 +872,40 @@ async function tick(){
         const note = document.createElement('div'); note.className='note';
         note.textContent = t().not_in_group(p.ungrouped.join(', '));
         c.appendChild(note);
+      }
+    } else if(p.skills){
+      c.appendChild(h);
+      const note = document.createElement('div'); note.className='note'; note.style.marginBottom='12px';
+      note.textContent = t().skills_note;
+      c.appendChild(note);
+      for(const sk of p.skills){
+        const el = document.createElement('div'); el.className='row clickable';
+        const left = document.createElement('span');
+        const caret = document.createElement('span'); caret.textContent = '▸ ';
+        left.appendChild(caret);
+        left.insertAdjacentHTML('beforeend', `${sk.name}<span class="tooltag">${sk.roots.join(', ')}</span>`);
+        const right = document.createElement('span');
+        for(const a of p.agents){
+          const tag = document.createElement('span');
+          const seen = sk.agents.includes(a);
+          tag.className = 'agenttag ' + (seen ? 'yes' : 'no');
+          tag.textContent = a;
+          right.appendChild(tag);
+        }
+        el.appendChild(left); el.appendChild(right);
+        const box = document.createElement('div'); box.className='content';
+        el.onclick = () => showContent(sk.path, box, caret);
+        c.appendChild(el); c.appendChild(box);
+      }
+      if(!p.skills.length){
+        const e = document.createElement('div'); e.className='empty';
+        e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
+        c.appendChild(e);
+      }
+      if(p.plugin_skill_count){
+        const pn = document.createElement('div'); pn.className='note'; pn.style.marginTop='12px';
+        pn.textContent = t().skills_plugin_note(p.plugin_skill_count);
+        c.appendChild(pn);
       }
     } else if(p.files){
       c.appendChild(h);
