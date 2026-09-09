@@ -271,13 +271,43 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 "이름에 sample이 든 스킬을 나열하라"고 물으니 `sample-skill`가 나왔다. 링크 없는 대조군
 디렉터리에서는 `NONE`이 나왔다 — **양방향으로 확인했으므로 우연이 아니다.**
 
-**나머지는 아직 미확인**: Codex·Cursor·Copilot이 링크를 따라가는지는 확인하지 못했다.
-이 기계에 해당 CLI가 설치돼 있지 않다(`codex`, `cursor-agent` 둘 다 없고 `~/.codex`도
-없다). `npx skills`가 기본을 심볼릭 링크로 설치하는 것이 방증이지만 방증일 뿐이다.
-**해당 도구가 있는 환경에서 같은 방식으로(링크 건 프로젝트 / 안 건 프로젝트) 확인해야 한다.**
+**Gemini CLI·Codex·Copilot도 따라간다 (2026-09-09 실측).** `npx`로 각 CLI를 임시 실행해
+확인했다 — **결제도 로그인도 필요 없었다.** 세 도구 모두 서버에 요청하지 않고 로컬에서
+스킬 목록을 뽑는 명령이 있기 때문이다. 프로젝트에 `zzz-linktest`라는 고유 이름의 스킬을
+심볼릭 링크로만 넣고, 아무것도 없는 폴더를 음성 대조군으로 뒀다:
+
+| 도구 | 확인 명령 | 링크만 있는 폴더 | 빈 폴더 |
+|---|---|---|---|
+| Claude Code | `claude -p "..."` | 나옴 | `NONE` |
+| Gemini CLI | `gemini skills list` | 나옴 | 없음 |
+| Codex | `codex debug prompt-input` | 나옴 (`r2` = 프로젝트 `.agents/skills`) | 0건 |
+| Copilot | `copilot skill list` | 나옴 | 0건 |
+
+함정 하나: **Gemini CLI는 신뢰하지 않는 폴더의 프로젝트 스킬을 건너뛴다**
+(`Skipping project agents due to untrusted folder`). `~/.gemini/trustedFolders.json`에
+경로를 넣어야 프로젝트 스킬을 읽는다. 처음엔 이걸 몰라서 "링크가 안 된다"고 잘못 볼
+뻔했다 — **진짜 폴더를 넣은 대조군도 똑같이 안 잡히는 걸 보고 원인을 갈랐다.**
+
+**Cursor만 미확인**: `cursor-agent`는 npm에 공식 패키지가 없고 설치 스크립트를 받아야 해서
+확인하지 않았다. 나머지 4개가 서로 다른 구현체(TypeScript·Rust)에서 전부 따라간 점,
+그리고 심볼릭 링크를 안 따라가려면 **일부러 그렇게 코드를 써야** 하는 점을 보면 될 가능성이
+높지만 확인한 것은 아니다.
 또 프로젝트 안에 링크를 만들면 git에 잡히므로 `.gitignore` 처리(개인 설정) 또는 커밋
 (팀 공유) 중 어느 쪽인지 정해야 한다.
 
 **어댑터는 만들지 않는다.** 도구별로 다른 것은 경로 문자열 하나뿐이므로 어댑터가 아니라
 **표 한 줄**이면 된다(`SKILL_ROOTS_PROJECT`). 도구마다 클래스를 두면 그게 곧 원칙 8이
 말하는 갈라질 사본이다. 새 도구 지원 = 표에 한 줄 추가.
+
+### 덧: 플러그인 개념도 퍼지고 있다 (2026-09-09 실측)
+
+조사 중 확인한 것 — **Codex와 Copilot에도 플러그인과 마켓플레이스가 생겼다.**
+
+- `codex plugin add|list|marketplace|remove`, 매니페스트는 `.codex-plugin/plugin.json`
+- `copilot plugin marketplace browse`, 기본 마켓플레이스 둘(`github/copilot-plugins`,
+  `github/awesome-copilot`). 플러그인이 **스킬·에이전트·훅·MCP·LSP를 묶어 배포한다** —
+  Claude 플러그인과 거의 같은 구성이다.
+
+즉 "플러그인은 Claude 전용 개념"이라던 ADR 9의 전제는 **더 이상 맞지 않는다.** 다만
+매니페스트 형식과 마켓플레이스 목록이 도구마다 따로라 여전히 공통 단위는 아니다.
+**공통 단위는 여전히 스킬 폴더 하나뿐이므로 위 결론(폴더로 켜고 끈다)은 바뀌지 않는다.**
