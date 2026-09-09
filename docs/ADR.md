@@ -232,6 +232,7 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
   | Codex | `.agents/skills/` | `~/.agents/skills/` |
   | Cursor | `.agents/skills/`, `.cursor/skills/` (+호환 `.claude/`, `.codex/`) | 동일 |
   | VS Code·Copilot | `.github/skills/`, `.claude/skills/`, `.agents/skills/` | `~/.copilot/`, `~/.claude/`, `~/.agents/` |
+  | Gemini CLI | `.agents/skills/`(우선), `.gemini/skills/` | `~/.agents/skills/`, `~/.gemini/skills/` |
 
   **`.agents/skills`로 수렴하는데 Claude Code만 그걸 읽지 않는다.**
 
@@ -242,6 +243,10 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
   - Cursor: **없음.** frontmatter의 `paths`·`disable-model-invocation`뿐이고 그건 스킬 자체의
     성질이지 프로젝트별 스위치가 아니다
   - VS Code·Copilot: **없음.** `chat.agentSkillsLocations`로 폴더를 더할 수만 있다
+  - Gemini CLI: `/skills enable|disable --scope workspace` — **프로젝트 단위가 있다.**
+    Claude Code에 이어 두 번째지만, 형식이 또 다르다(슬래시 커맨드+workspace 설정).
+    어댑터를 쓸 이유가 아니라 **폴더 방식이 옳다는 근거를 하나 더 준다** — 도구가 늘 때마다
+    형식이 하나씩 는다.
 
 - **묶음(플러그인) 개념은 표준에 없다.** Claude 플러그인은 스킬+커맨드+훅+서브에이전트+MCP를
   한 묶음으로 배포하지만, 표준이 정의하는 단위는 스킬 폴더 하나뿐이다. **훅·슬래시 커맨드·
@@ -258,6 +263,7 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 
 - 그룹 = 스킬 이름 목록 (지금 `modes.json`이 플러그인에 대해 하는 것과 같은 발상)
 - 켜기 = 그 스킬들을 프로젝트의 `.claude/skills/`와 `.agents/skills/`에 심볼릭 링크
+  (**폴더 둘이면 5개 도구를 전부 켠다** — Claude Code만 `.claude/`, 나머지는 `.agents/`)
 - 끄기 = 링크 제거 (원본은 사용자 디렉터리에 그대로 남는다)
 
 **Claude Code는 심볼릭 링크를 따라간다 (2026-09-09 실측).** 빈 디렉터리에
@@ -271,3 +277,7 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 **해당 도구가 있는 환경에서 같은 방식으로(링크 건 프로젝트 / 안 건 프로젝트) 확인해야 한다.**
 또 프로젝트 안에 링크를 만들면 git에 잡히므로 `.gitignore` 처리(개인 설정) 또는 커밋
 (팀 공유) 중 어느 쪽인지 정해야 한다.
+
+**어댑터는 만들지 않는다.** 도구별로 다른 것은 경로 문자열 하나뿐이므로 어댑터가 아니라
+**표 한 줄**이면 된다(`SKILL_ROOTS_PROJECT`). 도구마다 클래스를 두면 그게 곧 원칙 8이
+말하는 갈라질 사본이다. 새 도구 지원 = 표에 한 줄 추가.

@@ -304,23 +304,25 @@ def _instruction_rows(project_dir):
 # Claude Code만 `.agents/skills`를 읽지 않는다는 게 이 표의 요점이다.
 # 출처(2026-09 공식 문서): code.claude.com/docs/en/skills,
 # learn.chatgpt.com/docs/build-skills, cursor.com/docs/context/skills,
-# code.visualstudio.com/docs/copilot/customization/agent-skills
-SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot"]
+# code.visualstudio.com/docs/copilot/customization/agent-skills, geminicli.com/docs/cli/skills
+SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI"]
 
 SKILL_ROOTS_PROJECT = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor"]),
     (".github/skills", ["Copilot"]),
+    (".gemini/skills", ["Gemini CLI"]),
 ]
 
 SKILL_ROOTS_HOME = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor"]),
     (".copilot/skills", ["Copilot"]),
+    (".gemini/skills", ["Gemini CLI"]),
 ]
 
 
