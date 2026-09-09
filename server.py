@@ -446,6 +446,18 @@ def collect_skills(ctx):
         _scan_skill_root(os.path.join(project_dir, rel.replace("/", os.sep)), rel, agents, found)
     for rel, agents in SKILL_ROOTS_HOME:
         _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, agents, found)
+    # 플러그인이 제공하는 스킬. 이것도 스킬이고 매일 쓰는 쪽인데 스킬 폴더 밖에 살아서
+    # 루트 스캔에 안 걸린다. 플러그인 폴더는 Claude Code만 읽는다 -- 그룹을 프로젝트에
+    # 링크했다면 같은 이름으로 위 루트에서도 잡혀 자동으로 합쳐진다.
+    for plugin, skills in plugin_skills().items():
+        short = plugin.split("@")[0]
+        for name, path in skills.items():
+            md = os.path.join(path, "SKILL.md")
+            row = found.setdefault(name, {"name": name, "agents": [], "roots": [], "path": md})
+            row["roots"].append("plugin: " + short)
+            if "Claude Code" not in row["agents"]:
+                row["agents"].append("Claude Code")
+            READABLE_PATHS.add(md)
     rows = sorted(found.values(), key=lambda r: (len(r["agents"]), r["name"]))
     for r in rows:
         r["missing"] = [a for a in SKILL_AGENTS if a not in r["agents"]]
