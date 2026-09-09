@@ -148,9 +148,24 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
   첫 기능(아래 ①)을 같은 릴리스에 넣는다.
 
 **만들 것**: ①**지침 파일 통합 뷰** — 지금 `collect_instructions`가 `CLAUDE.md`와 agents
-디렉터리만 보는 것을 `AGENTS.md`, `.clinerules`, `.cursorrules`, `.cursor/rules/`,
-`.windsurfrules`, `GEMINI.md`, `.github/copilot-instructions.md`까지 확장하고 **크기·수정
-시각**을 함께 보여준다. 읽기 전용이라 쓰기 위험이 없고 패널 구조도 그대로다.
+디렉터리만 보는 것을 다른 도구의 지침 파일까지 확장하고 **크기·수정시각**을 함께 보여준다.
+읽기 전용이라 쓰기 위험이 없고 패널 구조도 그대로다.
+
+> **구현 결과 (2026-09-09)**: 위에 적었던 7종 대신 **29종**으로 만들었다
+> (`INSTRUCTION_SOURCES`). Roo Code·Aider·Goose·Junie·Kiro·Continue·Amp·Amazon Q·
+> Augment·JetBrains AI·Trae·OpenHands·Crush·Warp·Qwen·Firebase Studio와 Copilot의
+> `.github/instructions/`가 추가됐다. 경로는 ruler의 도구별 출력 경로표와 각 도구 문서로
+> 대조했다. 디렉터리형 소스는 경로 끝의 `/`로 구분한다.
+>
+> **그리고 범위를 정정한다.** 위 "뒤집은 이유"는 `example-app`의 실제 드리프트(같은
+> 규칙이 `AGENTS.md`와 `.clinerules`에 중복)를 근거로 들었지만, **크기·수정시각으로는 그
+> 드리프트가 보이지 않는다.** 지금 만든 것은 드리프트 탐지기가 아니라 **흩어진 지침 파일을
+> 한 자리에서 여는 색인**이다. 내용 대조는 별도 결정 사항으로 남긴다(→ 아직 안 함).
+>
+> 부작용 하나: `/api/state?project=`가 검증되지 않으므로(`server.py`) `/api/content`가
+> 허용하는 파일 이름이 2개에서 29개로 넓어졌다. 서버는 `127.0.0.1` 전용이고 CORS 헤더가
+> 없어 타 출처 JS가 응답을 읽지 못하므로 실제 유출 경로는 없다. 외부 바인딩을 열게 되면
+> 이 항목을 먼저 처리해야 한다.
 ②MCP 통합 뷰는 그다음 — Claude Code의 MCP 설정 위치를 먼저 확인해야 한다(이 기계의
 `~/.claude.json`·`~/.claude/settings.json` 어디에도 `mcpServers`가 없었다).
 
