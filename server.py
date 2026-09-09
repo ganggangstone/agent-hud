@@ -710,7 +710,7 @@ const T = {
   group_shortcut: 'Match this project to a group:',
     active: 'ON EVERYWHERE', activate: 'OFF', activate_hover: 'TURN ON ONLY THIS →',
     active_tip: 'Claude Code plugins: this group is on and every other plugin is off, on this computer',
-    activate_tip: 'turn ON this group\\'s Claude Code plugins and OFF all others, for this whole computer (next session)',
+    activate_tip: "turn ON this group's Claude Code plugins and OFF all others, for this whole computer (next session)",
     plugins_count: n => n + ' plugins',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
