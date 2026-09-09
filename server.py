@@ -104,38 +104,6 @@ def collect_update(ctx):
     }
 
 
-def collect_plugins(ctx):
-    settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
-    enabled = settings.get("enabledPlugins", {})
-    installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
-    marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
-    modes = read_json(MODES_FILE)
-    project_dir = default_project_dir(ctx)
-    proj_settings = read_json(os.path.join(project_dir, ".claude", "settings.json"))
-    denied = set(proj_settings.get("permissions", {}).get("deny", []))
-    rows = []
-    for name, entries in installed.items():
-        entry = entries[0] if entries else {}
-        v = entry.get("version", "?")
-        install_path = entry.get("installPath", "")
-        mp_name = name.split("@", 1)[1] if "@" in name else None
-        mp_src = (marketplaces.get(mp_name) or {}).get("source", {})
-        mp_label = mp_src.get("repo") or mp_src.get("path") or mp_name or "?"
-        member_of = [m for m, plist in modes.items() if name in plist]
-        skills = _list_skills(os.path.join(install_path, "skills")) if install_path else []
-        for s in skills:
-            s["blocked"] = f"Skill({name}:{s['id']})" in denied
-        rows.append({
-            "name": name,
-            "version": v,
-            "enabled": bool(enabled.get(name, False)),
-            "modes": member_of,
-            "source": mp_label,
-            "skills": skills,
-        })
-    return {"title": "Plugins", "rows": rows, "project_dir": project_dir, "known_projects": known_projects()}
-
-
 def collect_groups(ctx):
     project_dir = default_project_dir(ctx)
     pskills = plugin_skills()
@@ -222,14 +190,25 @@ def _list_agents(dir_path):
     return out
 
 
+def _walk_skills(root):
+    """root 아래 SKILL.md를 가진 폴더를 {이름: 경로}로. 플러그인은 skills/misc/x처럼 중첩된다."""
+    out = {}
+    if not os.path.isdir(root):
+        return out
+    for base, dirs, files in os.walk(root):
+        if "SKILL.md" in files:
+            out[os.path.basename(base)] = base
+            dirs[:] = []  # 스킬 폴더 안으로는 더 들어가지 않는다
+    return out
+
+
 def _list_skills(dir_path):
+    """SKILL.md를 가진 폴더를 전부. mattpocock은 skills/misc/<이름>처럼 한 겹 더 들어가
+    있어서, 바로 아래만 보면 스킬 37개가 0개로 보인다."""
     out = []
-    if os.path.isdir(dir_path):
-        for fn in sorted(os.listdir(dir_path)):
-            skill_md = os.path.join(dir_path, fn, "SKILL.md")
-            if os.path.isfile(skill_md):
-                name, desc = _frontmatter(skill_md)
-                out.append({"id": fn, "name": name, "desc": desc})
+    for sid, path in sorted(_walk_skills(dir_path).items()):
+        name, desc = _frontmatter(os.path.join(path, "SKILL.md"))
+        out.append({"id": sid, "name": name, "desc": desc, "path": path})
     return out
 
 
@@ -360,18 +339,6 @@ def _scan_skill_root(root, label, agents, found):
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
 
 
-def _walk_skills(root):
-    """root 아래 SKILL.md를 가진 폴더를 {이름: 경로}로. 플러그인은 skills/misc/x처럼 중첩된다."""
-    out = {}
-    if not os.path.isdir(root):
-        return out
-    for base, dirs, files in os.walk(root):
-        if "SKILL.md" in files:
-            out[os.path.basename(base)] = base
-            dirs[:] = []  # 스킬 폴더 안으로는 더 들어가지 않는다
-    return out
-
-
 def plugin_skills():
     """설치된 플러그인 -> {스킬 이름: 폴더 경로}. 플러그인이 곧 스킬 묶음이다."""
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
@@ -439,31 +406,89 @@ def apply_skill_group(group, project_dir):
     return True, f"{linked} linked, {removed} removed"
 
 
-def collect_skills(ctx):
-    project_dir = default_project_dir(ctx)
+def _skill_root_index(project_dir):
+    """스킬 폴더들을 훑어 {이름: (볼 수 있는 에이전트, 어느 폴더)}."""
     found = {}
     for rel, agents in SKILL_ROOTS_PROJECT:
         _scan_skill_root(os.path.join(project_dir, rel.replace("/", os.sep)), rel, agents, found)
     for rel, agents in SKILL_ROOTS_HOME:
         _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, agents, found)
-    # 플러그인이 제공하는 스킬. 이것도 스킬이고 매일 쓰는 쪽인데 스킬 폴더 밖에 살아서
-    # 루트 스캔에 안 걸린다. 플러그인 폴더는 Claude Code만 읽는다 -- 그룹을 프로젝트에
-    # 링크했다면 같은 이름으로 위 루트에서도 잡혀 자동으로 합쳐진다.
-    for plugin, skills in plugin_skills().items():
-        short = plugin.split("@")[0]
-        for name, path in skills.items():
-            md = os.path.join(path, "SKILL.md")
-            row = found.setdefault(name, {"name": name, "agents": [], "roots": [], "path": md})
-            row["roots"].append("plugin: " + short)
-            if "Claude Code" not in row["agents"]:
-                row["agents"].append("Claude Code")
-            READABLE_PATHS.add(md)
-    rows = sorted(found.values(), key=lambda r: (len(r["agents"]), r["name"]))
-    for r in rows:
-        r["missing"] = [a for a in SKILL_AGENTS if a not in r["agents"]]
+    return found
+
+
+def collect_skills(ctx):
+    """스킬 한 탭. 플러그인이 준 것과 단독으로 놓인 것을 한 화면에 둔다 --
+    사용자에게 그 둘은 '스킬'이라는 한 가지이고, 출처만 다르다."""
+    project_dir = default_project_dir(ctx)
+    index = _skill_root_index(project_dir)
+    settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
+    enabled = settings.get("enabledPlugins", {})
+    installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
+    marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
+    modes = read_json(MODES_FILE)
+    denied = set(read_json(os.path.join(project_dir, ".claude", "settings.json"))
+                 .get("permissions", {}).get("deny", []))
+
+    def decorate(skill, fallback_agents):
+        hit = index.get(skill["id"])
+        agents = hit["agents"] if hit else list(fallback_agents)
+        skill["agents"] = agents
+        skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
+        skill["roots"] = hit["roots"] if hit else []
+        READABLE_PATHS.add(os.path.join(skill["path"], "SKILL.md"))
+        return skill
+
+    rows = []
+    for name, entries in installed.items():
+        entry = entries[0] if entries else {}
+        install_path = entry.get("installPath", "")
+        mp_name = name.split("@", 1)[1] if "@" in name else None
+        mp_src = (marketplaces.get(mp_name) or {}).get("source", {})
+        skills = _list_skills(os.path.join(install_path, "skills")) if install_path else []
+        for sk in skills:
+            # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
+            # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
+            decorate(sk, ["Claude Code"])
+            sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
+        rows.append({
+            "name": name,
+            "version": entry.get("version", "?"),
+            "enabled": bool(enabled.get(name, False)),
+            "claude_only": True,
+            "modes": [m for m, plist in modes.items() if name in plist],
+            "source": mp_src.get("repo") or mp_src.get("path") or mp_name or "?",
+            "skills": skills,
+        })
+
+    # 플러그인에 속하지 않은 스킬들. 스위치가 없다 -- 폴더에 있으면 켜진 것이다.
+    plugin_ids = {sk["id"] for r in rows for sk in r["skills"]}
+    loose = []
+    for sid, hit in sorted(index.items()):
+        if sid in plugin_ids:
+            continue
+        name, desc = _frontmatter(os.path.join(hit["path"]))
+        loose.append(decorate({"id": sid, "name": name, "desc": desc,
+                               "path": os.path.dirname(hit["path"])}, []))
+    if loose:
+        rows.append({
+            "name": "", "version": "", "enabled": None, "claude_only": False,
+            "modes": [], "source": ", ".join(sorted({r for sk in loose for r in sk["roots"]})),
+            "skills": loose,
+        })
+
+    groups = []
+    pskills = plugin_skills()
+    for gname, members in modes.items():
+        gs = {}
+        for m in members:
+            gs.update(pskills.get(m, {}))
+        if gs:
+            groups.append({"name": gname, "skill_count": len(gs),
+                           "linked": group_link_state(project_dir, gs) == len(gs)})
     return {
         "title": "Skills (who can see them)",
-        "skills": rows,
+        "rows": rows,
+        "groups": groups,
         "agents": SKILL_AGENTS,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -499,7 +524,7 @@ def read_content(path):
         return None, str(e)
 
 
-PANELS = [collect_groups, collect_plugins, collect_skills, collect_instructions, collect_update]
+PANELS = [collect_groups, collect_skills, collect_instructions, collect_update]
 
 
 def known_plugin_names():
@@ -670,18 +695,22 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 const T = {
   en: {
     banner: '⚠ Plugin changes apply <b>starting next session</b>. Skill overrides apply immediately.',
-    title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents', title_skills: 'Skills',
+    title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
   skills_note: 'The SKILL.md format is a shared standard, but each agent looks in different folders. A skill is only usable by the agents that read the folder it sits in.',
   no_skills: 'No skills found in any known folder.',
   link_group: n => `Use in this project (${n} skills)`,
+  link_group_named: (g,n) => `${g} (${n})`,
   unlink_group: 'Remove from this project',
   link_confirm: (g, n, p) => `Link ${g}'s ${n} skills into ${p}?\n\nThis creates symlinks under .claude/skills and .agents/skills, so Claude Code, Codex, Cursor, Copilot and Gemini CLI can all use them here. Skills from other groups get unlinked. Originals are never moved.`,
   unlink_confirm: p => `Remove this group's skill links from ${p}?`,
   link_failed: 'Could not update skill links: ',
   linked_badge: 'in this project',
-    active: 'ACTIVE', activate: 'INACTIVE', activate_hover: 'SWITCH →',
-    active_tip: 'this group is the current working set (all its plugins on, everything else off)',
-    activate_tip: 'click to switch to this group: turns ON its plugins and OFF all others (takes effect next session)',
+  claude_only_tag: 'Claude Code only',
+  loose_skills: 'Skills not from a plugin',
+  group_shortcut: 'Match this project to a group:',
+    active: 'ON EVERYWHERE', activate: 'OFF', activate_hover: 'TURN ON ONLY THIS →',
+    active_tip: 'Claude Code plugins: this group is on and every other plugin is off, on this computer',
+    activate_tip: 'turn ON this group\\'s Claude Code plugins and OFF all others, for this whole computer (next session)',
     plugins_count: n => n + ' plugins',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
@@ -711,7 +740,7 @@ const T = {
     allowed_tip: 'allowed in this project — click to block just this skill here (applies immediately)',
     read_full_tip: 'click to read the full description',
     no_skills_found: 'no skills found in this plugin',
-    plugin_note: 'plugin switch = enable/disable (applies next session). skill switch = block/allow in the selected project (applies immediately).',
+    plugin_note: 'Plugin switch: on/off for Claude Code, whole computer, next session. Skill switch: block/allow in the selected project, immediately. Badges: which agents can see that skill here.',
     updated: 'updated: ',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
@@ -719,18 +748,22 @@ const T = {
   },
   ko: {
     banner: '⚠ 플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 스킬 permission override는 즉시 적용됩니다.',
-    title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트', title_skills: '스킬',
+    title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
   skills_note: 'SKILL.md 형식은 공통 표준이지만 도구마다 보는 폴더가 다릅니다. 스킬은 그 폴더를 읽는 에이전트만 쓸 수 있습니다.',
   no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
   link_group: n => `이 프로젝트에서 쓰기 (스킬 ${n}개)`,
+  link_group_named: (g,n) => `${g} (${n}개)`,
   unlink_group: '이 프로젝트에서 빼기',
   link_confirm: (g, n, p) => `${g} 그룹의 스킬 ${n}개를 ${p}에 연결할까요?\n\n.claude/skills와 .agents/skills에 바로가기를 만듭니다. 그러면 Claude Code·Codex·Cursor·Copilot·Gemini CLI가 여기서 그 스킬들을 씁니다. 다른 그룹의 바로가기는 빠집니다. 원본은 움직이지 않습니다.`,
   unlink_confirm: p => `${p}에서 이 그룹의 스킬 바로가기를 뺄까요?`,
   link_failed: '스킬 연결을 바꾸지 못했습니다: ',
   linked_badge: '이 프로젝트에 적용됨',
-    active: '활성', activate: '비활성', activate_hover: '전환하기 →',
-    active_tip: '현재 활성 그룹입니다 (이 그룹의 플러그인은 켜지고 나머지는 꺼진 상태)',
-    activate_tip: '클릭하면 이 그룹으로 전환됩니다: 이 그룹 플러그인은 켜지고 나머지는 전부 꺼집니다 (다음 세션부터 적용)',
+  claude_only_tag: 'Claude Code 전용',
+  loose_skills: '플러그인에 속하지 않은 스킬',
+  group_shortcut: '이 프로젝트를 그룹에 맞추기:',
+    active: '컴퓨터 전체에 켜짐', activate: '꺼짐', activate_hover: '이 그룹만 켜기 →',
+    active_tip: 'Claude Code 플러그인: 이 그룹만 켜지고 나머지는 꺼진 상태입니다 (이 컴퓨터 전체)',
+    activate_tip: '이 그룹의 Claude Code 플러그인만 켜고 나머지는 전부 끕니다. 이 컴퓨터 전체에 적용됩니다 (다음 세션부터)',
     plugins_count: n => n + '개 플러그인',
     remove: '제거 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 제거`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m}를 제거할까요?`,
@@ -760,7 +793,7 @@ const T = {
     allowed_tip: '이 프로젝트에서 허용됨 — 클릭하면 이 스킬만 차단 (즉시 적용)',
     read_full_tip: '클릭하면 전체 설명 보기',
     no_skills_found: '이 플러그인에는 스킬이 없습니다',
-    plugin_note: '플러그인 스위치 = enable/disable (다음 세션부터 적용). 스킬 스위치 = 이 프로젝트에서만 차단/허용 (즉시 적용).',
+    plugin_note: '플러그인 스위치: Claude Code에서 켜고 끄기 · 컴퓨터 전체 · 다음 세션부터. 스킬 스위치: 선택한 프로젝트에서만 차단/허용 · 즉시. 뱃지: 그 스킬을 여기서 어떤 에이전트가 볼 수 있나.',
     updated: '갱신: ',
     switching: '전환 중…',
     update_available: (v, latest, repo) => `↑ v${latest} 사용 가능 (현재 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
@@ -801,9 +834,11 @@ document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-const TITLE_MAP = { Groups: 'title_groups', Plugins: 'title_plugins', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
-const TABS = ['Plugins', 'Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
-let activeTab = localStorage.getItem('agent-hud-tab') || 'Plugins';
+const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
+const TABS = ['Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
+let activeTab = localStorage.getItem('agent-hud-tab') || 'Groups';
+// 탭 이름이 바뀌면 저장된 값이 어느 패널과도 안 맞아 빈 화면이 된다.
+if(!TABS.includes(activeTab)) activeTab = TABS[0];
 function renderTabs(){
   const bar = document.getElementById('tabs');
   bar.innerHTML = '';
@@ -961,23 +996,6 @@ async function tick(){
         left.appendChild(cnt);
         el.appendChild(left);
 
-        // 프로젝트별 스킬 연결. 위의 '전환'과 별개다 -- 저건 Claude Code 플러그인을
-        // 사용자 전역으로 켜고, 이건 이 프로젝트에서 다섯 도구가 쓰게 한다.
-        if(g.skill_count){
-          const on = g.skills_linked === g.skill_count;
-          const link = document.createElement('span');
-          link.className = 'switch ' + (on ? 'sw-on' : 'sw-off');
-          link.textContent = on ? t().linked_badge : t().link_group(g.skill_count);
-          link.onclick = () => {
-            const proj = p.project_dir;
-            if(on){
-              if(confirm(t().unlink_confirm(proj))) linkGroup('', link);
-            } else if(confirm(t().link_confirm(g.name, g.skill_count, proj))){
-              linkGroup(g.name, link);
-            }
-          };
-          el.appendChild(link);
-        }
         wrap.appendChild(el);
 
         for(const m of g.members){
@@ -1101,11 +1119,6 @@ async function tick(){
       }
     } else {
       c.appendChild(h);
-      if(p.title === 'Plugins'){
-        const note = document.createElement('div'); note.className = 'note'; note.style.marginBottom = '10px';
-        note.textContent = t().plugin_note;
-        c.appendChild(note);
-      }
       if(p.known_projects && p.known_projects.length > 1){
         const sel = document.createElement('select');
         sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:10px;font-size:12px;width:100%';
@@ -1121,25 +1134,53 @@ async function tick(){
         note.textContent = t().project_label + projectLabel(p.project_dir);
         c.appendChild(note);
       }
+      const swNote = document.createElement('div'); swNote.className='note'; swNote.style.marginBottom='10px';
+      swNote.textContent = t().plugin_note;
+      c.appendChild(swNote);
+      if(p.groups && p.groups.length){
+        const bar = document.createElement('div');
+        bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px';
+        const lab = document.createElement('span'); lab.className='note'; lab.textContent = t().group_shortcut;
+        bar.appendChild(lab);
+        for(const g of p.groups){
+          const b = document.createElement('span');
+          b.className = 'switch ' + (g.linked ? 'sw-on' : 'sw-off');
+          b.textContent = g.linked ? `${g.name} · ${t().linked_badge}` : t().link_group_named(g.name, g.skill_count);
+          b.onclick = () => {
+            if(g.linked){ if(confirm(t().unlink_confirm(p.project_dir))) linkGroup('', b); }
+            else if(confirm(t().link_confirm(g.name, g.skill_count, p.project_dir))) linkGroup(g.name, b);
+          };
+          bar.appendChild(b);
+        }
+        c.appendChild(bar);
+      }
       for(const row of p.rows){
         const wrap = document.createElement('div');
         const el = document.createElement('div'); el.className='row';
 
+        const isPlugin = row.enabled !== null;
+        const key = row.name || '__loose__';
         const sw = document.createElement('span');
-        sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
-        sw.textContent = row.enabled ? 'ON' : 'OFF';
-        sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
-        sw.onclick = () => toggle(row.name, !row.enabled, sw);
+        if(isPlugin){
+          sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
+          sw.textContent = row.enabled ? 'ON' : 'OFF';
+          sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
+          sw.onclick = () => toggle(row.name, !row.enabled, sw);
+        }
         const hasSkills = (row.skills||[]).length > 0;
         const label = document.createElement('span');
         label.className = hasSkills ? 'clickable' : '';
-        const caret = hasSkills ? (skillsOpen[row.name] ? '▾ ' : '▸ ') : '';
-        label.innerHTML = `${caret}${row.name}<span class="tag">v${row.version}</span>` +
-          (hasSkills ? `<span class="tag">${t().skills_count(row.skills.length)}</span>` : '');
+        const caret = hasSkills ? (skillsOpen[key] ? '▾ ' : '▸ ') : '';
+        label.innerHTML = isPlugin
+          ? `${caret}${row.name}<span class="tag">v${row.version}</span>` +
+            (hasSkills ? `<span class="tag">${t().skills_count(row.skills.length)}</span>` : '') +
+            `<span class="tooltag">${t().claude_only_tag}</span>`
+          : `${caret}${t().loose_skills}` +
+            (hasSkills ? `<span class="tag">${t().skills_count(row.skills.length)}</span>` : '');
         label.title = hasSkills ? t().show_skills_tip : t().no_skills_tip;
         if(hasSkills){
           el.classList.add('clickable');
-          el.onclick = (e) => { if(e.target === el || e.target === label || label.contains(e.target)){ skillsOpen[row.name] = !skillsOpen[row.name]; rerender(); } };
+          el.onclick = (e) => { if(e.target === el || e.target === label || label.contains(e.target)){ skillsOpen[key] = !skillsOpen[key]; rerender(); } };
         }
         const left = document.createElement('span');
         left.appendChild(sw); left.appendChild(label);
@@ -1158,7 +1199,7 @@ async function tick(){
         src.textContent = t().from + row.source;
         wrap.appendChild(src);
 
-        if(skillsOpen[row.name]){
+        if(skillsOpen[key]){
           if(hasSkills){
             for(const s of row.skills){
               const srow = document.createElement('div'); srow.className = 'row sub skill-row';
@@ -1166,7 +1207,8 @@ async function tick(){
               ssw.className = 'switch ' + (s.blocked ? 'sw-off' : 'sw-on');
               ssw.textContent = s.blocked ? t().blocked : t().allowed;
               ssw.title = s.blocked ? t().blocked_tip : t().allowed_tip;
-              ssw.onclick = () => toggleSkill(row.name, s.id, !s.blocked, ssw);
+              if(isPlugin){ ssw.onclick = () => toggleSkill(row.name, s.id, !s.blocked, ssw); }
+              else { ssw.className = 'switch sw-on'; ssw.textContent = t().allowed; }
 
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
@@ -1176,7 +1218,14 @@ async function tick(){
               sdesc.textContent = full.slice(0,90) + (full.length > 90 ? '…' : '');
               stext.appendChild(sname); stext.appendChild(sdesc);
 
-              srow.appendChild(ssw); srow.appendChild(stext);
+              const badges = document.createElement('span');
+              for(const a of (p.agents||[])){
+                const tag = document.createElement('span');
+                tag.className = 'agenttag ' + ((s.agents||[]).includes(a) ? 'yes' : 'no');
+                tag.textContent = a;
+                badges.appendChild(tag);
+              }
+              srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
               wrap.appendChild(srow);
               if(full.length > 90){
                 sdesc.classList.add('clickable');
