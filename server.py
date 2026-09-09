@@ -38,8 +38,10 @@ def register_project(path):
 
 
 def known_projects():
+    # 지워진 디렉터리는 뺀다. 남겨두면 대시보드가 없는 폴더를 기본 선택해 빈 화면을 보인다.
     projects = read_json(PROJECTS_FILE, {})
-    return sorted((p for p in projects if p not in ("/", HOME)), key=lambda p: -projects[p])
+    return sorted((p for p in projects if p not in ("/", HOME) and os.path.isdir(p)),
+                  key=lambda p: -projects[p])
 
 
 def default_project_dir(ctx):
@@ -135,6 +137,8 @@ def collect_plugins(ctx):
 
 
 def collect_groups(ctx):
+    project_dir = default_project_dir(ctx)
+    pskills = plugin_skills()
     modes = read_json(MODES_FILE)
     settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
     enabled = settings.get("enabledPlugins", {})
@@ -142,16 +146,22 @@ def collect_groups(ctx):
     groups = []
     for gname, members in modes.items():
         members = [m for m in members if m in installed]
+        gskills = {}
+        for m in members:
+            gskills.update(pskills.get(m, {}))
         groups.append({
             "name": gname,
             "members": [{"name": m, "enabled": bool(enabled.get(m, False))} for m in members],
+            "skill_count": len(gskills),
+            "skills_linked": group_link_state(project_dir, gskills),
             # a group counts as "active" when every member is on and every plugin outside it is off
             "active": bool(members)
                 and all(enabled.get(m, False) for m in members)
                 and not any(enabled.get(p, False) for p in installed if p not in members),
         })
     unrgrouped = sorted(installed - {m for g in modes.values() for m in g})
-    return {"title": "Groups", "groups": groups, "ungrouped": unrgrouped, "all_plugins": sorted(installed)}
+    return {"title": "Groups", "groups": groups, "ungrouped": unrgrouped, "all_plugins": sorted(installed),
+            "project_dir": project_dir, "known_projects": known_projects()}
 
 
 def activate_group(name):
@@ -340,6 +350,93 @@ def _scan_skill_root(root, label, agents, found):
             if a not in row["agents"]:
                 row["agents"].append(a)
         READABLE_PATHS.add(md)
+
+
+# 그룹의 스킬을 프로젝트에 심볼릭 링크해서 켜고 끈다. 도구별 설정 형식이 전부 다르지만
+# (Claude Code만 프로젝트 단위 스위치가 있고 Gemini CLI는 형식이 또 다르다) **폴더를 훑는
+# 것은 모두 똑같이 하므로**, 폴더에 있냐 없냐가 유일한 도구 공통 스위치다.
+# 링크를 따라가는 것은 Claude Code·Gemini CLI·Codex·Copilot에서 실측 확인했다(ADR 10).
+# 이 둘이면 그 네 도구가 전부 켜진다. Cursor는 .claude/.agents 둘 다 읽는다.
+GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
+
+
+def _walk_skills(root):
+    """root 아래 SKILL.md를 가진 폴더를 {이름: 경로}로. 플러그인은 skills/misc/x처럼 중첩된다."""
+    out = {}
+    if not os.path.isdir(root):
+        return out
+    for base, dirs, files in os.walk(root):
+        if "SKILL.md" in files:
+            out[os.path.basename(base)] = base
+            dirs[:] = []  # 스킬 폴더 안으로는 더 들어가지 않는다
+    return out
+
+
+def plugin_skills():
+    """설치된 플러그인 -> {스킬 이름: 폴더 경로}. 플러그인이 곧 스킬 묶음이다."""
+    installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
+    out = {}
+    for name, entries in installed.items():
+        skills = {}
+        for e in entries:
+            skills.update(_walk_skills(os.path.join(e.get("installPath", ""), "skills")))
+        out[name] = skills
+    return out
+
+
+def _link_path(project_dir, rel, skill):
+    return os.path.join(project_dir, rel.replace("/", os.sep), skill)
+
+
+def group_link_state(project_dir, skills):
+    """이 그룹의 스킬이 프로젝트에 몇 개나 걸려 있나."""
+    if not skills:
+        return 0
+    return sum(1 for sk in skills if all(os.path.islink(_link_path(project_dir, d, sk)) for d in GROUP_LINK_DIRS))
+
+
+def apply_skill_group(group, project_dir):
+    """group의 스킬을 링크하고, 다른 그룹에만 있는 스킬의 링크는 뺀다.
+    group이 빈 문자열이면 전부 뺀다(끄기)."""
+    if not project_dir or not os.path.isdir(project_dir):
+        return False, "project not found"
+    modes = read_json(MODES_FILE, {})
+    if group and group not in modes:
+        return False, "unknown group"
+    pskills = plugin_skills()
+    wanted, managed = {}, {}
+    for gname, members in modes.items():
+        for m in members:
+            for sk, path in pskills.get(m, {}).items():
+                managed[sk] = path
+                if gname == group:
+                    wanted[sk] = path
+    linked = removed = 0
+    try:
+        for rel in GROUP_LINK_DIRS:
+            d = os.path.join(project_dir, rel.replace("/", os.sep))
+            for sk, src in wanted.items():
+                os.makedirs(d, exist_ok=True)
+                dst = os.path.join(d, sk)
+                if os.path.islink(dst):
+                    if os.path.realpath(dst) == os.path.realpath(src):
+                        continue
+                    os.unlink(dst)
+                elif os.path.exists(dst):
+                    continue  # 진짜 폴더는 우리 것이 아니다. 절대 건드리지 않는다.
+                os.symlink(src, dst)
+                linked += 1
+            for sk in managed:
+                if sk in wanted:
+                    continue
+                dst = os.path.join(d, sk)
+                # 심볼릭 링크만 지운다. 진짜 폴더는 사용자 것이다.
+                if os.path.islink(dst):
+                    os.unlink(dst)
+                    removed += 1
+    except Exception as e:
+        return False, str(e)
+    return True, f"{linked} linked, {removed} removed"
 
 
 def collect_skills(ctx):
@@ -564,6 +661,12 @@ const T = {
     title_groups: 'Groups', title_plugins: 'Plugins', title_instructions: 'Instructions & agents', title_skills: 'Skills',
   skills_note: 'The SKILL.md format is a shared standard, but each agent looks in different folders. A skill is only usable by the agents that read the folder it sits in.',
   no_skills: 'No skills found in any known folder.',
+  link_group: n => `Use in this project (${n} skills)`,
+  unlink_group: 'Remove from this project',
+  link_confirm: (g, n, p) => `Link ${g}'s ${n} skills into ${p}?\n\nThis creates symlinks under .claude/skills and .agents/skills, so Claude Code, Codex, Cursor, Copilot and Gemini CLI can all use them here. Skills from other groups get unlinked. Originals are never moved.`,
+  unlink_confirm: p => `Remove this group's skill links from ${p}?`,
+  link_failed: 'Could not update skill links: ',
+  linked_badge: 'in this project',
     active: 'ACTIVE', activate: 'INACTIVE', activate_hover: 'SWITCH →',
     active_tip: 'this group is the current working set (all its plugins on, everything else off)',
     activate_tip: 'click to switch to this group: turns ON its plugins and OFF all others (takes effect next session)',
@@ -607,6 +710,12 @@ const T = {
     title_groups: '그룹', title_plugins: '플러그인', title_instructions: '지침 · 에이전트', title_skills: '스킬',
   skills_note: 'SKILL.md 형식은 공통 표준이지만 도구마다 보는 폴더가 다릅니다. 스킬은 그 폴더를 읽는 에이전트만 쓸 수 있습니다.',
   no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
+  link_group: n => `이 프로젝트에서 쓰기 (스킬 ${n}개)`,
+  unlink_group: '이 프로젝트에서 빼기',
+  link_confirm: (g, n, p) => `${g} 그룹의 스킬 ${n}개를 ${p}에 연결할까요?\n\n.claude/skills와 .agents/skills에 바로가기를 만듭니다. 그러면 Claude Code·Codex·Cursor·Copilot·Gemini CLI가 여기서 그 스킬들을 씁니다. 다른 그룹의 바로가기는 빠집니다. 원본은 움직이지 않습니다.`,
+  unlink_confirm: p => `${p}에서 이 그룹의 스킬 바로가기를 뺄까요?`,
+  link_failed: '스킬 연결을 바꾸지 못했습니다: ',
+  linked_badge: '이 프로젝트에 적용됨',
     active: '활성', activate: '비활성', activate_hover: '전환하기 →',
     active_tip: '현재 활성 그룹입니다 (이 그룹의 플러그인은 켜지고 나머지는 꺼진 상태)',
     activate_tip: '클릭하면 이 그룹으로 전환됩니다: 이 그룹 플러그인은 켜지고 나머지는 전부 꺼집니다 (다음 세션부터 적용)',
@@ -744,6 +853,16 @@ async function editGroup(action, group, plugin){
   polling = true;
   await tick();
 }
+async function linkGroup(name, btn){
+  polling = false; btn.classList.add('busy');
+  try{
+    const r = await fetch('/api/linkgroup', {method:'POST', body: JSON.stringify({group: name, project: currentProjectDir})});
+    const d = await r.json();
+    if(!d.ok) alert(t().link_failed + (d.error || t().error));
+  } catch(e){ alert(t().link_failed + e); }
+  polling = true;
+  await tick();
+}
 async function activateGroup(name, btn){
   polling = false; btn.classList.add('busy'); btn.textContent = t().switching;
   try{
@@ -829,6 +948,24 @@ async function tick(){
         cnt.textContent = t().plugins_count(g.members.length);
         left.appendChild(cnt);
         el.appendChild(left);
+
+        // 프로젝트별 스킬 연결. 위의 '전환'과 별개다 -- 저건 Claude Code 플러그인을
+        // 사용자 전역으로 켜고, 이건 이 프로젝트에서 다섯 도구가 쓰게 한다.
+        if(g.skill_count){
+          const on = g.skills_linked === g.skill_count;
+          const link = document.createElement('span');
+          link.className = 'switch ' + (on ? 'sw-on' : 'sw-off');
+          link.textContent = on ? t().linked_badge : t().link_group(g.skill_count);
+          link.onclick = () => {
+            const proj = p.project_dir;
+            if(on){
+              if(confirm(t().unlink_confirm(proj))) linkGroup('', link);
+            } else if(confirm(t().link_confirm(g.name, g.skill_count, proj))){
+              linkGroup(g.name, link);
+            }
+          };
+          el.appendChild(link);
+        }
         wrap.appendChild(el);
 
         for(const m of g.members){
@@ -1119,6 +1256,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
             ok, err = activate_group(payload.get("group", ""))
+            self._send_json({"ok": ok, "error": err})
+        elif self.path == "/api/linkgroup":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = apply_skill_group(payload.get("group", ""), project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/skill":
             length = int(self.headers.get("Content-Length", 0))
