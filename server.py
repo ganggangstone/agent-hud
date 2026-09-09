@@ -226,17 +226,48 @@ def _list_skills(dir_path):
 READABLE_PATHS = set()  # populated by collect_instructions, checked by /api/content
 
 
+# Instruction files other agent tools read. Claude Code reads CLAUDE.md only;
+# AGENTS.md is the de-facto standard for ~everything else, hence the drift.
+OTHER_INSTRUCTION_FILES = [
+    "AGENTS.md",
+    ".clinerules",
+    ".cursorrules",
+    ".windsurfrules",
+    "GEMINI.md",
+    os.path.join(".github", "copilot-instructions.md"),
+]
+
+
+def _file_row(label, path):
+    exists = os.path.isfile(path)
+    st = os.stat(path) if exists else None
+    if exists:
+        READABLE_PATHS.add(path)
+    return {
+        "name": label,
+        "exists": exists,
+        "size": st.st_size if st else 0,
+        "mtime": int(st.st_mtime) if st else 0,
+        "path": path,
+    }
+
+
 def collect_instructions(ctx):
-    global_md = os.path.join(CLAUDE_DIR, "CLAUDE.md")
     project_dir = default_project_dir(ctx)
-    project_md = os.path.join(project_dir, "CLAUDE.md")
-    rows = []
-    for label, path in (("Global CLAUDE.md", global_md), (f"Project CLAUDE.md ({project_dir})", project_md)):
-        exists = os.path.isfile(path)
-        size = os.path.getsize(path) if exists else 0
-        rows.append({"name": label, "exists": exists, "size": size, "path": path})
-        if exists:
-            READABLE_PATHS.add(path)
+    rows = [
+        _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
+        _file_row(f"Project CLAUDE.md ({project_dir})", os.path.join(project_dir, "CLAUDE.md")),
+    ]
+    # only shown when present -- a row per tool the user doesn't use is noise
+    for rel in OTHER_INSTRUCTION_FILES:
+        row = _file_row(rel, os.path.join(project_dir, rel))
+        if row["exists"]:
+            rows.append(row)
+    rules_dir = os.path.join(project_dir, ".cursor", "rules")
+    if os.path.isdir(rules_dir):
+        for fn in sorted(os.listdir(rules_dir)):
+            if fn.endswith((".md", ".mdc")):
+                rows.append(_file_row(os.path.join(".cursor", "rules", fn), os.path.join(rules_dir, fn)))
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -539,6 +570,7 @@ function setTheme(th){
 document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
+const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', Plugins: 'title_plugins', 'Instructions & agents (read-only)': 'title_instructions' };
 const TABS = ['Plugins', 'Groups', 'Instructions & agents (read-only)'];
 let activeTab = localStorage.getItem('agent-hud-tab') || 'Plugins';
@@ -746,7 +778,7 @@ async function tick(){
         left.appendChild(caret);
         left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${f.name}`);
         const sizeSpan = document.createElement('span'); sizeSpan.className = 'dim';
-        sizeSpan.textContent = f.exists ? f.size + 'B' : t().not_found;
+        sizeSpan.textContent = f.exists ? f.size + 'B · ' + fmtTime(f.mtime) : t().not_found;
         el.appendChild(left); el.appendChild(sizeSpan);
         c.appendChild(el);
         const box = document.createElement('div'); box.className = 'content';
