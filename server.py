@@ -226,17 +226,43 @@ def _list_skills(dir_path):
 READABLE_PATHS = set()  # populated by collect_instructions, checked by /api/content
 
 
-# Instruction files other agent tools read. Claude Code reads CLAUDE.md only;
-# AGENTS.md is the de-facto standard for ~everything else, hence the drift.
-# (상대경로, 이 파일을 읽는 도구) -- 배지로 그대로 보여준다.
-OTHER_INSTRUCTION_FILES = [
-    ("AGENTS.md", "Codex · Cursor · Cline +"),
+# 프로젝트 루트 기준 (경로, 이 파일을 읽는 도구). '/'로 끝나면 디렉터리를 훑는다.
+# AGENTS.md로 수렴하는 중이지만(30개 이상 도구가 읽는다) Claude Code는 CLAUDE.md만
+# 읽고, 도구 고유 파일도 여전히 남아 있다 -- 그래서 드리프트가 생긴다.
+# 경로 출처: github.com/intellectronica/ruler (도구별 출력 경로표), 각 도구 공식 문서.
+INSTRUCTION_SOURCES = [
+    ("CLAUDE.local.md", "Claude Code"),
+    ("AGENTS.md", "Codex · Cursor · Zed +"),
+    ("AGENT.md", "Amp (legacy)"),
     (".clinerules", "Cline"),
-    (".cursorrules", "Cursor"),
+    (".cursorrules", "Cursor (legacy)"),
+    (".cursor/rules/", "Cursor"),
     (".windsurfrules", "Windsurf"),
+    (".roorules", "Roo Code"),
+    (".roo/rules/", "Roo Code"),
     ("GEMINI.md", "Gemini CLI"),
-    (os.path.join(".github", "copilot-instructions.md"), "Copilot"),
+    ("QWEN.md", "Qwen Code"),
+    ("CONVENTIONS.md", "Aider"),
+    ("CRUSH.md", "Crush"),
+    ("WARP.md", "Warp"),
+    (".goosehints", "Goose"),
+    (".continuerules", "Continue"),
+    (".continue/rules/", "Continue"),
+    (".junie/guidelines.md", "Junie"),
+    (".junie/rules/", "Junie"),
+    (".aiassistant/rules/", "JetBrains AI"),
+    (".kiro/steering/", "Kiro"),
+    (".amazonq/rules/", "Amazon Q"),
+    (".augment/rules/", "Augment"),
+    (".augment-guidelines", "Augment (legacy)"),
+    (".trae/rules/", "Trae"),
+    (".openhands/microagents/", "OpenHands"),
+    (".idx/airules.md", "Firebase Studio"),
+    (".github/copilot-instructions.md", "Copilot"),
+    (".github/instructions/", "Copilot"),
 ]
+
+RULE_EXTS = (".md", ".mdc", ".txt", ".yaml", ".yml")
 
 
 def _file_row(label, path, tool="Claude Code"):
@@ -254,22 +280,31 @@ def _file_row(label, path, tool="Claude Code"):
     }
 
 
+def _instruction_rows(project_dir):
+    """없는 파일은 행을 만들지 않는다 -- 안 쓰는 도구 30줄은 소음이다."""
+    rows = []
+    for rel, tool in INSTRUCTION_SOURCES:
+        rel_os = rel.replace("/", os.sep)
+        if rel.endswith("/"):
+            d = os.path.join(project_dir, rel_os.rstrip(os.sep))
+            if not os.path.isdir(d):
+                continue
+            for fn in sorted(os.listdir(d)):
+                if fn.endswith(RULE_EXTS):
+                    rows.append(_file_row(rel + fn, os.path.join(d, fn), tool))
+        else:
+            row = _file_row(rel, os.path.join(project_dir, rel_os), tool)
+            if row["exists"]:
+                rows.append(row)
+    return rows
+
+
 def collect_instructions(ctx):
     project_dir = default_project_dir(ctx)
     rows = [
         _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
         _file_row(f"Project CLAUDE.md ({project_dir})", os.path.join(project_dir, "CLAUDE.md")),
-    ]
-    # only shown when present -- a row per tool the user doesn't use is noise
-    for rel, tool in OTHER_INSTRUCTION_FILES:
-        row = _file_row(rel, os.path.join(project_dir, rel), tool)
-        if row["exists"]:
-            rows.append(row)
-    rules_dir = os.path.join(project_dir, ".cursor", "rules")
-    if os.path.isdir(rules_dir):
-        for fn in sorted(os.listdir(rules_dir)):
-            if fn.endswith((".md", ".mdc")):
-                rows.append(_file_row(os.path.join(".cursor", "rules", fn), os.path.join(rules_dir, fn), "Cursor"))
+    ] + _instruction_rows(project_dir)
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
