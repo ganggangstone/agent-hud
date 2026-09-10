@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource
+import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -159,6 +159,57 @@ def _frontmatter(path):
     return name, desc
 
 
+# 공개 명세(agentskills.io/specification)가 정한 제약. 어기면 도구가 스킬을 무시할 수
+# 있지만 **위반이 곧 로드 실패는 아니다** — 상한을 넘고도 잘 읽히는 스킬을 실제로 봤다.
+# 그래서 화면에서도 "안 읽힘"이 아니라 "명세 위반"이라고 부른다.
+SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+DESC_MAX = 1024
+
+
+def _skill_meta(path, folder):
+    """SKILL.md를 한 번 읽어 (표시 이름, 설명, 명세 위반 목록)."""
+    name, desc, issues = folder, "", []
+    try:
+        with open(path, encoding="utf-8") as f:
+            head = f.read(8000)
+    except Exception:
+        return name, desc, [{"code": "unreadable"}]
+    if not head.startswith("---"):
+        return name, desc, [{"code": "no_frontmatter"}]
+    declared = None
+    lines = head.split("---", 2)[1].splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("name:"):
+            declared = line.split(":", 1)[1].strip().strip('"\'')
+        elif line.startswith("description:"):
+            rest = line.split(":", 1)[1].strip()
+            if rest in (">", "|", ">-", "|-", ""):
+                parts = []
+                i += 1
+                while i < len(lines) and (lines[i][:1] in (" ", "\t")):
+                    parts.append(lines[i].strip())
+                    i += 1
+                desc = " ".join(parts)
+                continue
+            desc = rest.strip('"\'')
+        i += 1
+    if declared:
+        name = declared
+        if not SKILL_NAME_RE.match(declared) or len(declared) > 64:
+            issues.append({"code": "name_format", "name": declared})
+        elif declared != folder:
+            issues.append({"code": "name_mismatch", "name": declared, "folder": folder})
+    else:
+        issues.append({"code": "name_missing"})
+    if not desc.strip():
+        issues.append({"code": "desc_missing"})
+    elif len(desc) > DESC_MAX:
+        issues.append({"code": "desc_long", "len": len(desc)})
+    return name, desc, issues
+
+
 def _list_agents(dir_path):
     out = []
     if os.path.isdir(dir_path):
@@ -187,8 +238,8 @@ def _list_skills(dir_path):
     있어서, 바로 아래만 보면 스킬 37개가 0개로 보인다."""
     out = []
     for sid, path in sorted(_walk_skills(dir_path).items()):
-        name, desc = _frontmatter(os.path.join(path, "SKILL.md"))
-        out.append({"id": sid, "name": name, "desc": desc, "path": path})
+        name, desc, issues = _skill_meta(os.path.join(path, "SKILL.md"), sid)
+        out.append({"id": sid, "name": name, "desc": desc, "path": path, "issues": issues})
     return out
 
 
@@ -533,8 +584,8 @@ def collect_skills(ctx):
     for sid, hit in sorted(index.items()):
         if sid in plugin_ids:
             continue
-        name, desc = _frontmatter(os.path.join(hit["path"]))
-        loose.append(decorate({"id": sid, "name": name, "desc": desc,
+        name, desc, issues = _skill_meta(hit["path"], sid)
+        loose.append(decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
                                "path": os.path.dirname(hit["path"])}, []))
     if loose:
         rows.append({
@@ -853,6 +904,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
 .agenttag.partial{color:var(--dim);text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
+.warn{margin-left:8px;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;
+  background:var(--off-tint);color:var(--text);cursor:help;white-space:nowrap;vertical-align:middle}
 .comp{background:var(--off-tint);color:var(--dim);padding:2px 7px;border-radius:4px;
   font-size:11px;white-space:nowrap;cursor:help;border:1px solid transparent}
 .comp.stays{color:var(--text);opacity:.75}
@@ -936,6 +989,16 @@ const T = {
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
   no_project_yet: 'no folders yet',
+  spec_issue: 'spec',
+  issue: {
+    unreadable: () => 'SKILL.md could not be read',
+    no_frontmatter: () => 'No YAML frontmatter',
+    name_missing: () => 'name is missing',
+    name_format: i => `name "${i.name}" — lowercase letters, digits and single hyphens only, max 64`,
+    name_mismatch: i => `name "${i.name}" does not match its folder "${i.folder}"`,
+    desc_missing: () => 'description is missing',
+    desc_long: i => `description is ${i.len} characters (limit 1024)`,
+  },
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -997,6 +1060,16 @@ const T = {
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
   no_project_yet: '아직 폴더가 없습니다',
+  spec_issue: '명세 위반',
+  issue: {
+    unreadable: () => 'SKILL.md를 읽지 못했습니다',
+    no_frontmatter: () => 'YAML frontmatter가 없습니다',
+    name_missing: () => 'name이 없습니다',
+    name_format: i => `name "${i.name}" — 소문자·숫자·하이픈 하나씩만, 64자 이내`,
+    name_mismatch: i => `name "${i.name}"이 폴더 이름 "${i.folder}"과 다릅니다`,
+    desc_missing: () => 'description이 없습니다',
+    desc_long: i => `description이 ${i.len}자입니다 (상한 1024)`,
+  },
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -1477,6 +1550,13 @@ async function tick(){
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
               sname.textContent = s.name;
+              if((s.issues||[]).length){
+                // 명세 위반이지 로드 실패가 아니다. 표현을 그렇게 유지할 것.
+                const w = document.createElement('span'); w.className = 'warn';
+                w.textContent = t().spec_issue;
+                w.title = s.issues.map(i => (t().issue[i.code] || (x=>i.code))(i)).join('\n');
+                sname.appendChild(w);
+              }
               const full = s.desc||'';
               const sdesc = document.createElement('div'); sdesc.className = 'dim skill-desc';
               sdesc.textContent = full;
