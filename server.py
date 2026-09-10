@@ -405,6 +405,56 @@ def group_link_state(project_dir, skills):
     return sum(1 for sk in skills if all(os.path.islink(_link_path(project_dir, d, sk)) for d in GROUP_LINK_DIRS))
 
 
+def skill_sources(project_dir):
+    """{스킬 이름: 원본 폴더}. 원본은 플러그인 폴더나 사용자 스킬 폴더에서만 찾는다 --
+    프로젝트 안의 링크를 원본으로 삼으면 자기 자신을 가리키게 된다."""
+    out = {}
+    for skills in plugin_skills().values():
+        out.update(skills)
+    for rel, _agents in SKILL_ROOTS_HOME:
+        root = os.path.join(HOME, rel.replace("/", os.sep))
+        if not os.path.isdir(root):
+            continue
+        for name in sorted(os.listdir(root)):
+            d = os.path.join(root, name)
+            if os.path.isfile(os.path.join(d, "SKILL.md")):
+                out.setdefault(name, d)
+    return out
+
+
+def skill_is_shared(project_dir, name):
+    """이 프로젝트의 모든 스킬 폴더에 링크가 걸려 있나."""
+    return all(os.path.islink(_link_path(project_dir, d, name)) for d in GROUP_LINK_DIRS)
+
+
+def link_skill(name, on, project_dir):
+    """스킬 하나를 이 프로젝트의 모든 에이전트에게 열거나 닫는다.
+    원본이 어디에 있든(플러그인·~/.claude·~/.agents) 비어 있는 폴더만 채운다 --
+    그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다."""
+    if not project_dir or not os.path.isdir(project_dir):
+        return False, "project not found"
+    src = skill_sources(project_dir).get(name)
+    if not src:
+        return False, "unknown skill"
+    try:
+        for rel in GROUP_LINK_DIRS:
+            dst = _link_path(project_dir, rel, name)
+            if on:
+                if os.path.islink(dst):
+                    if os.path.realpath(dst) == os.path.realpath(src):
+                        continue
+                    os.unlink(dst)
+                elif os.path.exists(dst):
+                    continue  # 진짜 폴더는 사용자 것이다. 건드리지 않는다.
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                os.symlink(src, dst)
+            elif os.path.islink(dst):
+                os.unlink(dst)  # 링크만 지운다
+    except Exception as e:
+        return False, str(e)
+    return True, ""
+
+
 def apply_skill_group(group, project_dir):
     """group의 스킬을 링크하고, 다른 그룹에만 있는 스킬의 링크는 뺀다.
     group이 빈 문자열이면 전부 뺀다(끄기)."""
@@ -470,6 +520,7 @@ def collect_skills(ctx):
     사용자에게 그 둘은 '스킬'이라는 한 가지이고, 출처만 다르다."""
     project_dir = default_project_dir(ctx)
     index = _skill_root_index(project_dir)
+    sources = skill_sources(project_dir)
     settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
     enabled = settings.get("enabledPlugins", {})
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
@@ -484,6 +535,8 @@ def collect_skills(ctx):
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
+        skill["shared"] = skill_is_shared(project_dir, skill["id"])
+        skill["linkable"] = skill["id"] in sources
         READABLE_PATHS.add(os.path.join(skill["path"], "SKILL.md"))
         return skill
 
@@ -724,6 +777,11 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .dim{color:var(--dim);font-size:13px}
 .skill-desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.share{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);
+  white-space:nowrap;cursor:pointer;user-select:none;flex:0 0 auto}
+.share:hover{color:var(--text)}
+.share input{accent-color:var(--accent);cursor:pointer;margin:0}
+.share.busy{opacity:.4;cursor:wait}
 .agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;white-space:nowrap}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
@@ -806,6 +864,8 @@ const T = {
     project_label: 'project: ',
     click_to_open: 'click to open', not_found: 'not found',
   agents_claude_only: 'Subagents below are Claude Code only.',
+  share_all: 'all agents',
+  share_all_tip: 'Let every agent use this skill in this project. Links it into the folders it is missing from; the original never moves.',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'no subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -862,6 +922,8 @@ const T = {
     project_label: '프로젝트: ',
     click_to_open: '누르면 열립니다', not_found: '없음',
   agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
+  share_all: '모두에게',
+  share_all_tip: '이 프로젝트에서 모든 에이전트가 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -946,6 +1008,7 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
+let helpOpen = false;
 const skillsOpen = {};
 function stateUrl(){
   return '/api/state' + (selectedProject ? ('?project=' + encodeURIComponent(selectedProject)) : '');
@@ -984,6 +1047,16 @@ async function editGroup(action, group, plugin){
     const d = await r.json();
     if(!d.ok) alert(t().group_update_failed + (d.error || t().error));
   } catch(e){ alert(t().group_update_failed + e); }
+  polling = true;
+  await tick();
+}
+async function linkSkill(name, on, el){
+  polling = false; el.classList.add('busy');
+  try{
+    const r = await fetch('/api/linkskill', {method:'POST', body: JSON.stringify({name, on, project: currentProjectDir})});
+    const d = await r.json();
+    if(!d.ok) alert(t().link_failed + (d.error || t().error));
+  } catch(e){ alert(t().link_failed + e); }
   polling = true;
   await tick();
 }
@@ -1231,12 +1304,14 @@ async function tick(){
         const box = document.createElement('div'); box.className = 'shortcut';
         const lab = document.createElement('div'); lab.className = 'shortcut-title';
         lab.textContent = t().group_shortcut;
-        const help = document.createElement('span'); help.className = 'help';
+        const help = document.createElement('span');
+        help.className = 'help' + (helpOpen ? ' open' : '');
         help.textContent = '?'; help.tabIndex = 0;
         lab.appendChild(help);
-        const helpBox = document.createElement('div'); helpBox.className = 'content';
+        const helpBox = document.createElement('div');
+        helpBox.className = 'content' + (helpOpen ? ' open' : '');
         helpBox.textContent = t().group_shortcut_help;
-        const toggleHelp = () => { helpBox.classList.toggle('open'); help.classList.toggle('open'); };
+        const toggleHelp = () => { helpOpen = !helpOpen; rerender(); };
         help.onclick = toggleHelp;
         help.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleHelp(); } };
         const sub = document.createElement('div'); sub.className = 'note';
@@ -1339,6 +1414,15 @@ async function tick(){
                 }
               }
               srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
+              if(s.linkable){
+                const share = document.createElement('label'); share.className = 'share';
+                const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!s.shared;
+                cb.onclick = e => { e.stopPropagation(); linkSkill(s.id, cb.checked, share); };
+                share.appendChild(cb);
+                share.appendChild(document.createTextNode(t().share_all));
+                share.title = t().share_all_tip;
+                srow.appendChild(share);
+              }
               wrap.appendChild(srow);
               if(full.length > 40){
                 sdesc.classList.add('clickable');
@@ -1430,6 +1514,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
             ok, err = activate_group(payload.get("group", ""))
+            self._send_json({"ok": ok, "error": err})
+        elif self.path == "/api/linkskill":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = link_skill(payload.get("name", ""), bool(payload.get("on")), project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/linkgroup":
             length = int(self.headers.get("Content-Length", 0))
