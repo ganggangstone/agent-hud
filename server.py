@@ -14,7 +14,6 @@ TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
 PORT_FILE = os.path.join(TOOL_DIR, ".port")
 PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
-CLAUDE_BIN = shutil.which("claude") or "/opt/homebrew/bin/claude"
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
 VERSION = "0.1.0"
@@ -106,8 +105,7 @@ def collect_update(ctx):
 
 def collect_groups(ctx):
     project_dir = default_project_dir(ctx)
-    settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
-    enabled = settings.get("enabledPlugins", {})
+    enabled, has_local = plugin_state(project_dir)
     installed = known_plugin_names()
     sets = read_sets()
     assigned = read_json(SETS_FILE, {}).get(project_dir, "")
@@ -122,25 +120,9 @@ def collect_groups(ctx):
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
                      + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk)} for sk in skills],
         })
-    plugins = [{"name": m, "on": bool(enabled.get(m, False)),
-                "groups": sorted(g for g, v in sets.items() if m in v["plugins"])}
-               for m in sorted(installed)]
-    return {"title": "Groups", "groups": groups, "plugins": plugins,
+    return {"title": "Groups", "groups": groups,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
             "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
-
-
-def activate_group(name):
-    modes = read_json(MODES_FILE, {})
-    if name not in modes:
-        return False, "unknown group"
-    members = set(modes[name])
-    errors = []
-    for plugin in known_plugin_names():
-        ok, err = toggle_plugin(plugin, plugin in members)
-        if not ok:
-            errors.append(f"{plugin}: {err}")
-    return (not errors), "; ".join(errors)[:300]
 
 
 def _frontmatter(path):
@@ -500,8 +482,7 @@ def collect_skills(ctx):
     project_dir = default_project_dir(ctx)
     index = _skill_root_index(project_dir)
     sources = skill_sources(project_dir)
-    settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
-    enabled = settings.get("enabledPlugins", {})
+    enabled, has_local = plugin_state(project_dir)
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
     modes = read_json(MODES_FILE)
@@ -567,6 +548,7 @@ def collect_skills(ctx):
         "title": "Skills (who can see them)",
         "rows": rows,
         "agents": SKILL_AGENTS,
+        "has_local": has_local,
         "project_dir": project_dir,
         "known_projects": known_projects(),
     }
@@ -612,17 +594,39 @@ def known_plugin_names():
     return set(installed.keys())
 
 
-def toggle_plugin(name, enable):
-    if name not in known_plugin_names():
-        return False, "unknown plugin"
-    verb = "enable" if enable else "disable"
+# 플러그인 on/off는 프로젝트 단위다. `claude plugin enable`은 사용자 전역 파일에 쓰므로
+# 쓰지 않는다 -- `enabledPlugins`는 어느 설정 파일에나 넣을 수 있고(공식 문서 "Any file"),
+# 프로젝트 값이 전역을 이긴다. 실측으로 확인했다(ADR 10 덧4).
+# 쓰는 곳은 `settings.local.json` -- Claude Code가 만드는 개인용 파일이고 커밋되지 않는다.
+LOCAL_SETTINGS = os.path.join(".claude", "settings.local.json")
+
+
+def plugin_state(project_dir):
+    """이 프로젝트에서 실제로 적용되는 플러그인 on/off. -> (상태, 이 프로젝트가 직접 정했나)"""
+    user = read_json(os.path.join(CLAUDE_DIR, "settings.json")).get("enabledPlugins", {})
+    shared = read_json(os.path.join(project_dir, ".claude", "settings.json")).get("enabledPlugins", {})
+    local = read_json(os.path.join(project_dir, LOCAL_SETTINGS)).get("enabledPlugins", {})
+    return {**user, **shared, **local}, bool(local)   # 로컬 > 프로젝트 공유 > 사용자
+
+
+def set_plugins(changes, project_dir):
+    """{플러그인: bool}을 이 프로젝트의 settings.local.json에 병합한다."""
+    if not project_dir or not os.path.isdir(project_dir):
+        return False, "project not found"
+    known = known_plugin_names()
+    unknown = [n for n in changes if n not in known]
+    if unknown:
+        return False, "unknown plugin: " + ", ".join(unknown[:3])
+    path = os.path.join(project_dir, LOCAL_SETTINGS)
+    data = read_json(path, {})
+    data.setdefault("enabledPlugins", {}).update({k: bool(v) for k, v in changes.items()})
     try:
-        r = subprocess.run([CLAUDE_BIN, "plugin", verb, name], capture_output=True, text=True, timeout=15)
-        if r.returncode != 0:
-            return False, (r.stderr or r.stdout).strip()[:200]
-        return True, ""
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         return False, str(e)
+    return True, ""
 
 
 # 세트는 함께 쓰는 플러그인과 스킬의 묶음이다. 옛 modes.json은 {이름: [플러그인]} 이었고
@@ -696,17 +700,12 @@ def assign_set(name, project_dir):
 
     # 2) 플러그인: 전역이다. 세트를 배정하지 않을 때는 건드리지 않는다.
     if name:
+        # 설치된 플러그인 전부에 값을 적는다. 하나라도 빠뜨리면 그건 전역 값을 물려받아
+        # "왜 이게 켜져 있지"가 된다.
         members = set(sets[name]["plugins"])
-        # 이미 원하는 상태인 것에는 명령을 보내지 않는다. claude plugin enable 은
-        # 이미 켜져 있으면 실패로 답하므로, 그냥 부르면 매번 오류가 쌓인다.
-        enabled = read_json(os.path.join(CLAUDE_DIR, "settings.json")).get("enabledPlugins", {})
-        for plugin in known_plugin_names():
-            want = plugin in members
-            if bool(enabled.get(plugin, False)) == want:
-                continue
-            ok, err = toggle_plugin(plugin, want)
-            if not ok:
-                errors.append(f"{plugin}: {err}")
+        ok, err = set_plugins({pl: pl in members for pl in known_plugin_names()}, project_dir)
+        if not ok:
+            errors.append(err)
 
     assigned = read_json(SETS_FILE, {})
     if name:
@@ -902,19 +901,19 @@ const T = {
   en: {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
-    title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
+    title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
   skills_note: 'Everything on this tab applies to the selected project only. Struck through = that agent cannot see the skill; only Claude Code looks inside plugin folders.',
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
     set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
     set_apply: 'Apply to this project', set_applied: 'Applied here',
-    set_apply_tip: 'Skills go into this project only. Plugins are a Claude Code setting shared by every project.',
-    assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\nSkills (${sk}) are linked into this project only.\nPlugins turned on for the whole computer: ${pl}\nEvery other plugin is turned off.`,
+    set_apply_tip: 'Applies to this project only. Other projects are untouched.',
+    assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\n${sk} skills are linked here.\nPlugins on: ${pl}\nEvery other plugin is turned off, in this project only.`,
     unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins stay as they are.`,
     kind_plugin: 'plugin', kind_skill: 'skill',
     add_member_ph: '+ add a plugin or skill…',
-    member_plugin_tip: 'On for Claude Code, on this computer',
+    member_plugin_tip: 'On in this project',
     member_skill_tip: 'Linked into this project',
     assign_failed: 'Could not apply that group: ',
     on: 'ON', off: 'OFF',
@@ -923,8 +922,7 @@ const T = {
     new_group: '+ create a new group', new_group_tip: 'Plugins you switch on together. For example one set for coding, one for video work',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
-    groups_legend: 'A set is the plugins and skills you use together. Applying one to a project links its skills there and turns its plugins on for Claude Code.',
-    no_project: 'No folders yet. Add one, or open an agent session inside a folder and it appears here',
+    groups_legend: 'The plugins and skills you use together. Applying one sets up that project and leaves the others alone.',
   not_found: 'not found',
   agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
@@ -935,10 +933,7 @@ const T = {
   share_done: 'applied everywhere',
   share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
   partly: 'Some skills only',
-  all_plugins_title: 'Plugins', 
-  all_plugins_note: 'On or off for Claude Code, on this whole computer. Takes effect next session.',
-  plugin_on_here: 'This plugin is on. Turn it off in the Groups tab',
-  plugin_off_here: 'This plugin is off, so Claude Code does not load its skills. Turn it on in the Groups tab',
+  inherited_note: 'Nothing has been set for this project yet, so it uses the defaults.',
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
@@ -947,8 +942,8 @@ const T = {
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ', skill_update_failed: 'Could not change that skill: ',
-    plugin_on_tip: 'On. Click to turn it off (next session)',
-    plugin_off_tip: 'Off. Click to turn it on (next session)',
+    plugin_on_tip: 'On in this project. Click to turn it off (next session)',
+    plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
@@ -967,19 +962,19 @@ const T = {
   ko: {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
-    title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
+    title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
   skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다. 취소선 = 그 에이전트가 못 보는 스킬이고, 플러그인 폴더는 Claude Code만 봅니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
     set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
     set_apply: '이 프로젝트에 적용', set_applied: '적용됨',
-    set_apply_tip: '스킬은 이 프로젝트에만 걸립니다. 플러그인은 Claude Code 설정이라 모든 프로젝트에 함께 걸립니다.',
-    assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개 — 이 프로젝트에만 걸립니다.\n컴퓨터 전체에서 켜지는 플러그인: ${pl}\n나머지 플러그인은 꺼집니다.`,
+    set_apply_tip: '이 프로젝트에만 적용됩니다. 다른 프로젝트는 그대로입니다.',
+    assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개가 여기 걸립니다.\n켜지는 플러그인: ${pl}\n나머지 플러그인은 꺼집니다. 이 프로젝트에서만요.`,
     unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인은 그대로 둡니다.`,
     kind_plugin: '플러그인', kind_skill: '스킬',
     add_member_ph: '+ 플러그인 또는 스킬 추가…',
-    member_plugin_tip: 'Claude Code에서 켜짐 · 이 컴퓨터 전체',
+    member_plugin_tip: '이 프로젝트에서 켜짐',
     member_skill_tip: '이 프로젝트에 걸려 있음',
     assign_failed: '그룹을 적용하지 못했습니다: ',
     on: '켜짐', off: '꺼짐',
@@ -988,8 +983,7 @@ const T = {
     new_group: '+ 새 그룹 만들기', new_group_tip: '함께 쓰는 플러그인과 스킬을 묶어둡니다. 예를 들어 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
-    groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 스킬은 그 프로젝트에 걸리고, 플러그인은 Claude Code에서 켜집니다.',
-    no_project: '아직 폴더가 없습니다. 직접 추가하거나, 폴더 안에서 에이전트 세션을 열면 나타납니다',
+    groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 그 프로젝트만 바뀌고 나머지는 그대로입니다.',
   not_found: '없음',
   agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
@@ -1000,10 +994,7 @@ const T = {
   share_done: '전부 적용됨',
   share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   partly: '일부 스킬만',
-  all_plugins_title: '플러그인',
-  all_plugins_note: 'Claude Code에서 켜고 끕니다. 이 컴퓨터 전체에 적용되고 다음 세션부터 반영됩니다.',
-  plugin_on_here: '켜져 있는 플러그인입니다. 끄려면 그룹 탭으로 가세요',
-  plugin_off_here: '꺼져 있어서 Claude Code가 이 스킬들을 안 읽습니다. 켜려면 그룹 탭으로 가세요',
+  inherited_note: '이 프로젝트에 아직 정한 것이 없어 기본값을 씁니다.',
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
@@ -1012,8 +1003,8 @@ const T = {
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
-    plugin_on_tip: '켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
-    plugin_off_tip: '꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
+    plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
+    plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
@@ -1118,7 +1109,7 @@ async function showContent(path, box, caretEl){
 async function toggle(name, enable, dotEl){
   polling = false; dotEl.classList.add('busy');
   try{
-    const r = await fetch('/api/toggle', {method:'POST', body: JSON.stringify({name, enable})});
+    const r = await fetch('/api/toggle', {method:'POST', body: JSON.stringify({name, enable, project: currentProjectDir})});
     const d = await r.json();
     if(!d.ok) alert(t().toggle_failed + (d.error || t().error));
   } catch(e){ alert(t().toggle_failed + e); }
@@ -1322,42 +1313,6 @@ async function tick(){
         c.appendChild(wrap);
       }
 
-      if((p.plugins||[]).length){
-        const wrap = document.createElement('div'); wrap.className = 'section';
-        wrap.style.marginTop = '18px';
-        const head = document.createElement('div'); head.className = 'row sec-head';
-        const hl = document.createElement('span'); hl.className = 'sec-left';
-        const ht = document.createElement('span'); ht.style.fontWeight='600';
-        ht.textContent = t().all_plugins_title;
-        hl.appendChild(ht);
-        head.appendChild(hl);
-        wrap.appendChild(head);
-        const hn = document.createElement('div'); hn.className='note';
-        hn.style.cssText = 'margin:0 0 8px';
-        hn.textContent = t().all_plugins_note;
-        wrap.appendChild(hn);
-        for(const pl of p.plugins){
-          const r = document.createElement('div'); r.className='row sub';
-          const l = document.createElement('span'); l.className='sec-left';
-          const sw = document.createElement('span');
-          sw.className = 'switch ' + (pl.on?'sw-on':'sw-off');
-          sw.textContent = pl.on ? t().on : t().off;
-          sw.title = pl.on ? t().plugin_on_tip : t().plugin_off_tip;
-          sw.onclick = () => toggle(pl.name, !pl.on, sw);
-          l.appendChild(sw);
-          const n = document.createElement('span'); n.textContent = pl.name;
-          l.appendChild(n);
-          const rt = document.createElement('span'); rt.className='sec-right';
-          for(const g of pl.groups){
-            const gt = document.createElement('span'); gt.className='tag';
-            gt.textContent = t().group_tag(g);
-            rt.appendChild(gt);
-          }
-          r.appendChild(l); r.appendChild(rt);
-          wrap.appendChild(r);
-        }
-        c.appendChild(wrap);
-      }
     } else if(p.files){
       c.appendChild(h);
       c.appendChild(projectPicker(p));
@@ -1411,6 +1366,12 @@ async function tick(){
         n.textContent = t().skills_note;
         c.appendChild(n);
       }
+      if(p.has_local === false){
+        const d = document.createElement('div'); d.className='note';
+        d.style.marginBottom = '10px';
+        d.textContent = t().inherited_note;
+        c.appendChild(d);
+      }
       if(!p.rows.length){
         const e = document.createElement('div'); e.className = 'empty';
         e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
@@ -1427,12 +1388,12 @@ async function tick(){
         const el = document.createElement('div'); el.className = 'row sec-head';
         const left = document.createElement('span'); left.className = 'sec-left';
         if(isPlugin){
-          // 전역 설정이라 여기서는 못 바꾼다. 규칙대로 점으로 보여준다.
-          const dot = document.createElement('span');
-          dot.className = 'dot ' + (row.enabled ? 'on' : 'off');
-          dot.style.cursor = 'default';
-          dot.title = row.enabled ? t().plugin_on_here : t().plugin_off_here;
-          left.appendChild(dot);
+          const sw = document.createElement('span');
+          sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
+          sw.textContent = row.enabled ? t().on : t().off;
+          sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
+          sw.onclick = e => { e.stopPropagation(); toggle(row.name, !row.enabled, sw); };
+          left.appendChild(sw);
         }
         const label = document.createElement('span');
         label.className = 'sec-name' + (hasSkills ? ' clickable' : '');
@@ -1655,7 +1616,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
-            ok, err = toggle_plugin(payload.get("name", ""), bool(payload.get("enable")))
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = set_plugins({payload.get("name", ""): bool(payload.get("enable"))}, project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/group":
             length = int(self.headers.get("Content-Length", 0))
