@@ -269,6 +269,27 @@ def _file_row(label, path, tool="Claude Code"):
     }
 
 
+SKIP_DIRS = {"node_modules", "venv", ".venv", "dist", "build", "target", "vendor", "__pycache__"}
+
+
+def _subproject_dirs(project_dir, limit=40):
+    """바로 아래 폴더들. 점으로 시작하거나 빌드 산출물인 것은 뺀다."""
+    try:
+        names = sorted(os.listdir(project_dir))[:400]
+    except OSError:
+        return []
+    out = []
+    for n in names:
+        if n.startswith(".") or n in SKIP_DIRS:
+            continue
+        d = os.path.join(project_dir, n)
+        if os.path.isdir(d) and not os.path.islink(d):
+            out.append(d)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _instruction_rows(project_dir):
     """없는 파일은 행을 만들지 않는다 -- 안 쓰는 도구 30줄은 소음이다."""
     rows = []
@@ -283,6 +304,16 @@ def _instruction_rows(project_dir):
                     rows.append(_file_row(rel + fn, os.path.join(d, fn), tool))
         else:
             row = _file_row(rel, os.path.join(project_dir, rel_os), tool)
+            if row["exists"]:
+                rows.append(row)
+    # CLAUDE.md는 위에서 프로젝트 루트용으로 따로 쓰이므로 INSTRUCTION_SOURCES에 없다.
+    # 하위 폴더에서는 그게 빠지면 안 된다 -- Claude Code도 하위 CLAUDE.md를 읽는다.
+    for sub in _subproject_dirs(project_dir):
+        base = os.path.basename(sub)
+        for rel, tool in [("CLAUDE.md", "Claude Code")] + INSTRUCTION_SOURCES:
+            if rel.endswith("/"):
+                continue  # 하위까지 디렉터리형을 훑으면 비용이 커진다
+            row = _file_row(base + "/" + rel, os.path.join(sub, rel.replace("/", os.sep)), tool)
             if row["exists"]:
                 rows.append(row)
     return rows
@@ -406,6 +437,12 @@ def apply_skill_group(group, project_dir):
     return True, f"{linked} linked, {removed} removed"
 
 
+def _common_agents(skills):
+    """섹션의 스킬이 모두 공유하는 에이전트. 줄마다 같은 뱃지를 되풀이하지 않기 위한 것."""
+    sets = [set(sk["agents"]) for sk in skills]
+    return [a for a in SKILL_AGENTS if all(a in x for x in sets)] if sets else []
+
+
 def _skill_root_index(project_dir):
     """스킬 폴더들을 훑어 {이름: (볼 수 있는 에이전트, 어느 폴더)}."""
     found = {}
@@ -452,6 +489,7 @@ def collect_skills(ctx):
             sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
         rows.append({
             "name": name,
+            "section_agents": _common_agents(skills),
             "version": entry.get("version", "?"),
             "enabled": bool(enabled.get(name, False)),
             "claude_only": True,
@@ -472,6 +510,7 @@ def collect_skills(ctx):
     if loose:
         rows.append({
             "name": "", "version": "", "enabled": None, "claude_only": False,
+            "section_agents": _common_agents(loose),
             "modes": [], "source": ", ".join(sorted({r for sk in loose for r in sk["roots"]})),
             "skills": loose,
         })
@@ -637,7 +676,7 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
 .row:last-child{border-bottom:none}
 .row.sub{padding-left:18px;font-size:13px;font-weight:500}
-.skill-row{align-items:flex-start;justify-content:flex-start;gap:10px}
+.skill-row{align-items:center;justify-content:flex-start;gap:10px}
 .skill-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
 .skill-name{font-weight:600;color:var(--text)}
 .skill-desc{font-size:12px;line-height:1.5}
@@ -669,6 +708,7 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .content.open{display:block}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .dim{color:var(--dim);font-size:13px}
+.skill-desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;white-space:nowrap}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
@@ -684,7 +724,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
   border:1px solid var(--border);border-radius:999px;font-size:10px;font-weight:600;
   color:var(--dim);cursor:help;flex:0 0 auto}
-.help:hover,.help:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.help:hover,.help:focus-visible,.help.open{color:var(--accent);border-color:var(--accent);outline:none}
+.help{cursor:pointer}
 .btn{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:4px;
   padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--accent);color:var(--panel)}
@@ -1168,12 +1209,16 @@ async function tick(){
         const lab = document.createElement('div'); lab.className = 'shortcut-title';
         lab.textContent = t().group_shortcut;
         const help = document.createElement('span'); help.className = 'help';
-        help.textContent = '?'; help.title = t().group_shortcut_help;
-        help.tabIndex = 0;
+        help.textContent = '?'; help.tabIndex = 0;
         lab.appendChild(help);
+        const helpBox = document.createElement('div'); helpBox.className = 'content';
+        helpBox.textContent = t().group_shortcut_help;
+        const toggleHelp = () => { helpBox.classList.toggle('open'); help.classList.toggle('open'); };
+        help.onclick = toggleHelp;
+        help.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleHelp(); } };
         const sub = document.createElement('div'); sub.className = 'note';
         sub.textContent = t().group_shortcut_sub;
-        box.appendChild(lab); box.appendChild(sub);
+        box.appendChild(lab); box.appendChild(sub); box.appendChild(helpBox);
         const bar = document.createElement('div');
         bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
         for(const g of p.groups){
@@ -1221,6 +1266,12 @@ async function tick(){
         left.appendChild(sw); left.appendChild(label);
 
         const right = document.createElement('span');
+        for(const a of (p.agents||[])){
+          const tag = document.createElement('span');
+          tag.className = 'agenttag ' + ((row.section_agents||[]).includes(a) ? 'yes' : 'no');
+          tag.textContent = a;
+          right.appendChild(tag);
+        }
         for(const g of (row.modes||[])){
           const gtag = document.createElement('span');
           gtag.className = 'tag'; gtag.textContent = t().group_tag(g);
@@ -1250,19 +1301,23 @@ async function tick(){
               sname.textContent = s.name;
               const full = s.desc||'';
               const sdesc = document.createElement('div'); sdesc.className = 'dim skill-desc';
-              sdesc.textContent = full.slice(0,90) + (full.length > 90 ? '…' : '');
+              sdesc.textContent = full;
               stext.appendChild(sname); stext.appendChild(sdesc);
 
+              // 섹션과 같으면 아무것도 안 그린다. 같은 사실을 줄마다 되풀이하지 않는다.
               const badges = document.createElement('span');
-              for(const a of (p.agents||[])){
-                const tag = document.createElement('span');
-                tag.className = 'agenttag ' + ((s.agents||[]).includes(a) ? 'yes' : 'no');
-                tag.textContent = a;
-                badges.appendChild(tag);
+              const sec = (row.section_agents||[]).join('|');
+              if((s.agents||[]).join('|') !== sec){
+                for(const a of (p.agents||[])){
+                  const tag = document.createElement('span');
+                  tag.className = 'agenttag ' + ((s.agents||[]).includes(a) ? 'yes' : 'no');
+                  tag.textContent = a;
+                  badges.appendChild(tag);
+                }
               }
               srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
               wrap.appendChild(srow);
-              if(full.length > 90){
+              if(full.length > 40){
                 sdesc.classList.add('clickable');
                 sdesc.title = t().read_full_tip;
                 const dbox = document.createElement('div'); dbox.className = 'content';
