@@ -536,7 +536,7 @@ def collect_instructions(ctx):
     project_dir = default_project_dir(ctx)
     rows = [
         _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
-        _file_row(f"Project CLAUDE.md ({project_dir})", os.path.join(project_dir, "CLAUDE.md")),
+        _file_row("Project CLAUDE.md", os.path.join(project_dir, "CLAUDE.md")),
     ]
     sub_rows, truncated = _instruction_rows(project_dir)
     rows += sub_rows
@@ -662,23 +662,31 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
   --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:28px;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0 auto;padding:28px;max-width:976px;-webkit-font-smoothing:antialiased}
 h1{margin:0;display:flex;align-items:baseline;gap:.13em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
 h1 .wm-a{font-weight:400;color:var(--text)}
 h1 .wm-b{font-weight:800;color:var(--text)}
 #h1sub{display:block;margin-top:5px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace}
 #h1sub:lang(ko){letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px;max-width:920px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px}
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
 .card.wide{grid-column:1/-1}
 .empty{color:var(--dim);font-size:13px;padding:6px 0;display:flex;align-items:center;gap:8px}
 .card h2{font-size:12px;color:var(--dim);margin:0 0 10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
 .row:last-child{border-bottom:none}
 .row.sub{padding-left:18px;font-size:13px;font-weight:500}
-.skill-row{align-items:center;justify-content:flex-start;gap:10px}
-.skill-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.section{margin-bottom:6px}
+.sec-head{border-bottom:0;padding:10px 0 4px;gap:10px;align-items:flex-start}
+.sec-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;flex:1}
+.sec-name{overflow-wrap:anywhere;min-width:0}
+.sec-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:0 0 auto}
+.sec-meta{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;
+  flex-wrap:wrap;padding:0 0 10px;border-bottom:1px solid var(--border)}
+.badges{display:flex;align-items:center;gap:5px 7px;flex-wrap:wrap;min-width:0}
+.skill-row{align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap}
+.skill-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 240px}
 .skill-name{font-weight:600;color:var(--text)}
 .skill-desc{font-size:12px;line-height:1.5}
 .note.sub{padding-left:18px}
@@ -686,7 +694,7 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .dot:hover{transform:scale(1.4)}
 .dot.busy{opacity:.4;cursor:wait}
 .on{background:var(--on)} .off{background:var(--off)}
-.switch{display:inline-flex;align-items:center;justify-content:center;min-width:44px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:4px;margin-right:10px;cursor:pointer;user-select:none;transition:background .12s,color .12s,transform .12s}
+.switch{display:inline-flex;align-items:center;justify-content:center;min-width:44px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:4px;cursor:pointer;flex:0 0 auto;user-select:none;transition:background .12s,color .12s,transform .12s}
 .sw-on.switch:hover{background:var(--on);color:var(--panel);border-color:var(--on)}
 .sw-off.switch:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .switch:active{transform:scale(.96)}
@@ -710,17 +718,17 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .dim{color:var(--dim);font-size:13px}
 .skill-desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.share{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);
+.share{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);margin-left:auto;
   white-space:nowrap;cursor:pointer;user-select:none;flex:0 0 auto}
 .share:hover{color:var(--text)}
 .share-done{color:var(--on)}
 .share input{accent-color:var(--accent);cursor:pointer;margin:0}
 .share.busy{opacity:.4;cursor:wait}
-.agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;white-space:nowrap}
+.agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
-.tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:8px;white-space:nowrap}
-.tag{font-size:11px;color:var(--dim);padding:1px 0;margin-left:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap;margin-left:8px}
+.tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap}
 .tag.danger{cursor:pointer}
 .tag.danger:hover{color:#f04452}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
@@ -762,7 +770,6 @@ const T = {
   skills_note: 'A struck-through agent cannot see that skill in this project. Skills inside a plugin are read by Claude Code only.',
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
-  claude_only_tag: 'Claude Code only',
   loose_skills: 'Skills not from a plugin',
     active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS GROUP →',
     active_tip: 'On, and every plugin outside this group is off',
@@ -779,6 +786,7 @@ const T = {
     switch_confirm: (g,list) => `Turn on only "${g}"?\n\nOn: ${list}\nOff: every other plugin`,
     no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
     project_label: 'project: ',
+  not_found: 'not found',
   agents_claude_only: 'Subagents below are Claude Code only.',
   share_to: names => 'also use in ' + names.join(', '),
   share_done: 'in every agent',
@@ -790,7 +798,6 @@ const T = {
     activation_failed: 'Could not turn that group on: ', skill_update_failed: 'Could not change that skill: ',
     plugin_on_tip: 'On. Click to turn it off (next session)',
     plugin_off_tip: 'Off. Click to turn it on (next session)',
-    show_skills_tip: 'Click to list the skills in this plugin', no_skills_tip: 'This plugin ships no skills',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
@@ -811,7 +818,6 @@ const T = {
   skills_note: '취소선이 그어진 에이전트는 이 프로젝트에서 그 스킬을 못 봅니다. 플러그인 안의 스킬은 원래 Claude Code만 읽습니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
-  claude_only_tag: 'Claude Code 전용',
   loose_skills: '플러그인 밖의 스킬',
     active: '켜짐', activate: '꺼짐', activate_hover: '이 그룹만 →',
     active_tip: '지금 이 그룹만 켜져 있습니다',
@@ -828,6 +834,7 @@ const T = {
     switch_confirm: (g,list) => `"${g}" 그룹만 켤까요?\n\n켜짐: ${list}\n꺼짐: 나머지 플러그인 전부`,
     no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
+  not_found: '없음',
   agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
   share_to: names => names.join('·') + '도 쓰기',
   share_done: '전부 쓰는 중',
@@ -839,7 +846,6 @@ const T = {
     activation_failed: '그룹을 켜지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
     plugin_on_tip: '켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
-    show_skills_tip: '누르면 스킬 목록이 펼쳐집니다', no_skills_tip: '스킬이 없는 플러그인입니다',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
@@ -894,7 +900,8 @@ const shortAgent = a => a.replace(' CLI','');
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
 const TABS = ['Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
-let activeTab = localStorage.getItem('agent-hud-tab') || 'Groups';
+// ?tab= 이 있으면 그걸 쓴다. 특정 탭을 링크로 걸거나 캡처할 때 필요하다.
+let activeTab = new URLSearchParams(location.search).get('tab') || localStorage.getItem('agent-hud-tab') || 'Groups';
 // 탭 이름이 바뀌면 저장된 값이 어느 패널과도 안 맞아 빈 화면이 된다.
 if(!TABS.includes(activeTab)) activeTab = TABS[0];
 function renderTabs(){
@@ -917,7 +924,9 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
-const skillsOpen = {};
+// ?open=<플러그인> 으로 펼친 채 열 수 있다 (?tab= 과 같은 이유)
+const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get('open')||'')
+  .split(',').filter(Boolean).map(k => [k, true]));
 function stateUrl(){
   return '/api/state' + (selectedProject ? ('?project=' + encodeURIComponent(selectedProject)) : '');
 }
@@ -1047,8 +1056,10 @@ async function tick(){
           act.onmouseleave = () => { act.textContent = t().activate; };
           act.onclick = () => { if(confirm(t().switch_confirm(g.name, g.members.map(m=>m.name).join(', ') || '(none)'))) activateGroup(g.name, act); };
         }
+        left.className = 'sec-left';
         left.appendChild(act);
-        left.appendChild(document.createTextNode(g.name));
+        const gname = document.createElement('span'); gname.textContent = g.name;
+        left.appendChild(gname);
         const cnt = document.createElement('span'); cnt.className='tag';
         cnt.textContent = t().plugins_count(g.members.length);
         left.appendChild(cnt);
@@ -1090,35 +1101,6 @@ async function tick(){
         const note = document.createElement('div'); note.className='note';
         note.textContent = t().not_in_group(p.ungrouped.join(', '));
         c.appendChild(note);
-      }
-    } else if(p.skills){
-      c.appendChild(h);
-      const note = document.createElement('div'); note.className='note'; note.style.marginBottom='12px';
-      note.textContent = t().skills_note;
-      c.appendChild(note);
-      for(const sk of p.skills){
-        const el = document.createElement('div'); el.className='row clickable';
-        const left = document.createElement('span');
-        const caret = document.createElement('span'); caret.textContent = '▸ ';
-        left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `${sk.name}<span class="tooltag">${sk.roots.join(', ')}</span>`);
-        const right = document.createElement('span');
-        for(const a of p.agents){
-          const tag = document.createElement('span');
-          const seen = sk.agents.includes(a);
-          tag.className = 'agenttag ' + (seen ? 'yes' : 'no');
-          tag.textContent = a;
-          right.appendChild(tag);
-        }
-        el.appendChild(left); el.appendChild(right);
-        const box = document.createElement('div'); box.className='content';
-        el.onclick = () => showContent(sk.path, box, caret);
-        c.appendChild(el); c.appendChild(box);
-      }
-      if(!p.skills.length){
-        const e = document.createElement('div'); e.className='empty';
-        e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
-        c.appendChild(e);
       }
     } else if(p.files){
       c.appendChild(h);
@@ -1200,49 +1182,61 @@ async function tick(){
       }
       for(const row of p.rows){
         const wrap = document.createElement('div');
-        const el = document.createElement('div'); el.className='row';
-
+        wrap.className = 'section';
         const isPlugin = row.enabled !== null;
         const key = row.name || '__loose__';
-        const sw = document.createElement('span');
+        const hasSkills = (row.skills||[]).length > 0;
+
+        // 1행: 스위치 · 이름 · 버전 · 개수 ......... 그룹
+        const el = document.createElement('div'); el.className = 'row sec-head';
+        const left = document.createElement('span'); left.className = 'sec-left';
         if(isPlugin){
+          const sw = document.createElement('span');
           sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
           sw.textContent = row.enabled ? 'ON' : 'OFF';
           sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
-          sw.onclick = () => toggle(row.name, !row.enabled, sw);
+          sw.onclick = e => { e.stopPropagation(); toggle(row.name, !row.enabled, sw); };
+          left.appendChild(sw);
         }
-        const hasSkills = (row.skills||[]).length > 0;
         const label = document.createElement('span');
-        label.className = hasSkills ? 'clickable' : '';
-        const caret = hasSkills ? (skillsOpen[key] ? '▾ ' : '▸ ') : '';
-        label.innerHTML = isPlugin
-          ? `${caret}${row.name}<span class="tag">v${row.version}</span>` +
-            (hasSkills ? `<span class="tag">${t().skills_count(row.skills.length)}</span>` : '') +
-            `<span class="tooltag">${t().claude_only_tag}</span>`
-          : `${caret}${t().loose_skills}` +
-            (hasSkills ? `<span class="tag">${t().skills_count(row.skills.length)}</span>` : '');
-        label.title = hasSkills ? t().show_skills_tip : t().no_skills_tip;
-        if(hasSkills){
-          el.classList.add('clickable');
-          el.onclick = (e) => { if(e.target === el || e.target === label || label.contains(e.target)){ skillsOpen[key] = !skillsOpen[key]; rerender(); } };
-        }
-        const left = document.createElement('span');
-        left.appendChild(sw); left.appendChild(label);
-
-        const right = document.createElement('span');
-        right.style.cssText = 'display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end';
-        for(const a of (p.agents||[])){
-          const tag = document.createElement('span');
-          tag.className = 'agenttag ' + ((row.section_agents||[]).includes(a) ? 'yes' : 'no');
-          tag.textContent = a;
-          right.appendChild(tag);
-        }
+        label.className = 'sec-name' + (hasSkills ? ' clickable' : '');
+        label.textContent = (hasSkills ? (skillsOpen[key] ? '▾ ' : '▸ ') : '') +
+          (isPlugin ? row.name : t().loose_skills);
+        label.title = row.source ? t().from + row.source : '';
+        left.appendChild(label);
+        const right = document.createElement('span'); right.className = 'sec-right';
         for(const g of (row.modes||[])){
           const gtag = document.createElement('span');
           gtag.className = 'tag'; gtag.textContent = t().group_tag(g);
           gtag.title = t().group_tag_tip;
           right.appendChild(gtag);
         }
+        el.appendChild(left); el.appendChild(right);
+        if(hasSkills){
+          el.classList.add('clickable');
+          el.onclick = e => { if(!e.target.closest('.switch,.share,.tag')) { skillsOpen[key] = !skillsOpen[key]; rerender(); } };
+        }
+        wrap.appendChild(el);
+
+        // 2행: 뱃지 ......... 체크박스. 폭이 좁아지면 이 줄 안에서만 접힌다.
+        const meta = document.createElement('div'); meta.className = 'sec-meta';
+        const badges = document.createElement('span'); badges.className = 'badges';
+        if(isPlugin){
+          const v = document.createElement('span'); v.className='tag'; v.textContent = 'v' + row.version;
+          badges.appendChild(v);
+        }
+        if(hasSkills){
+          const c = document.createElement('span'); c.className='tag';
+          c.textContent = t().skills_count(row.skills.length);
+          badges.appendChild(c);
+        }
+        for(const a of (p.agents||[])){
+          const tag = document.createElement('span');
+          tag.className = 'agenttag ' + ((row.section_agents||[]).includes(a) ? 'yes' : 'no');
+          tag.textContent = shortAgent(a);
+          badges.appendChild(tag);
+        }
+        meta.appendChild(badges);
         const secMiss = (p.agents||[]).filter(a => !(row.section_agents||[]).includes(a));
         const ids = (row.skills||[]).filter(x => x.linkable).map(x => x.id);
         if(ids.length){
@@ -1255,14 +1249,9 @@ async function tick(){
           share.appendChild(document.createTextNode(
             secMiss.length ? t().share_to(secMiss.map(shortAgent)) : t().share_done));
           share.title = t().share_all_tip;
-          right.appendChild(share);
+          meta.appendChild(share);
         }
-        el.appendChild(left); el.appendChild(right);
-        wrap.appendChild(el);
-
-        const src = document.createElement('div'); src.className = 'note';
-        src.textContent = t().from + row.source;
-        wrap.appendChild(src);
+        wrap.appendChild(meta);
 
         if(skillsOpen[key]){
           if(hasSkills){
@@ -1296,14 +1285,18 @@ async function tick(){
               }
               srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
               if(s.linkable){
+                // 섹션과 같은 말이면 글자를 반복하지 않는다. 뱃지와 같은 규칙.
                 const miss = (s.missing||[]).map(shortAgent);
+                const sameAsSection = (s.agents||[]).join('|') === (row.section_agents||[]).join('|');
                 const share = document.createElement('label');
                 share.className = 'share' + (miss.length ? '' : ' share-done');
                 const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!s.shared;
                 cb.onclick = e => { e.stopPropagation(); linkSkill(s.id, cb.checked, share); };
                 share.appendChild(cb);
-                share.appendChild(document.createTextNode(miss.length ? t().share_to(miss) : t().share_done));
-                share.title = t().share_all_tip;
+                if(!sameAsSection){
+                  share.appendChild(document.createTextNode(miss.length ? t().share_to(miss) : t().share_done));
+                }
+                share.title = miss.length ? t().share_to(miss) : t().share_done;
                 srow.appendChild(share);
               }
               wrap.appendChild(srow);
