@@ -269,54 +269,66 @@ def _file_row(label, path, tool="Claude Code"):
     }
 
 
-SKIP_DIRS = {"node_modules", "venv", ".venv", "dist", "build", "target", "vendor", "__pycache__"}
+SKIP_DIRS = {"node_modules", "venv", ".venv", "dist", "build", "target", "vendor",
+             "__pycache__", ".git", "Pods", ".next", ".nuxt", ".cache", "coverage"}
+
+# 프로젝트 하나를 훑는 비용의 상한. 이 패널은 3초마다 다시 그려지므로 큰 저장소에서
+# 디스크를 계속 긁고 있으면 안 된다. 넘으면 멈추고 잘렸다는 사실을 화면에 밝힌다.
+SCAN_DIR_BUDGET = 4000
+SCAN_ROW_CAP = 300
+SCAN_TTL = 20.0
+_scan_cache = {}  # project_dir -> (잰 시각, (행, 잘림))
+
+# 지침은 루트에만 있지 않다. Claude Code는 하위 디렉터리의 CLAUDE.md를 읽고,
+# 모노레포는 패키지마다 따로 둔다. 그래서 밑까지 내려간다.
+_FLAT_NAMES = {"CLAUDE.md": "Claude Code"}
+_NESTED_FLAT = []
+for _rel, _tool in INSTRUCTION_SOURCES:
+    if _rel.endswith("/"):
+        continue
+    (_NESTED_FLAT.append((_rel, _tool)) if "/" in _rel else _FLAT_NAMES.setdefault(_rel, _tool))
+_DIR_SOURCES = [(r, t) for r, t in INSTRUCTION_SOURCES if r.endswith("/")]
 
 
-def _subproject_dirs(project_dir, limit=40):
-    """바로 아래 폴더들. 점으로 시작하거나 빌드 산출물인 것은 뺀다."""
-    try:
-        names = sorted(os.listdir(project_dir))[:400]
-    except OSError:
-        return []
-    out = []
-    for n in names:
-        if n.startswith(".") or n in SKIP_DIRS:
-            continue
-        d = os.path.join(project_dir, n)
-        if os.path.isdir(d) and not os.path.islink(d):
-            out.append(d)
-        if len(out) >= limit:
+def _scan_tree(project_dir):
+    """project_dir 아래 전체에서 지침 파일을 찾는다. -> (행 목록, 잘렸는지)"""
+    rows, dirs, truncated = [], 0, False
+    for cur, subs, files in os.walk(project_dir):
+        dirs += 1
+        if dirs > SCAN_DIR_BUDGET or len(rows) > SCAN_ROW_CAP:
+            truncated = True
             break
-    return out
-
-
-def _instruction_rows(project_dir):
-    """없는 파일은 행을 만들지 않는다 -- 안 쓰는 도구 30줄은 소음이다."""
-    rows = []
-    for rel, tool in INSTRUCTION_SOURCES:
-        rel_os = rel.replace("/", os.sep)
-        if rel.endswith("/"):
-            d = os.path.join(project_dir, rel_os.rstrip(os.sep))
+        subs[:] = sorted(d for d in subs if not d.startswith(".") and d not in SKIP_DIRS)
+        rel_dir = os.path.relpath(cur, project_dir)
+        prefix = "" if rel_dir == "." else rel_dir.replace(os.sep, "/") + "/"
+        for fn in sorted(files):
+            tool = _FLAT_NAMES.get(fn)
+            if tool:
+                rows.append(_file_row(prefix + fn, os.path.join(cur, fn), tool))
+        for rel, tool in _NESTED_FLAT:          # .github/copilot-instructions.md 처럼 경로가 붙은 것
+            path = os.path.join(cur, rel.replace("/", os.sep))
+            if os.path.isfile(path):
+                rows.append(_file_row(prefix + rel, path, tool))
+        for rel, tool in _DIR_SOURCES:          # .cursor/rules/ 같은 디렉터리형 (점 폴더라 위 가지치기에 걸린다)
+            d = os.path.join(cur, rel.replace("/", os.sep).rstrip(os.sep))
             if not os.path.isdir(d):
                 continue
             for fn in sorted(os.listdir(d)):
                 if fn.endswith(RULE_EXTS):
-                    rows.append(_file_row(rel + fn, os.path.join(d, fn), tool))
-        else:
-            row = _file_row(rel, os.path.join(project_dir, rel_os), tool)
-            if row["exists"]:
-                rows.append(row)
-    # CLAUDE.md는 위에서 프로젝트 루트용으로 따로 쓰이므로 INSTRUCTION_SOURCES에 없다.
-    # 하위 폴더에서는 그게 빠지면 안 된다 -- Claude Code도 하위 CLAUDE.md를 읽는다.
-    for sub in _subproject_dirs(project_dir):
-        base = os.path.basename(sub)
-        for rel, tool in [("CLAUDE.md", "Claude Code")] + INSTRUCTION_SOURCES:
-            if rel.endswith("/"):
-                continue  # 하위까지 디렉터리형을 훑으면 비용이 커진다
-            row = _file_row(base + "/" + rel, os.path.join(sub, rel.replace("/", os.sep)), tool)
-            if row["exists"]:
-                rows.append(row)
-    return rows
+                    rows.append(_file_row(prefix + rel + fn, os.path.join(d, fn), tool))
+    return rows, truncated
+
+
+def _instruction_rows(project_dir):
+    """전체 트리를 훑되 결과는 잠깐 재사용한다 (폴링이 3초라 매번 훑을 이유가 없다)."""
+    now = time.time()
+    hit = _scan_cache.get(project_dir)
+    if hit and now - hit[0] < SCAN_TTL:
+        return hit[1]
+    rows, truncated = _scan_tree(project_dir)
+    rows = [r for r in rows if r["name"] != "CLAUDE.md"]  # 루트 것은 위쪽 고정 행이 보여준다
+    _scan_cache[project_dir] = (now, (rows, truncated))
+    return rows, truncated
 
 
 # 스킬은 SKILL.md 형식이 공개 표준(agentskills.io)이라 폴더째 이식된다. 그런데 명세는
@@ -539,13 +551,16 @@ def collect_instructions(ctx):
     rows = [
         _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
         _file_row(f"Project CLAUDE.md ({project_dir})", os.path.join(project_dir, "CLAUDE.md")),
-    ] + _instruction_rows(project_dir)
+    ]
+    sub_rows, truncated = _instruction_rows(project_dir)
+    rows += sub_rows
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
     return {
         "title": "Instructions & agents (read-only)",
         "files": rows,
+        "truncated": truncated,
         "agents": agents,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -791,6 +806,7 @@ const T = {
     project_label: 'project: ',
     click_to_open: 'click to open', not_found: 'not found',
   agents_claude_only: 'Subagents below are Claude Code only.',
+  scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'no subagents registered',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'toggle failed: ', group_update_failed: 'group update failed: ',
@@ -846,6 +862,7 @@ const T = {
     project_label: '프로젝트: ',
     click_to_open: '누르면 열립니다', not_found: '없음',
   agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
+  scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
@@ -1168,6 +1185,12 @@ async function tick(){
         const an = document.createElement('div'); an.className='note'; an.style.marginTop='12px';
         an.textContent = t().agents_claude_only;
         c.appendChild(an);
+      }
+      if(p.truncated){
+        const w = document.createElement('div'); w.className = 'note';
+        w.style.color = 'var(--text)';
+        w.textContent = '⚠ ' + t().scan_truncated;
+        c.appendChild(w);
       }
       for(const a of (p.agents||[])){
         const el = document.createElement('div'); el.className = 'row clickable';
