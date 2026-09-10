@@ -1,6 +1,7 @@
 .port
 projects.json
 modes.json
+project-sets.json
 launchd.out.log
 launchd.err.log
 __pycache__/
@@ -11,3 +12,11 @@ agent-hud.bundle
 
 # 개인 작업 노트 — 공개하지 않는다
 CLAUDE.md
+
+# 이 도구가 프로젝트 폴더에 만드는 것들 — 개인 상태이지 소스가 아니다.
+# Agent HUD를 이 저장소 자신에게 써보면 여기 생긴다.
+.claude/settings.local.json
+.claude/skills/
+.agents/skills/
+
+.DS_Store
