@@ -10,8 +10,12 @@ __pycache__/
 # 이관용 백업 번들 — 저장소에 넣지 않는다
 agent-hud.bundle
 
-# 개인 작업 노트 — 공개하지 않는다
+# 공개 저장소에 둘 것이 아닌 것들 — 로컬에만 둔다.
+# CLAUDE.md: 사고 기록. HANDOFF.md: 이어받는 사람용 메모(개인 설정·미완 목록).
+# assets/promo.md: 아직 올리지 않은 홍보 문구. 릴리스 노트나 실제 채널로 간다.
 CLAUDE.md
+HANDOFF.md
+assets/promo.md
 
 # 이 도구가 프로젝트 폴더에 만드는 것들 — 개인 상태이지 소스가 아니다.
 # Agent HUD를 이 저장소 자신에게 써보면 여기 생긴다.
