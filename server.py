@@ -376,6 +376,33 @@ def _scan_skill_root(root, label, agents, found):
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
 
 
+# 플러그인은 스킬만 담지 않는다. 공식 문서 기준 구성 요소와, 그중 무엇이 다른 에이전트로
+# 갈 수 있는지. 체크박스는 스킬만 옮기므로 나머지가 있으면 화면이 그 사실을 말해야 한다.
+# 출처: code.claude.com/docs/en/plugins (Plugin structure overview)
+PLUGIN_PARTS = [
+    # (경로, 이름, 다른 에이전트로 가나)
+    ("agents", "agents", True),          # Cursor·Copilot이 .claude/agents를 읽는다
+    (".mcp.json", "mcp", True),          # MCP는 공통 규격, 설정 위치만 다르다
+    ("commands", "commands", False),
+    ("hooks", "hooks", False),
+    (".lsp.json", "lsp", False),
+    ("monitors", "monitors", False),
+    ("bin", "bin", False),
+    ("settings.json", "settings", False),
+]
+
+
+def plugin_components(install_path):
+    """스킬 말고 이 플러그인에 또 뭐가 들어 있나."""
+    if not install_path:
+        return []
+    out = []
+    for rel, name, portable in PLUGIN_PARTS:
+        if os.path.exists(os.path.join(install_path, rel)):
+            out.append({"name": name, "portable": portable})
+    return out
+
+
 def plugin_skills():
     """설치된 플러그인 -> {스킬 이름: 폴더 경로}. 플러그인이 곧 스킬 묶음이다."""
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
@@ -498,6 +525,7 @@ def collect_skills(ctx):
         rows.append({
             "name": name,
             "section_agents": _common_agents(skills),
+            "components": plugin_components(install_path),
             "version": entry.get("version", "?"),
             "enabled": bool(enabled.get(name, False)),
             "claude_only": True,
@@ -747,6 +775,9 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
+.comp{border:1px dashed var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;
+  font-size:11px;white-space:nowrap;cursor:help}
+.comp.stays{border-style:dashed;color:var(--off)}
 .tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap;margin-left:8px}
 .tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap}
 .tag.danger{cursor:pointer}
@@ -811,6 +842,10 @@ const T = {
     project_label: 'project: ',
   not_found: 'not found',
   agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
+  comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
+    monitors: 'monitors', bin: 'binaries', settings: 'settings'},
+  comp_portable_tip: 'Other agents can read this format too, but the checkbox only moves skills.',
+  comp_stays_tip: 'This part stays in Claude Code. The checkbox moves skills only.',
   share_to: names => 'also use in ' + names.join(', '),
   share_done: 'in every agent',
   share_all_tip: 'Makes this skill usable by those agents in this project. Links it into the folders it is missing from; the original never moves.',
@@ -861,6 +896,10 @@ const T = {
     project_label: '프로젝트: ',
   not_found: '없음',
   agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
+  comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
+    monitors: '모니터', bin: '실행파일', settings: '기본설정'},
+  comp_portable_tip: '다른 에이전트도 읽을 수 있는 형식이지만, 체크박스는 스킬만 옮깁니다.',
+  comp_stays_tip: '이건 Claude Code에만 남습니다. 체크박스는 스킬만 옮깁니다.',
   share_to: names => names.join('·') + '도 쓰기',
   share_done: '전부 쓰는 중',
   share_all_tip: '이 프로젝트에서 그 에이전트들도 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
@@ -1263,6 +1302,15 @@ async function tick(){
           const c = document.createElement('span'); c.className='tag';
           c.textContent = t().skills_count(row.skills.length);
           badges.appendChild(c);
+        }
+        // 스킬 말고 또 뭐가 들었는지. 체크박스는 스킬만 옮기므로 이게 안 보이면
+        // 사용자는 플러그인이 통째로 간다고 오해한다.
+        for(const comp of (row.components||[])){
+          const tag = document.createElement('span');
+          tag.className = 'comp' + (comp.portable ? '' : ' stays');
+          tag.textContent = t().comp[comp.name] || comp.name;
+          tag.title = comp.portable ? t().comp_portable_tip : t().comp_stays_tip;
+          badges.appendChild(tag);
         }
         for(const a of (p.agents||[])){
           const tag = document.createElement('span');
