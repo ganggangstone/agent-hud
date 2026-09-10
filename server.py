@@ -106,24 +106,26 @@ def collect_update(ctx):
 
 def collect_groups(ctx):
     project_dir = default_project_dir(ctx)
-    modes = read_json(MODES_FILE)
     settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
     enabled = settings.get("enabledPlugins", {})
     installed = known_plugin_names()
+    sets = read_sets()
+    assigned = read_json(SETS_FILE, {}).get(project_dir, "")
+    sources = skill_sources(project_dir)
     groups = []
-    for gname, members in modes.items():
-        members = [m for m in members if m in installed]
+    for gname, entry in sets.items():
+        plugins = [m for m in entry["plugins"] if m in installed]
+        skills = [sk for sk in entry["skills"] if sk in sources]
         groups.append({
             "name": gname,
-            "members": [{"name": m, "enabled": bool(enabled.get(m, False))} for m in members],
-            # a group counts as "active" when every member is on and every plugin outside it is off
-            "active": bool(members)
-                and all(enabled.get(m, False) for m in members)
-                and not any(enabled.get(p, False) for p in installed if p not in members),
+            "assigned": gname == assigned,
+            "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
+                     + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk)} for sk in skills],
         })
-    unrgrouped = sorted(installed - {m for g in modes.values() for m in g})
-    return {"title": "Groups", "groups": groups, "ungrouped": unrgrouped, "all_plugins": sorted(installed),
-            "project_dir": project_dir, "known_projects": known_projects()}
+    ungrouped = sorted(installed - {m for v in sets.values() for m in v["plugins"]})
+    return {"title": "Groups", "groups": groups, "ungrouped": ungrouped,
+            "all_plugins": sorted(installed), "all_skills": sorted(sources),
+            "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
 
 
 def activate_group(name):
@@ -621,30 +623,100 @@ def toggle_plugin(name, enable):
         return False, str(e)
 
 
-def modify_group(action, group, plugin):
-    group = (group or "").strip()
-    if not group:
-        return False, "group name required"
-    if plugin not in known_plugin_names():
-        return False, "unknown plugin"
-    modes = read_json(MODES_FILE, {})
-    if action == "add":
-        modes.setdefault(group, [])
-        if plugin not in modes[group]:
-            modes[group].append(plugin)
-    elif action == "remove":
-        if group in modes and plugin in modes[group]:
-            modes[group].remove(plugin)
-            if not modes[group]:
-                del modes[group]
-    else:
-        return False, "unknown action"
+# 세트는 함께 쓰는 플러그인과 스킬의 묶음이다. 옛 modes.json은 {이름: [플러그인]} 이었고
+# 지금은 {이름: {"plugins": [...], "skills": [...]}} 다. 옛 파일도 그대로 읽는다.
+SETS_FILE = os.path.join(TOOL_DIR, "project-sets.json")  # {프로젝트: 세트 이름}
+
+
+def read_sets():
+    raw = read_json(MODES_FILE, {})
+    out = {}
+    for name, v in raw.items():
+        if isinstance(v, list):
+            out[name] = {"plugins": list(v), "skills": []}
+        else:
+            out[name] = {"plugins": list(v.get("plugins", [])), "skills": list(v.get("skills", []))}
+    return out
+
+
+def write_sets(sets):
     try:
         with open(MODES_FILE, "w") as f:
-            json.dump(modes, f, ensure_ascii=False, indent=2)
+            json.dump(sets, f, ensure_ascii=False, indent=2)
+        return True, ""
     except Exception as e:
         return False, str(e)
-    return True, ""
+
+
+def modify_group(action, group, member, kind="plugin"):
+    group = (group or "").strip()
+    if not group:
+        return False, "set name required"
+    key = "skills" if kind == "skill" else "plugins"
+    if kind == "plugin" and member not in known_plugin_names():
+        return False, "unknown plugin"
+    if kind == "skill" and member not in skill_sources(PROJECT_DIR):
+        return False, "unknown skill"
+    sets = read_sets()
+    if action == "add":
+        entry = sets.setdefault(group, {"plugins": [], "skills": []})
+        if member not in entry[key]:
+            entry[key].append(member)
+    elif action == "remove":
+        entry = sets.get(group)
+        if entry and member in entry[key]:
+            entry[key].remove(member)
+            if not entry["plugins"] and not entry["skills"]:
+                del sets[group]
+    else:
+        return False, "unknown action"
+    return write_sets(sets)
+
+
+def assign_set(name, project_dir):
+    """세트를 프로젝트에 적용한다. 스킬은 이 프로젝트에만, 플러그인은 컴퓨터 전체에 걸린다 --
+    Claude Code의 enabledPlugins가 사용자 전역 값 하나뿐이라 그렇다(ADR 10).
+    name이 빈 문자열이면 이 프로젝트의 배정을 푼다."""
+    if not project_dir or not os.path.isdir(project_dir):
+        return False, "project not found"
+    sets = read_sets()
+    if name and name not in sets:
+        return False, "unknown set"
+
+    # 1) 스킬: 이 세트 것만 남긴다. 어느 세트에도 없는 스킬 링크는 사용자가 직접 건 것이므로 둔다.
+    wanted = set(sets.get(name, {}).get("skills", [])) if name else set()
+    managed = {sk for v in sets.values() for sk in v["skills"]}
+    errors = []
+    for sk in sorted(managed):
+        ok, err = link_skill(sk, sk in wanted, project_dir)
+        if not ok and sk in wanted:
+            errors.append(f"{sk}: {err}")
+
+    # 2) 플러그인: 전역이다. 세트를 배정하지 않을 때는 건드리지 않는다.
+    if name:
+        members = set(sets[name]["plugins"])
+        # 이미 원하는 상태인 것에는 명령을 보내지 않는다. claude plugin enable 은
+        # 이미 켜져 있으면 실패로 답하므로, 그냥 부르면 매번 오류가 쌓인다.
+        enabled = read_json(os.path.join(CLAUDE_DIR, "settings.json")).get("enabledPlugins", {})
+        for plugin in known_plugin_names():
+            want = plugin in members
+            if bool(enabled.get(plugin, False)) == want:
+                continue
+            ok, err = toggle_plugin(plugin, want)
+            if not ok:
+                errors.append(f"{plugin}: {err}")
+
+    assigned = read_json(SETS_FILE, {})
+    if name:
+        assigned[project_dir] = name
+    else:
+        assigned.pop(project_dir, None)
+    try:
+        with open(SETS_FILE, "w") as f:
+            json.dump(assigned, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        errors.append(str(e))
+    return (not errors), "; ".join(errors)[:300]
 
 
 def modify_skill_permission(action, plugin, skill, project_dir):
@@ -835,19 +907,24 @@ const T = {
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
+    set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
+    set_apply: 'Apply to this project', set_applied: 'Applied here',
+    set_apply_tip: 'Skills go into this project only. Plugins are a Claude Code setting shared by every project.',
+    assign_confirm: (g, p, pl, sk) => `Apply "${g}" to this project?\n\n${p}\n\nSkills (${sk}) are linked into this project only.\nPlugins turned on for the whole computer: ${pl}\nEvery other plugin is turned off.`,
+    unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins stay as they are.`,
+    kind_plugin: 'plugin', kind_skill: 'skill',
+    add_member_ph: '+ add a plugin or skill…',
+    member_plugin_tip: 'On for Claude Code, on this computer',
+    member_skill_tip: 'Linked into this project',
+    assign_failed: 'Could not apply that set: ',
     on: 'ON', off: 'OFF',
-    active_tip: 'On, and every plugin outside this group is off',
-    activate_tip: 'Turn this group on and every other plugin off (next session)',
-    plugins_count: n => n + (n === 1 ? ' plugin' : ' plugins'),
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
-    add_plugin_ph: '+ add a plugin to this group…',
     new_group: '+ create a new group', new_group_tip: 'Plugins you switch on together. For example one set for coding, one for video work',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
     not_in_group: list => 'Not in any group yet: ' + list,
-    groups_legend: 'A group is a set of plugins you use together. Turning one on turns the others off, everywhere on this computer.',
-    switch_confirm: (g,list) => `Turn on only "${g}"?\n\nOn: ${list}\nOff: every other plugin`,
+    groups_legend: 'A set is the plugins and skills you use together. Applying one to a project links its skills there and turns its plugins on for Claude Code.',
     no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
     project_label: 'project: ',
   not_found: 'not found',
@@ -863,8 +940,7 @@ const T = {
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
-    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
-    activation_failed: 'Could not turn that group on: ', skill_update_failed: 'Could not change that skill: ',
+    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ', skill_update_failed: 'Could not change that skill: ',
     plugin_on_tip: 'On. Click to turn it off (next session)',
     plugin_off_tip: 'Off. Click to turn it on (next session)',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
@@ -890,19 +966,24 @@ const T = {
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
+    set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
+    set_apply: '이 프로젝트에 적용', set_applied: '적용됨',
+    set_apply_tip: '스킬은 이 프로젝트에만, 플러그인은 Claude Code 설정이라 모든 프로젝트에 함께 걸립니다.',
+    assign_confirm: (g, p, pl, sk) => `"${g}" 세트를 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개 — 이 프로젝트에만 걸립니다.\n컴퓨터 전체에서 켜지는 플러그인: ${pl}\n나머지 플러그인은 꺼집니다.`,
+    unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인은 그대로 둡니다.`,
+    kind_plugin: '플러그인', kind_skill: '스킬',
+    add_member_ph: '+ 플러그인 또는 스킬 추가…',
+    member_plugin_tip: 'Claude Code에서 켜짐 · 이 컴퓨터 전체',
+    member_skill_tip: '이 프로젝트에 걸려 있음',
+    assign_failed: '세트를 적용하지 못했습니다: ',
     on: '켜짐', off: '꺼짐',
-    active_tip: '지금 이 그룹만 켜져 있습니다',
-    activate_tip: '이 그룹만 켜고 나머지는 끕니다. 다음 세션부터 반영됩니다',
-    plugins_count: n => '플러그인 ' + n + '개',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
-    add_plugin_ph: '+ 이 그룹에 플러그인 추가…',
-    new_group: '+ 새 그룹 만들기', new_group_tip: '함께 켜고 끌 플러그인을 묶어둡니다. 예를 들어 개발용, 영상제작용',
+    new_group: '+ 새 그룹 만들기', new_group_tip: '함께 쓰는 플러그인과 스킬을 묶어둡니다. 예를 들어 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     not_in_group: list => '아직 어느 그룹에도 안 넣은 플러그인: ' + list,
-    groups_legend: '함께 쓰는 플러그인을 묶어둔 것입니다. 하나를 켜면 나머지 그룹은 같이 꺼지고, 이 컴퓨터 전체에 적용됩니다.',
-    switch_confirm: (g,list) => `"${g}" 그룹만 켤까요?\n\n켜짐: ${list}\n꺼짐: 나머지 플러그인 전부`,
+    groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 스킬은 그 프로젝트에 걸리고, 플러그인은 Claude Code에서 켜집니다.',
     no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
   not_found: '없음',
@@ -918,8 +999,7 @@ const T = {
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
-    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
-    activation_failed: '그룹을 켜지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
+    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
     plugin_on_tip: '켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
     skills_count: n => '스킬 ' + n + '개',
@@ -1036,10 +1116,10 @@ async function toggle(name, enable, dotEl){
   polling = true;
   await tick();
 }
-async function editGroup(action, group, plugin){
+async function editGroup(action, group, member, kind){
   polling = false;
   try{
-    const r = await fetch('/api/group', {method:'POST', body: JSON.stringify({action, group, plugin})});
+    const r = await fetch('/api/group', {method:'POST', body: JSON.stringify({action, group, member, kind: kind || 'plugin'})});
     const d = await r.json();
     if(!d.ok) alert(t().group_update_failed + (d.error || t().error));
   } catch(e){ alert(t().group_update_failed + e); }
@@ -1056,13 +1136,13 @@ async function linkSkill(names, on, el){
   polling = true;
   await tick();
 }
-async function activateGroup(name, btn){
+async function assignSet(name, btn){
   polling = false; btn.classList.add('busy'); btn.textContent = t().switching;
   try{
-    const r = await fetch('/api/activate', {method:'POST', body: JSON.stringify({group: name})});
+    const r = await fetch('/api/activate', {method:'POST', body: JSON.stringify({group: name, project: currentProjectDir})});
     const d = await r.json();
-    if(!d.ok) alert(t().activation_failed + (d.error || t().error));
-  } catch(e){ alert(t().activation_failed + e); }
+    if(!d.ok) alert(t().assign_failed + (d.error || t().error));
+  } catch(e){ alert(t().assign_failed + e); }
   polling = true;
   await tick();
 }
@@ -1113,8 +1193,8 @@ async function tick(){
       newBtn.onclick = () => {
         const name = prompt(t().new_group_name_prompt);
         if(!name) return;
-        const first = prompt(t().new_group_first_prompt + p.all_plugins.join('\n'));
-        if(first) editGroup('add', name.trim(), first.trim());
+        const first = prompt(t().new_group_first_prompt + (p.all_plugins||[]).join('\n'));
+        if(first) editGroup('add', name.trim(), first.trim(), 'plugin');
       };
       headerRow.appendChild(h); headerRow.appendChild(newBtn);
       c.appendChild(headerRow);
@@ -1122,53 +1202,76 @@ async function tick(){
       legend.textContent = t().groups_legend;
       c.appendChild(legend);
       for(const g of p.groups){
-        const wrap = document.createElement('div');
-        const el = document.createElement('div'); el.className='row';
+        const wrap = document.createElement('div'); wrap.className = 'section';
+        const el = document.createElement('div'); el.className='row sec-head';
 
-        const left = document.createElement('span');
-        const act = document.createElement('span');
-        act.className = 'switch ' + (g.active ? 'sw-on' : 'sw-off');
-        act.textContent = g.active ? t().on : t().off;
-        act.title = g.active ? t().active_tip : t().activate_tip;
-        if(!g.active){
-          act.onclick = () => { if(confirm(t().switch_confirm(g.name, g.members.map(m=>m.name).join(', ') || '(none)'))) activateGroup(g.name, act); };
-        }
-        left.className = 'sec-left';
-        left.appendChild(act);
-        const gname = document.createElement('span'); gname.textContent = g.name;
+        const left = document.createElement('span'); left.className = 'sec-left';
+        const gname = document.createElement('span'); gname.style.fontWeight='600';
+        gname.textContent = g.name;
         left.appendChild(gname);
+        const plugins = g.members.filter(m => m.kind === 'plugin');
+        const skills = g.members.filter(m => m.kind === 'skill');
         const cnt = document.createElement('span'); cnt.className='tag';
-        cnt.textContent = t().plugins_count(g.members.length);
+        cnt.textContent = t().set_count(plugins.length, skills.length);
         left.appendChild(cnt);
-        el.appendChild(left);
 
+        const right = document.createElement('span'); right.className = 'sec-right';
+        const apply = document.createElement('span');
+        apply.className = 'btn' + (g.assigned ? ' btn-on' : '');
+        apply.textContent = g.assigned ? t().set_applied : t().set_apply;
+        apply.title = t().set_apply_tip;
+        apply.onclick = () => {
+          if(g.assigned){
+            if(confirm(t().unassign_confirm(g.name, p.project_dir))) assignSet('', apply);
+          } else if(confirm(t().assign_confirm(g.name, p.project_dir,
+              plugins.map(m=>m.name).join(', ') || '-', skills.length))){
+            assignSet(g.name, apply);
+          }
+        };
+        right.appendChild(apply);
+        el.appendChild(left); el.appendChild(right);
         wrap.appendChild(el);
 
         for(const m of g.members){
           const mrow = document.createElement('div'); mrow.className='row sub';
-          const mleft = document.createElement('span');
-          const mdot = document.createElement('span'); mdot.className = 'dot ' + (m.enabled?'on':'off');
+          const mleft = document.createElement('span'); mleft.className = 'sec-left';
+          const mdot = document.createElement('span'); mdot.className = 'dot ' + (m.on?'on':'off');
           mdot.style.cursor = 'default';
+          mdot.title = m.kind === 'plugin' ? t().member_plugin_tip : t().member_skill_tip;
           mleft.appendChild(mdot);
-          mleft.appendChild(document.createTextNode(m.name));
+          const mn = document.createElement('span'); mn.textContent = m.name;
+          mleft.appendChild(mn);
+          const kind = document.createElement('span'); kind.className = 'comp';
+          kind.textContent = m.kind === 'plugin' ? t().kind_plugin : t().kind_skill;
+          mleft.appendChild(kind);
           const rm = document.createElement('span'); rm.className='tag clickable danger'; rm.textContent=t().remove;
           rm.title = t().remove_tip(m.name, g.name);
-          rm.onclick = () => { if(confirm(t().remove_confirm(m.name, g.name))) editGroup('remove', g.name, m.name); };
+          rm.onclick = () => { if(confirm(t().remove_confirm(m.name, g.name))) editGroup('remove', g.name, m.name, m.kind); };
           mrow.appendChild(mleft); mrow.appendChild(rm);
           wrap.appendChild(mrow);
         }
 
         const addRow = document.createElement('div'); addRow.className='row sub';
         const addSel = document.createElement('select');
-        addSel.style.cssText='background:var(--bg);color:var(--dim);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px';
-        const ph = document.createElement('option'); ph.value=''; ph.textContent=t().add_plugin_ph;
+        addSel.style.cssText='background:var(--bg);color:var(--dim);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;max-width:100%';
+        const ph = document.createElement('option'); ph.value=''; ph.textContent=t().add_member_ph;
         addSel.appendChild(ph);
-        for(const pl of p.all_plugins){
-          if(g.members.some(m => m.name === pl)) continue;
-          const o = document.createElement('option'); o.value=pl; o.textContent=pl;
-          addSel.appendChild(o);
-        }
-        addSel.onchange = () => { if(addSel.value) editGroup('add', g.name, addSel.value); };
+        const mk = (label, items, kind) => {
+          const grp = document.createElement('optgroup'); grp.label = label;
+          for(const it of items){
+            if(g.members.some(m => m.name === it && m.kind === kind)) continue;
+            const o = document.createElement('option'); o.value = kind + ':' + it; o.textContent = it;
+            grp.appendChild(o);
+          }
+          if(grp.children.length) addSel.appendChild(grp);
+        };
+        mk(t().kind_plugin, p.all_plugins||[], 'plugin');
+        mk(t().kind_skill, p.all_skills||[], 'skill');
+        addSel.onchange = () => {
+          if(!addSel.value) return;
+          const [kind, ...rest] = addSel.value.split(':');
+          editGroup('add', g.name, rest.join(':'), kind);
+        };
         addRow.appendChild(addSel);
         wrap.appendChild(addRow);
         c.appendChild(wrap);
@@ -1512,7 +1615,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
-            ok, err = modify_group(payload.get("action", ""), payload.get("group", ""), payload.get("plugin", ""))
+            ok, err = modify_group(payload.get("action", ""), payload.get("group", ""),
+                                   payload.get("member", "") or payload.get("plugin", ""),
+                                   payload.get("kind", "plugin"))
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/activate":
             length = int(self.headers.get("Content-Length", 0))
@@ -1520,7 +1625,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
-            ok, err = activate_group(payload.get("group", ""))
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = assign_set(payload.get("group", ""), project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/linkskill":
             length = int(self.headers.get("Content-Length", 0))
