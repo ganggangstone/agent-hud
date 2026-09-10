@@ -666,8 +666,11 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro 
 h1{margin:0;display:flex;align-items:baseline;gap:.13em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
 h1 .wm-a{font-weight:400;color:var(--text)}
 h1 .wm-b{font-weight:800;color:var(--text)}
-#h1sub{display:block;margin-top:5px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace}
+#h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
+  color:var(--dim);font-size:12px;line-height:1.6;max-width:74ch}
+.rule-note b{color:var(--text);font-weight:600}
 #h1sub:lang(ko){letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px}
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
@@ -755,9 +758,9 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
     </span>
   </span>
 </div>
-<div class="note" id="applyBanner" style="margin-bottom:12px"></div>
 <div class="note" id="updateBanner" style="margin-bottom:12px;display:none"></div>
-<div id="tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px"></div>
+<div id="tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:12px"></div>
+<div id="applyBanner" class="rule-note"></div>
 <div class="grid" id="app"></div>
 <div style="max-width:920px;margin-top:16px"><a id="fbLink" class="card-action" href="#" target="_blank" rel="noopener"></a></div>
 <div id="ts"></div>
@@ -771,7 +774,7 @@ const T = {
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
-    active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS GROUP →',
+    on: 'ON', off: 'OFF', activate_hover: 'ONLY THIS GROUP →',
     active_tip: 'On, and every plugin outside this group is off',
     activate_tip: 'Turn this group on and every other plugin off (next session)',
     plugins_count: n => n + (n === 1 ? ' plugin' : ' plugins'),
@@ -819,7 +822,7 @@ const T = {
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
-    active: '켜짐', activate: '꺼짐', activate_hover: '이 그룹만 →',
+    on: '켜짐', off: '꺼짐', activate_hover: '이 그룹만 →',
     active_tip: '지금 이 그룹만 켜져 있습니다',
     activate_tip: '이 그룹만 켜고 나머지는 끕니다. 다음 세션부터 반영됩니다',
     plugins_count: n => '플러그인 ' + n + '개',
@@ -860,7 +863,7 @@ const T = {
     feedback_open: '피드백 보내기 ↗',
   },
 };
-let lang = localStorage.getItem('agent-hud-lang') || 'en';
+let lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
 function renderLangToggle(){
   document.documentElement.lang = lang;
@@ -1049,11 +1052,11 @@ async function tick(){
         const left = document.createElement('span');
         const act = document.createElement('span');
         act.className = 'switch ' + (g.active ? 'sw-on' : 'sw-off');
-        act.textContent = g.active ? t().active : t().activate;
+        act.textContent = g.active ? t().on : t().off;
         act.title = g.active ? t().active_tip : t().activate_tip;
         if(!g.active){
           act.onmouseenter = () => { act.textContent = t().activate_hover; };
-          act.onmouseleave = () => { act.textContent = t().activate; };
+          act.onmouseleave = () => { act.textContent = t().off; };
           act.onclick = () => { if(confirm(t().switch_confirm(g.name, g.members.map(m=>m.name).join(', ') || '(none)'))) activateGroup(g.name, act); };
         }
         left.className = 'sec-left';
@@ -1180,6 +1183,16 @@ async function tick(){
         note.textContent = t().project_label + projectLabel(p.project_dir);
         c.appendChild(note);
       }
+      if(p.agents){
+        const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
+        n.textContent = t().skills_note;
+        c.appendChild(n);
+      }
+      if(!p.rows.length){
+        const e = document.createElement('div'); e.className = 'empty';
+        e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
+        c.appendChild(e);
+      }
       for(const row of p.rows){
         const wrap = document.createElement('div');
         wrap.className = 'section';
@@ -1193,7 +1206,7 @@ async function tick(){
         if(isPlugin){
           const sw = document.createElement('span');
           sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
-          sw.textContent = row.enabled ? 'ON' : 'OFF';
+          sw.textContent = row.enabled ? t().on : t().off;
           sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
           sw.onclick = e => { e.stopPropagation(); toggle(row.name, !row.enabled, sw); };
           left.appendChild(sw);
