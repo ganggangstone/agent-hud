@@ -792,7 +792,7 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 #h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
-  color:var(--dim);font-size:12px;line-height:1.6;max-width:74ch}
+  color:var(--dim);font-size:12px;line-height:1.6}
 .rule-note b{color:var(--text);font-weight:600}
 #h1sub:lang(ko){letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px}
@@ -835,9 +835,7 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .tab-opt.active{background:var(--accent);color:#fff}
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
-.note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;max-width:74ch;text-wrap:pretty}
-/* 74ch는 여러 줄 산문에는 맞지만, 한 줄이면 될 안내를 굳이 접는다 */
-.note.wide{max-width:none}
+.note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
 span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
@@ -1314,7 +1312,7 @@ async function tick(){
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
       }
-      const an = document.createElement('div'); an.className='note wide'; an.style.marginTop='14px';
+      const an = document.createElement('div'); an.className='note'; an.style.marginTop='14px';
       an.textContent = t().agents_note;
       c.appendChild(an);
       if(p.truncated){
@@ -1359,7 +1357,7 @@ async function tick(){
         c.appendChild(note);
       }
       if(p.agents){
-        const n = document.createElement('div'); n.className = 'note wide'; n.style.marginBottom = '12px';
+        const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;
         c.appendChild(n);
       }
