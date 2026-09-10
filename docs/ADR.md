@@ -343,3 +343,24 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 **"이 프로젝트 = 이 세트"를 만들 때의 제약이 여기서 나온다.** 프로젝트 단위로 바꿀 수 있는
 것은 스킬(과 서브에이전트)뿐이다. 훅·커맨드·MCP·LSP는 플러그인을 전역으로 켜야 동작하고,
 `enabledPlugins`는 사용자 전역 값 하나뿐이라 프로젝트마다 다르게 둘 수 없다.
+
+### 덧3: 프로젝트 등록은 Claude Code에 묶여 있지 않다 (2026-09-10 정정)
+
+프로젝트 목록이 Claude Code의 `SessionStart` 훅으로만 채워지고 있어서 "다른 에이전트만 쓰는
+사람은 프로젝트를 잡을 방법이 없다"고 적을 뻔했다. **틀렸다.** 네 도구 모두 세션 시작 훅이 있다:
+
+| 도구 | 훅 | 설정 |
+|---|---|---|
+| Claude Code | `SessionStart` | `~/.claude/settings.json` (JSON) |
+| Codex | `SessionStart` | `~/.codex/config.toml` (TOML) — 저장소 안 `.codex/config.toml`에 넣으면 대화형에서 안 도는 버그가 보고돼 있다 |
+| Copilot | `sessionStart` | JSON. 훅 입력에 `cwd`가 들어온다 |
+| Gemini CLI | `gemini hooks` | 자체 명령. **`gemini hooks migrate`로 Claude Code 훅을 가져온다** |
+
+이 기계의 ponytail 플러그인이 이미 `claude-codex-hooks.json`, `copilot-hooks.json`,
+`qoder-hooks.json`을 들고 있었다 — 근거가 손안에 있었는데 안 봤다.
+
+**그런데 훅은 두 번째 선택지다.** 훅을 심으려면 도구 네 개의 설정 파일을 우리가 편집해야 하고,
+형식이 JSON·TOML로 갈리며, 지울 때 우리가 뭘 어디 넣었는지 다시 찾아야 한다 — `.zshrc`를
+직접 고치지 않기로 한 것과 같은 문제다. 그래서 먼저 만든 것은 **`+ 폴더 추가`**다. 우리
+`projects.json`에만 쓰고, 도구가 하나도 안 깔린 기계에서도 되고, 목록에서 빼면 끝난다.
+훅 자동 등록은 나중에 **선택 기능**으로 둔다.

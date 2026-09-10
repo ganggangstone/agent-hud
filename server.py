@@ -924,8 +924,7 @@ const T = {
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
     groups_legend: 'A set is the plugins and skills you use together. Applying one to a project links its skills there and turns its plugins on for Claude Code.',
-    no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
-    project_label: 'project: ',
+    no_project: 'No folders yet. Add one, or open an agent session inside a folder and it appears here',
   not_found: 'not found',
   agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
@@ -940,6 +939,10 @@ const T = {
   all_plugins_note: 'On or off for Claude Code, on this whole computer. Takes effect next session.',
   plugin_on_here: 'This plugin is on. Turn it off in the Groups tab',
   plugin_off_here: 'This plugin is off, so Claude Code does not load its skills. Turn it on in the Groups tab',
+  add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
+  add_project_prompt: 'Full path of the folder to add:',
+  add_project_failed: 'Could not add that folder: ',
+  no_project_yet: 'no folders yet',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -986,8 +989,7 @@ const T = {
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 스킬은 그 프로젝트에 걸리고, 플러그인은 Claude Code에서 켜집니다.',
-    no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
-    project_label: '프로젝트: ',
+    no_project: '아직 폴더가 없습니다. 직접 추가하거나, 폴더 안에서 에이전트 세션을 열면 나타납니다',
   not_found: '없음',
   agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
@@ -1002,6 +1004,10 @@ const T = {
   all_plugins_note: 'Claude Code에서 켜고 끕니다. 이 컴퓨터 전체에 적용되고 다음 세션부터 반영됩니다.',
   plugin_on_here: '켜져 있는 플러그인입니다. 끄려면 그룹 탭으로 가세요',
   plugin_off_here: '꺼져 있어서 Claude Code가 이 스킬들을 안 읽습니다. 켜려면 그룹 탭으로 가세요',
+  add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
+  add_project_prompt: '추가할 폴더의 전체 경로:',
+  add_project_failed: '폴더를 추가하지 못했습니다: ',
+  no_project_yet: '아직 폴더가 없습니다',
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -1095,9 +1101,6 @@ const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get(
 function stateUrl(){
   return '/api/state' + (selectedProject ? ('?project=' + encodeURIComponent(selectedProject)) : '');
 }
-function projectLabel(dir){
-  return (dir && dir !== '/') ? dir : t().no_project;
-}
 async function showContent(path, box, caretEl){
   const open = box.classList.contains('open');
   if(open){ box.classList.remove('open'); polling = true; if(caretEl) caretEl.textContent = '▸ '; return; }
@@ -1171,6 +1174,42 @@ function renderFeedback(upd){
   const a = document.getElementById('fbLink');
   a.textContent = t().feedback_open;
   a.href = `https://github.com/${upd.repo}/issues/new?template=feedback.yml&version=${encodeURIComponent(upd.version)}`;
+}
+// 프로젝트 선택기. 두 탭이 같은 코드를 복사해 갖고 있었다.
+// 목록이 비어도 보여준다 -- 폴더를 직접 더할 수 있어야 시작이 되기 때문이다.
+function projectPicker(p){
+  const box = document.createElement('div');
+  box.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:10px';
+  const sel = document.createElement('select');
+  sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;flex:1;min-width:0';
+  const list = p.known_projects || [];
+  if(!list.length){
+    const o = document.createElement('option'); o.textContent = t().no_project_yet; sel.appendChild(o);
+    sel.disabled = true;
+  }
+  for(const pr of list){
+    const o = document.createElement('option'); o.value = pr; o.textContent = pr;
+    if(pr === p.project_dir) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
+  const add = document.createElement('span'); add.className = 'card-action';
+  add.textContent = t().add_project; add.title = t().add_project_tip;
+  add.onclick = async () => {
+    const path = (prompt(t().add_project_prompt) || '').trim();
+    if(!path) return;
+    polling = false;
+    try{
+      const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
+      const d = await r.json();
+      if(!d.ok){ alert(t().add_project_failed + (d.error || t().error)); }
+      else { selectedProject = path; localStorage.setItem('agent-hud-project', path); }
+    } catch(e){ alert(t().add_project_failed + e); }
+    polling = true;
+    await tick();
+  };
+  box.appendChild(sel); box.appendChild(add);
+  return box;
 }
 async function tick(){
   if(!polling) return;
@@ -1321,21 +1360,7 @@ async function tick(){
       }
     } else if(p.files){
       c.appendChild(h);
-      if(p.known_projects && p.known_projects.length > 1){
-        const sel = document.createElement('select');
-        sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:10px;font-size:12px;width:100%';
-        for(const pr of p.known_projects){
-          const opt = document.createElement('option'); opt.value = pr; opt.textContent = pr;
-          if(pr === p.project_dir) opt.selected = true;
-          sel.appendChild(opt);
-        }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
-        c.appendChild(sel);
-      } else {
-        const note = document.createElement('div'); note.className = 'note';
-        note.textContent = t().project_label + projectLabel(p.project_dir);
-        c.appendChild(note);
-      }
+      c.appendChild(projectPicker(p));
       for(const f of p.files){
         const el = document.createElement('div'); el.className = 'row' + (f.exists ? ' clickable' : '');
         const left = document.createElement('span');
@@ -1380,21 +1405,7 @@ async function tick(){
       }
     } else {
       c.appendChild(h);
-      if(p.known_projects && p.known_projects.length > 1){
-        const sel = document.createElement('select');
-        sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:10px;font-size:12px;width:100%';
-        for(const pr of p.known_projects){
-          const opt = document.createElement('option'); opt.value = pr; opt.textContent = pr;
-          if(pr === p.project_dir) opt.selected = true;
-          sel.appendChild(opt);
-        }
-        sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
-        c.appendChild(sel);
-      } else {
-        const note = document.createElement('div'); note.className = 'note';
-        note.textContent = t().project_label + projectLabel(p.project_dir);
-        c.appendChild(note);
-      }
+      c.appendChild(projectPicker(p));
       if(p.agents){
         const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;
