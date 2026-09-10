@@ -106,7 +106,6 @@ def collect_update(ctx):
 
 def collect_groups(ctx):
     project_dir = default_project_dir(ctx)
-    pskills = plugin_skills()
     modes = read_json(MODES_FILE)
     settings = read_json(os.path.join(CLAUDE_DIR, "settings.json"))
     enabled = settings.get("enabledPlugins", {})
@@ -114,14 +113,9 @@ def collect_groups(ctx):
     groups = []
     for gname, members in modes.items():
         members = [m for m in members if m in installed]
-        gskills = {}
-        for m in members:
-            gskills.update(pskills.get(m, {}))
         groups.append({
             "name": gname,
             "members": [{"name": m, "enabled": bool(enabled.get(m, False))} for m in members],
-            "skill_count": len(gskills),
-            "skills_linked": group_link_state(project_dir, gskills),
             # a group counts as "active" when every member is on and every plugin outside it is off
             "active": bool(members)
                 and all(enabled.get(m, False) for m in members)
@@ -398,13 +392,6 @@ def _link_path(project_dir, rel, skill):
     return os.path.join(project_dir, rel.replace("/", os.sep), skill)
 
 
-def group_link_state(project_dir, skills):
-    """이 그룹의 스킬이 프로젝트에 몇 개나 걸려 있나."""
-    if not skills:
-        return 0
-    return sum(1 for sk in skills if all(os.path.islink(_link_path(project_dir, d, sk)) for d in GROUP_LINK_DIRS))
-
-
 def skill_sources(project_dir):
     """{스킬 이름: 원본 폴더}. 원본은 플러그인 폴더나 사용자 스킬 폴더에서만 찾는다 --
     프로젝트 안의 링크를 원본으로 삼으면 자기 자신을 가리키게 된다."""
@@ -453,50 +440,6 @@ def link_skill(name, on, project_dir):
     except Exception as e:
         return False, str(e)
     return True, ""
-
-
-def apply_skill_group(group, project_dir):
-    """group의 스킬을 링크하고, 다른 그룹에만 있는 스킬의 링크는 뺀다.
-    group이 빈 문자열이면 전부 뺀다(끄기)."""
-    if not project_dir or not os.path.isdir(project_dir):
-        return False, "project not found"
-    modes = read_json(MODES_FILE, {})
-    if group and group not in modes:
-        return False, "unknown group"
-    pskills = plugin_skills()
-    wanted, managed = {}, {}
-    for gname, members in modes.items():
-        for m in members:
-            for sk, path in pskills.get(m, {}).items():
-                managed[sk] = path
-                if gname == group:
-                    wanted[sk] = path
-    linked = removed = 0
-    try:
-        for rel in GROUP_LINK_DIRS:
-            d = os.path.join(project_dir, rel.replace("/", os.sep))
-            for sk, src in wanted.items():
-                os.makedirs(d, exist_ok=True)
-                dst = os.path.join(d, sk)
-                if os.path.islink(dst):
-                    if os.path.realpath(dst) == os.path.realpath(src):
-                        continue
-                    os.unlink(dst)
-                elif os.path.exists(dst):
-                    continue  # 진짜 폴더는 우리 것이 아니다. 절대 건드리지 않는다.
-                os.symlink(src, dst)
-                linked += 1
-            for sk in managed:
-                if sk in wanted:
-                    continue
-                dst = os.path.join(d, sk)
-                # 심볼릭 링크만 지운다. 진짜 폴더는 사용자 것이다.
-                if os.path.islink(dst):
-                    os.unlink(dst)
-                    removed += 1
-    except Exception as e:
-        return False, str(e)
-    return True, f"{linked} linked, {removed} removed"
 
 
 def _common_agents(skills):
@@ -580,19 +523,9 @@ def collect_skills(ctx):
             "skills": loose,
         })
 
-    groups = []
-    pskills = plugin_skills()
-    for gname, members in modes.items():
-        gs = {}
-        for m in members:
-            gs.update(pskills.get(m, {}))
-        if gs:
-            groups.append({"name": gname, "skill_count": len(gs),
-                           "linked": group_link_state(project_dir, gs) == len(gs)})
     return {
         "title": "Skills (who can see them)",
         "rows": rows,
-        "groups": groups,
         "agents": SKILL_AGENTS,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -793,19 +726,11 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .card-action{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;white-space:nowrap}
 .card-action:hover{opacity:.75}
-.shortcut{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:14px 0}
-.shortcut-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:6px}
-.help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
-  border:1px solid var(--border);border-radius:999px;font-size:10px;font-weight:600;
-  color:var(--dim);cursor:help;flex:0 0 auto}
-.help:hover,.help:focus-visible,.help.open{color:var(--accent);border-color:var(--accent);outline:none}
-.help{cursor:pointer}
 .btn{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:4px;
   padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--accent);color:var(--panel)}
 .btn-on{border-color:var(--on);color:var(--on);background:var(--on-tint)}
 .btn-on:hover{background:var(--on);color:var(--panel)}
-.note+.shortcut{margin-top:12px}
 #ts{color:var(--dim);font-size:11px;margin-top:16px}
 </style></head><body>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
@@ -836,58 +761,48 @@ const T = {
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
   skills_note: 'A struck-through agent cannot see that skill in this project. Skills inside a plugin are read by Claude Code only.',
   no_skills: 'No skills found in any known folder.',
-  link_group: n => `Add to this project (${n})`,
-  link_group_named: (g,n) => `${g} · add to this project (${n})`,
-  unlink_group: 'Remove from this project',
-  link_confirm: (g, n, p) => `Open "${g}" (${n} skills) to every agent in this project?\n\n${p}\n\nSymlinks go under .claude/skills and .agents/skills.\nOther groups' links are removed. Originals stay put.`,
-  unlink_confirm: p => `Close these skills to the other agents?\n\n${p}\n\nOnly the links are removed.`,
-  link_failed: 'Could not update skill links: ',
-  linked_badge: 'shared',
+  link_failed: 'Could not share that skill: ',
   claude_only_tag: 'Claude Code only',
   loose_skills: 'Skills not from a plugin',
-  group_shortcut: 'Let Codex, Cursor, Copilot and Gemini use these too',
-  group_shortcut_sub: 'Only this project changes. Other projects and the original skills stay as they are.',
-  group_shortcut_help: 'Creates symlinks under this project\u2019s .claude/skills and .agents/skills. The original folders are not moved; pressing again removes only the links.',
-    active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS →',
+    active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS GROUP →',
     active_tip: 'On, and every plugin outside this group is off',
-    activate_tip: 'Turn this group on and the rest off (next session)',
-    plugins_count: n => n + ' plugins',
+    activate_tip: 'Turn this group on and every other plugin off (next session)',
+    plugins_count: n => n + (n === 1 ? ' plugin' : ' plugins'),
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
     add_plugin_ph: '+ add a plugin to this group…',
-    new_group: '+ create a new group', new_group_tip: 'a group is a set of plugins you switch on together (e.g. one for coding, one for video work)',
+    new_group: '+ create a new group', new_group_tip: 'Plugins you switch on together. For example one set for coding, one for video work',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
-    not_in_group: list => 'not in any group: ' + list,
+    not_in_group: list => 'Not in any group yet: ' + list,
     groups_legend: 'A group is a set of plugins you use together. Turning one on turns the others off, everywhere on this computer.',
     switch_confirm: (g,list) => `Turn on only "${g}"?\n\nOn: ${list}\nOff: every other plugin`,
-    no_project: 'no project seen yet. start a Claude Code session inside a project folder and it will appear here automatically',
+    no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
     project_label: 'project: ',
-    click_to_open: 'click to open', not_found: 'not found',
   agents_claude_only: 'Subagents below are Claude Code only.',
-  share_to: names => 'also for ' + names.join(', '),
-  share_done: 'every agent',
+  share_to: names => 'also use in ' + names.join(', '),
+  share_done: 'in every agent',
   share_all_tip: 'Makes this skill usable by those agents in this project. Links it into the folders it is missing from; the original never moves.',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
-    no_subagents: 'no subagents registered',
+    no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
-    toggle_failed: 'toggle failed: ', group_update_failed: 'group update failed: ',
-    activation_failed: 'activation failed: ', skill_update_failed: 'skill update failed: ',
-    plugin_on_tip: 'this plugin is enabled — click to disable it (takes effect next session)',
-    plugin_off_tip: 'this plugin is disabled — click to enable it (takes effect next session)',
-    show_skills_tip: 'click to show the skills inside this plugin', no_skills_tip: 'this plugin has no skills',
-    skills_count: n => n + ' skills',
-    group_tag: g => 'group: ' + g, group_tag_tip: 'manage groups in the Groups panel above',
+    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
+    activation_failed: 'Could not turn that group on: ', skill_update_failed: 'Could not change that skill: ',
+    plugin_on_tip: 'On. Click to turn it off (next session)',
+    plugin_off_tip: 'Off. Click to turn it on (next session)',
+    show_skills_tip: 'Click to list the skills in this plugin', no_skills_tip: 'This plugin ships no skills',
+    skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
+    group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
     blocked: 'BLOCKED', allowed: 'ALLOWED',
-    blocked_tip: 'blocked in this project — click to allow it again (applies immediately)',
-    allowed_tip: 'allowed in this project — click to block just this skill here (applies immediately)',
-    read_full_tip: 'click to read the full description',
-    no_skills_found: 'no skills found in this plugin',
+    blocked_tip: 'Blocked in this project. Click to allow it again',
+    allowed_tip: 'Click to block this one skill in this project',
+    read_full_tip: 'Read the full description',
+    no_skills_found: 'No skills',
     updated: 'updated: ',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
-    feedback_open: 'report an issue ↗',
+    feedback_open: 'send feedback ↗',
   },
   ko: {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
@@ -895,18 +810,9 @@ const T = {
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
   skills_note: '취소선이 그어진 에이전트는 이 프로젝트에서 그 스킬을 못 봅니다. 플러그인 안의 스킬은 원래 Claude Code만 읽습니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
-  link_group: n => `이 프로젝트에 넣기 (${n})`,
-  link_group_named: (g,n) => `${g} · 이 프로젝트에 넣기 (${n})`,
-  unlink_group: '이 프로젝트에서 빼기',
-  link_confirm: (g, n, p) => `"${g}" 스킬 ${n}개를 넣을까요?\n\n${p}\n\n이 폴더의 .claude/skills와 .agents/skills에 바로가기가 생깁니다.\n다른 그룹 것은 빠지고, 원본은 그대로 남습니다.`,
-  unlink_confirm: p => `넣어둔 스킬을 뺄까요?\n\n${p}\n\n바로가기만 지우고 원본은 남습니다.`,
   link_failed: '스킬을 넣지 못했습니다: ',
-  linked_badge: '공유 중',
   claude_only_tag: 'Claude Code 전용',
   loose_skills: '플러그인 밖의 스킬',
-  group_shortcut: 'Codex · Cursor · Copilot · Gemini도 쓰게 하기',
-  group_shortcut_sub: '이 프로젝트에서만 바뀝니다. 다른 프로젝트와 원본 스킬은 그대로입니다.',
-  group_shortcut_help: '이 프로젝트의 .claude/skills와 .agents/skills에 심볼릭 링크를 만듭니다. 원본 폴더는 움직이지 않고, 다시 누르면 링크만 지웁니다.',
     active: '켜짐', activate: '꺼짐', activate_hover: '이 그룹만 →',
     active_tip: '지금 이 그룹만 켜져 있습니다',
     activate_tip: '이 그룹만 켜고 나머지는 끕니다. 다음 세션부터 반영됩니다',
@@ -922,7 +828,6 @@ const T = {
     switch_confirm: (g,list) => `"${g}" 그룹만 켤까요?\n\n켜짐: ${list}\n꺼짐: 나머지 플러그인 전부`,
     no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
-    click_to_open: '누르면 열립니다', not_found: '없음',
   agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
   share_to: names => names.join('·') + '도 쓰기',
   share_done: '전부 쓰는 중',
@@ -946,7 +851,7 @@ const T = {
     updated: '갱신: ',
     switching: '바꾸는 중…',
     update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
-    feedback_open: '문제 신고하기 ↗',
+    feedback_open: '피드백 보내기 ↗',
   },
 };
 let lang = localStorage.getItem('agent-hud-lang') || 'en';
@@ -1012,7 +917,6 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
-let helpOpen = false;
 const skillsOpen = {};
 function stateUrl(){
   return '/api/state' + (selectedProject ? ('?project=' + encodeURIComponent(selectedProject)) : '');
@@ -1058,16 +962,6 @@ async function linkSkill(names, on, el){
   polling = false; el.classList.add('busy');
   try{
     const r = await fetch('/api/linkskill', {method:'POST', body: JSON.stringify({names: [].concat(names), on, project: currentProjectDir})});
-    const d = await r.json();
-    if(!d.ok) alert(t().link_failed + (d.error || t().error));
-  } catch(e){ alert(t().link_failed + e); }
-  polling = true;
-  await tick();
-}
-async function linkGroup(name, btn){
-  polling = false; btn.classList.add('busy');
-  try{
-    const r = await fetch('/api/linkgroup', {method:'POST', body: JSON.stringify({group: name, project: currentProjectDir})});
     const d = await r.json();
     if(!d.ok) alert(t().link_failed + (d.error || t().error));
   } catch(e){ alert(t().link_failed + e); }
@@ -1304,38 +1198,6 @@ async function tick(){
         note.textContent = t().project_label + projectLabel(p.project_dir);
         c.appendChild(note);
       }
-      if(p.groups && p.groups.length){
-        const box = document.createElement('div'); box.className = 'shortcut';
-        const lab = document.createElement('div'); lab.className = 'shortcut-title';
-        lab.textContent = t().group_shortcut;
-        const help = document.createElement('span');
-        help.className = 'help' + (helpOpen ? ' open' : '');
-        help.textContent = '?'; help.tabIndex = 0;
-        lab.appendChild(help);
-        const helpBox = document.createElement('div');
-        helpBox.className = 'content' + (helpOpen ? ' open' : '');
-        helpBox.textContent = t().group_shortcut_help;
-        const toggleHelp = () => { helpOpen = !helpOpen; rerender(); };
-        help.onclick = toggleHelp;
-        help.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleHelp(); } };
-        const sub = document.createElement('div'); sub.className = 'note';
-        sub.textContent = t().group_shortcut_sub;
-        box.appendChild(lab); box.appendChild(sub); box.appendChild(helpBox);
-        const bar = document.createElement('div');
-        bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
-        for(const g of p.groups){
-          const b = document.createElement('span');
-          b.className = 'btn' + (g.linked ? ' btn-on' : '');
-          b.textContent = g.linked ? `${g.name} · ${t().linked_badge}` : t().link_group_named(g.name, g.skill_count);
-          b.onclick = () => {
-            if(g.linked){ if(confirm(t().unlink_confirm(p.project_dir))) linkGroup('', b); }
-            else if(confirm(t().link_confirm(g.name, g.skill_count, p.project_dir))) linkGroup(g.name, b);
-          };
-          bar.appendChild(b);
-        }
-        box.appendChild(bar);
-        c.appendChild(box);
-      }
       for(const row of p.rows){
         const wrap = document.createElement('div');
         const el = document.createElement('div'); el.className='row';
@@ -1553,17 +1415,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not ok:
                     errs.append(f"{n}: {err}")
             self._send_json({"ok": not errs, "error": "; ".join(errs[:3])})
-        elif self.path == "/api/linkgroup":
-            length = int(self.headers.get("Content-Length", 0))
-            try:
-                payload = json.loads(self.rfile.read(length) or b"{}")
-            except Exception:
-                return self._send_json({"ok": False, "error": "bad request"}, 400)
-            project = payload.get("project", "") or PROJECT_DIR
-            if project not in known_projects():
-                return self._send_json({"ok": False, "error": "unknown project"}, 400)
-            ok, err = apply_skill_group(payload.get("group", ""), project)
-            self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/skill":
             length = int(self.headers.get("Content-Length", 0))
             try:
