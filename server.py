@@ -787,9 +787,7 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0 auto;padding:28px;max-width:976px;-webkit-font-smoothing:antialiased}
-h1{margin:0;display:flex;align-items:baseline;gap:.13em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
-h1 .wm-a{font-weight:400;color:var(--text)}
-h1 .wm-b{font-weight:800;color:var(--text)}
+h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--text)}
 #h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
@@ -878,7 +876,7 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 </style></head><body>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
   <span>
-    <h1><span class="wm-a">Agent</span><span class="wm-b">HUD</span></h1>
+    <h1>Agent HUD</h1>
     <span id="h1sub"></span>
   </span>
   <span style="display:flex;gap:8px">
@@ -1089,6 +1087,8 @@ const contentCache = {};
 // ?open=<플러그인> 으로 펼친 채 열 수 있다 (?tab= 과 같은 이유)
 const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get('open')||'')
   .split(',').filter(Boolean).map(k => [k, true]));
+// 플러그인 밖의 스킬은 펼친 채로 시작한다. 보통 몇 개뿐이고, 접어두면 있는 줄도 모른다.
+if(!('__loose__' in skillsOpen)) skillsOpen['__loose__'] = true;
 function stateUrl(){
   return '/api/state' + (selectedProject ? ('?project=' + encodeURIComponent(selectedProject)) : '');
 }
