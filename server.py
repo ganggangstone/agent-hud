@@ -613,7 +613,7 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <style>
 :root{
   --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
-  --accent:#3182f6;--on:#00a870;--off:#8a919e;--on-tint:#e3f9ef;--off-tint:#eef0f2;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;
   --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
 }
 :root[data-theme="dark"]{
@@ -623,11 +623,12 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:28px;-webkit-font-smoothing:antialiased}
-h1{margin:0;display:flex;align-items:baseline;gap:.26em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
-h1 .wm-a{font-weight:300;color:var(--dim)}
+h1{margin:0;display:flex;align-items:baseline;gap:.13em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
+h1 .wm-a{font-weight:400;color:var(--text)}
 h1 .wm-b{font-weight:800;color:var(--text)}
-#h1sub{display:block;margin-top:5px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+#h1sub{display:block;margin-top:5px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace}
+#h1sub:lang(ko){letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px;max-width:920px}
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
 .card.wide{grid-column:1/-1}
@@ -646,22 +647,24 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .dot.busy{opacity:.4;cursor:wait}
 .on{background:var(--on)} .off{background:var(--off)}
 .switch{display:inline-flex;align-items:center;justify-content:center;min-width:44px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:4px;margin-right:10px;cursor:pointer;user-select:none;transition:background .12s,color .12s,transform .12s}
-.switch:hover{opacity:.85}
-.sw-off.switch:hover{background:var(--accent);color:#fff}
+.sw-on.switch:hover{background:var(--on);color:var(--panel);border-color:var(--on)}
+.sw-off.switch:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .switch:active{transform:scale(.96)}
 .switch.busy{opacity:.4;cursor:wait}
 .lang-opt{padding:6px 12px;cursor:pointer;color:var(--dim);transition:background .12s,color .12s;font-size:12px}
 .lang-opt:hover{color:var(--text)}
 .lang-opt.active{background:var(--accent);color:#fff}
+.quiet-toggle .lang-opt.active{background:var(--off-tint);color:var(--text)}
 .tab-opt{padding:7px 14px;cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;transition:background .12s,color .12s}
 .tab-opt:not(:last-child){border-right:1px solid var(--border)}
 .tab-opt:hover{color:var(--text)}
 .tab-opt.active{background:var(--accent);color:#fff}
-.sw-on{background:var(--on-tint);color:var(--on)}
-.sw-off{background:var(--off-tint);color:var(--off)}
+.sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
+.sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;max-width:74ch;text-wrap:pretty}
 .clickable{cursor:pointer}
-.clickable:hover{color:var(--accent)}
+.row.clickable:hover{background:var(--off-tint)}
+span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .content{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:6px 0 10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;max-height:360px;overflow:auto;display:none}
 .content.open{display:block}
 .badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
@@ -677,7 +680,16 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .card-action{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;white-space:nowrap}
 .card-action:hover{opacity:.75}
 .shortcut{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:14px 0}
-.shortcut-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.shortcut-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  border:1px solid var(--border);border-radius:999px;font-size:10px;font-weight:600;
+  color:var(--dim);cursor:help;flex:0 0 auto}
+.help:hover,.help:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.btn{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:4px;
+  padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--accent);color:var(--panel)}
+.btn-on{border-color:var(--on);color:var(--on);background:var(--on-tint)}
+.btn-on:hover{background:var(--on);color:var(--panel)}
 .note+.shortcut{margin-top:12px}
 #ts{color:var(--dim);font-size:11px;margin-top:16px}
 </style></head><body>
@@ -690,7 +702,7 @@ h1 .wm-b{font-weight:800;color:var(--text)}
     <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
     </span>
-    <span id="themeToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
+    <span id="themeToggle" class="quiet-toggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="themeLight" class="lang-opt">☀</span><span id="themeDark" class="lang-opt">☾</span>
     </span>
   </span>
@@ -707,19 +719,20 @@ const T = {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
-  skills_note: 'Badges show which agents can see each skill in this project. An agent sees a skill only if it reads the folder the skill sits in.',
+  skills_note: 'A struck-through agent cannot see that skill in this project. Skills inside a plugin are read by Claude Code only.',
   no_skills: 'No skills found in any known folder.',
-  link_group: n => `Use in this project (${n} skills)`,
-  link_group_named: (g,n) => `${g} · ${n}`,
+  link_group: n => `Add to this project (${n})`,
+  link_group_named: (g,n) => `${g} · add to this project (${n})`,
   unlink_group: 'Remove from this project',
   link_confirm: (g, n, p) => `Open "${g}" (${n} skills) to every agent in this project?\n\n${p}\n\nSymlinks go under .claude/skills and .agents/skills.\nOther groups' links are removed. Originals stay put.`,
   unlink_confirm: p => `Close these skills to the other agents?\n\n${p}\n\nOnly the links are removed.`,
   link_failed: 'Could not update skill links: ',
-  linked_badge: 'open',
+  linked_badge: 'shared',
   claude_only_tag: 'Claude Code only',
   loose_skills: 'Skills not from a plugin',
-  group_shortcut: 'Open a group to the other agents',
-  group_shortcut_sub: 'Links the group\u2019s skills into this project, so Codex, Cursor, Copilot and Gemini CLI can use them too.',
+  group_shortcut: 'Let Codex, Cursor, Copilot and Gemini use these too',
+  group_shortcut_sub: 'Only this project changes. Other projects and the original skills stay as they are.',
+  group_shortcut_help: 'Creates symlinks under this project\u2019s .claude/skills and .agents/skills. The original folders are not moved; pressing again removes only the links.',
     active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS →',
     active_tip: 'On, and every plugin outside this group is off',
     activate_tip: 'Turn this group on and the rest off (next session)',
@@ -752,71 +765,71 @@ const T = {
     allowed_tip: 'allowed in this project — click to block just this skill here (applies immediately)',
     read_full_tip: 'click to read the full description',
     no_skills_found: 'no skills found in this plugin',
-    plugin_note: 'Plugin switch: on or off everywhere. Skill switch: block it in this project only.',
     updated: 'updated: ',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
     feedback_open: 'report an issue ↗',
   },
   ko: {
-    banner: '플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 나머지는 즉시 적용됩니다.',
+    banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
-  skills_note: '뱃지는 이 프로젝트에서 그 스킬을 볼 수 있는 에이전트입니다. 에이전트는 자기가 읽는 폴더에 있는 스킬만 봅니다.',
-  no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
-  link_group: n => `이 프로젝트에서 쓰기 (스킬 ${n}개)`,
-  link_group_named: (g,n) => `${g} · ${n}개`,
+  skills_note: '취소선이 그어진 에이전트는 이 프로젝트에서 그 스킬을 못 봅니다. 플러그인 안의 스킬은 원래 Claude Code만 읽습니다.',
+  no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
+  link_group: n => `이 프로젝트에 넣기 (${n})`,
+  link_group_named: (g,n) => `${g} · 이 프로젝트에 넣기 (${n})`,
   unlink_group: '이 프로젝트에서 빼기',
-  link_confirm: (g, n, p) => `"${g}" 스킬 ${n}개를 이 프로젝트의 모든 에이전트에게 열까요?\n\n${p}\n\n.claude/skills와 .agents/skills에 바로가기를 만듭니다.\n다른 그룹의 바로가기는 빠지고, 원본은 그대로입니다.`,
-  unlink_confirm: p => `이 스킬들을 다른 에이전트에서 뺄까요?\n\n${p}\n\n바로가기만 지웁니다.`,
-  link_failed: '스킬 연결을 바꾸지 못했습니다: ',
-  linked_badge: '열림',
+  link_confirm: (g, n, p) => `"${g}" 스킬 ${n}개를 넣을까요?\n\n${p}\n\n이 폴더의 .claude/skills와 .agents/skills에 바로가기가 생깁니다.\n다른 그룹 것은 빠지고, 원본은 그대로 남습니다.`,
+  unlink_confirm: p => `넣어둔 스킬을 뺄까요?\n\n${p}\n\n바로가기만 지우고 원본은 남습니다.`,
+  link_failed: '스킬을 넣지 못했습니다: ',
+  linked_badge: '공유 중',
   claude_only_tag: 'Claude Code 전용',
-  loose_skills: '플러그인에 속하지 않은 스킬',
-  group_shortcut: '다른 에이전트에서도 쓰기',
-  group_shortcut_sub: '그룹의 스킬을 이 프로젝트에 바로가기로 겁니다. Codex·Cursor·Copilot·Gemini CLI도 그 스킬을 쓰게 됩니다.',
+  loose_skills: '플러그인 밖의 스킬',
+  group_shortcut: 'Codex · Cursor · Copilot · Gemini도 쓰게 하기',
+  group_shortcut_sub: '이 프로젝트에서만 바뀝니다. 다른 프로젝트와 원본 스킬은 그대로입니다.',
+  group_shortcut_help: '이 프로젝트의 .claude/skills와 .agents/skills에 심볼릭 링크를 만듭니다. 원본 폴더는 움직이지 않고, 다시 누르면 링크만 지웁니다.',
     active: '켜짐', activate: '꺼짐', activate_hover: '이 그룹만 →',
-    active_tip: '켜져 있고, 이 그룹 밖의 플러그인은 전부 꺼져 있습니다',
-    activate_tip: '이 그룹만 켜고 나머지는 끕니다 (다음 세션부터)',
-    plugins_count: n => n + '개 플러그인',
-    remove: '제거 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 제거`,
-    remove_confirm: (m,g) => `"${g}" 그룹에서 ${m}를 제거할까요?`,
+    active_tip: '지금 이 그룹만 켜져 있습니다',
+    activate_tip: '이 그룹만 켜고 나머지는 끕니다. 다음 세션부터 반영됩니다',
+    plugins_count: n => '플러그인 ' + n + '개',
+    remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
+    remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
     add_plugin_ph: '+ 이 그룹에 플러그인 추가…',
-    new_group: '+ 새 그룹 만들기', new_group_tip: '그룹은 함께 켜고 끄는 플러그인 묶음입니다 (예: 개발용, 영상제작용)',
+    new_group: '+ 새 그룹 만들기', new_group_tip: '함께 켜고 끌 플러그인을 묶어둡니다. 예를 들어 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
-    new_group_first_prompt: '어떤 플러그인으로 시작할까요?\n',
-    not_in_group: list => '어느 그룹에도 속하지 않음: ' + list,
-    groups_legend: '그룹은 함께 쓰는 플러그인 묶음입니다. 하나를 켜면 나머지는 꺼지고, 이 컴퓨터 전체에 적용됩니다.',
+    new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
+    not_in_group: list => '아직 어느 그룹에도 안 넣은 플러그인: ' + list,
+    groups_legend: '함께 쓰는 플러그인을 묶어둔 것입니다. 하나를 켜면 나머지 그룹은 같이 꺼지고, 이 컴퓨터 전체에 적용됩니다.',
     switch_confirm: (g,list) => `"${g}" 그룹만 켤까요?\n\n켜짐: ${list}\n꺼짐: 나머지 플러그인 전부`,
-    no_project: '아직 감지된 프로젝트가 없습니다. 프로젝트 폴더 안에서 Claude Code 세션을 시작하면 자동으로 여기 나타납니다',
+    no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
-    click_to_open: '클릭해서 열기', not_found: '없음',
-  agents_claude_only: '아래 서브에이전트는 Claude Code 전용입니다.',
+    click_to_open: '누르면 열립니다', not_found: '없음',
+  agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
-    toggle_failed: '토글 실패: ', group_update_failed: '그룹 수정 실패: ',
-    activation_failed: '전환 실패: ', skill_update_failed: '스킬 수정 실패: ',
-    plugin_on_tip: '활성화된 플러그인입니다 — 클릭하면 끕니다 (다음 세션부터 적용)',
-    plugin_off_tip: '비활성화된 플러그인입니다 — 클릭하면 켭니다 (다음 세션부터 적용)',
-    show_skills_tip: '클릭하면 이 플러그인의 스킬 목록이 보입니다', no_skills_tip: '이 플러그인에는 스킬이 없습니다',
-    skills_count: n => n + '개 스킬',
-    group_tag: g => '그룹: ' + g, group_tag_tip: '위쪽 그룹 패널에서 관리하세요',
+    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
+    activation_failed: '그룹을 켜지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
+    plugin_on_tip: '켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
+    plugin_off_tip: '꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
+    show_skills_tip: '누르면 스킬 목록이 펼쳐집니다', no_skills_tip: '스킬이 없는 플러그인입니다',
+    skills_count: n => '스킬 ' + n + '개',
+    group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
-    blocked: '차단됨', allowed: '허용됨',
-    blocked_tip: '이 프로젝트에서 차단됨 — 클릭하면 다시 허용 (즉시 적용)',
-    allowed_tip: '이 프로젝트에서 허용됨 — 클릭하면 이 스킬만 차단 (즉시 적용)',
-    read_full_tip: '클릭하면 전체 설명 보기',
-    no_skills_found: '이 플러그인에는 스킬이 없습니다',
-    plugin_note: '플러그인 스위치는 컴퓨터 전체를 켜고 끕니다. 스킬 스위치는 이 프로젝트에서만 막습니다.',
+    blocked: '차단', allowed: '허용',
+    blocked_tip: '이 프로젝트에서 막아둔 스킬입니다. 누르면 풉니다',
+    allowed_tip: '누르면 이 프로젝트에서만 막습니다',
+    read_full_tip: '설명 전체 보기',
+    no_skills_found: '스킬이 없습니다',
     updated: '갱신: ',
-    switching: '전환 중…',
-    update_available: (v, latest, repo) => `↑ v${latest} 사용 가능 (현재 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
+    switching: '바꾸는 중…',
+    update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
     feedback_open: '문제 신고하기 ↗',
   },
 };
 let lang = localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
 function renderLangToggle(){
+  document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
   document.getElementById('langKo').classList.toggle('active', lang === 'ko');
 }
@@ -1150,13 +1163,14 @@ async function tick(){
         note.textContent = t().project_label + projectLabel(p.project_dir);
         c.appendChild(note);
       }
-      const swNote = document.createElement('div'); swNote.className='note';
-      swNote.textContent = t().plugin_note;
-      c.appendChild(swNote);
       if(p.groups && p.groups.length){
         const box = document.createElement('div'); box.className = 'shortcut';
         const lab = document.createElement('div'); lab.className = 'shortcut-title';
         lab.textContent = t().group_shortcut;
+        const help = document.createElement('span'); help.className = 'help';
+        help.textContent = '?'; help.title = t().group_shortcut_help;
+        help.tabIndex = 0;
+        lab.appendChild(help);
         const sub = document.createElement('div'); sub.className = 'note';
         sub.textContent = t().group_shortcut_sub;
         box.appendChild(lab); box.appendChild(sub);
@@ -1164,7 +1178,7 @@ async function tick(){
         bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
         for(const g of p.groups){
           const b = document.createElement('span');
-          b.className = 'switch ' + (g.linked ? 'sw-on' : 'sw-off');
+          b.className = 'btn' + (g.linked ? ' btn-on' : '');
           b.textContent = g.linked ? `${g.name} · ${t().linked_badge}` : t().link_group_named(g.name, g.skill_count);
           b.onclick = () => {
             if(g.linked){ if(confirm(t().unlink_confirm(p.project_dir))) linkGroup('', b); }
