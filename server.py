@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil
+import json, os, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -643,9 +643,24 @@ def modify_skill_permission(action, plugin, skill, project_dir):
     return True, ""
 
 
+_last_cpu = [time.monotonic(), sum(os.times()[:2])]
+
+
+def proc_usage():
+    """이 서버 자신의 메모리와 CPU. 폴링하는 도구라 스스로 얼마나 먹는지 보여야 한다.
+    stdlib만 쓴다 -- 이걸 위해 psutil을 넣을 이유는 없다."""
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform != "darwin":
+        rss *= 1024  # 리눅스는 KB, macOS는 바이트로 준다
+    now, cpu = time.monotonic(), sum(os.times()[:2])
+    dw, dc = now - _last_cpu[0], cpu - _last_cpu[1]
+    _last_cpu[0], _last_cpu[1] = now, cpu
+    return {"mb": round(rss / 1048576, 1), "cpu": round(dc / dw * 100, 1) if dw > 0.05 else None}
+
+
 def build_state(project_dir=None):
     ctx = {"project_dir": project_dir}
-    return {"ts": time.time(), "panels": [p(ctx) for p in PANELS]}
+    return {"ts": time.time(), "proc": proc_usage(), "panels": [p(ctx) for p in PANELS]}
 
 
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
@@ -713,6 +728,8 @@ h1 .wm-b{font-weight:800;color:var(--text)}
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;max-width:74ch;text-wrap:pretty}
+/* 74ch는 여러 줄 산문에는 맞지만, 한 줄이면 될 안내를 굳이 접는다 */
+.note.wide{max-width:none}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
 span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
@@ -773,7 +790,7 @@ const T = {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
-  skills_note: 'A struck-through agent cannot see that skill here. Plugins are a Claude Code idea, so no other agent looks inside a plugin folder -- tick the box and the skill is linked into this project, where they all find it.',
+  skills_note: 'Struck through = that agent cannot see the skill. Only Claude Code looks inside plugin folders. Tick the box and every agent finds it.',
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
@@ -813,6 +830,7 @@ const T = {
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
     updated: 'updated ', every_n: n => `every ${n}s`, paused: 'paused',
+    usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · ${cpu}% CPU`),
     period_tip: 'How often this page re-reads the files',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
@@ -822,7 +840,7 @@ const T = {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
-  skills_note: '취소선이 그어진 에이전트는 여기서 그 스킬을 못 봅니다. 플러그인은 Claude Code에만 있는 개념이라 다른 에이전트는 플러그인 폴더 자체를 들여다보지 않습니다. 체크박스를 켜면 스킬이 이 프로젝트 폴더에 걸려서 모두가 찾을 수 있게 됩니다.',
+  skills_note: '취소선 = 그 에이전트가 못 보는 스킬. 플러그인 폴더는 Claude Code만 보기 때문입니다. 체크박스를 켜면 모든 에이전트가 찾습니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
@@ -862,6 +880,7 @@ const T = {
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
     updated: '갱신 ', every_n: n => `${n}초마다`, paused: '멈춤',
+    usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · CPU ${cpu}%`),
     period_tip: '이 화면이 파일을 얼마나 자주 다시 읽을지',
     switching: '바꾸는 중…',
     update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
@@ -1157,7 +1176,7 @@ async function tick(){
         const left = document.createElement('span');
         const caret = document.createElement('span'); caret.textContent = '▸ ';
         left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `🤖 ${a.name}`);
+        left.insertAdjacentHTML('beforeend', a.name);
         const descSpan = document.createElement('span'); descSpan.className = 'dim';
         descSpan.textContent = (a.desc||'').slice(0,40);
         el.appendChild(left); el.appendChild(descSpan);
@@ -1167,7 +1186,7 @@ async function tick(){
       }
       if(!(p.agents||[]).length){
         const note = document.createElement('div'); note.className = 'empty';
-        note.innerHTML = `<span>🤖</span><span>${t().no_subagents}</span>`;
+        note.innerHTML = `<span>${t().no_subagents}</span>`;
         c.appendChild(note);
       }
     } else {
@@ -1188,7 +1207,7 @@ async function tick(){
         c.appendChild(note);
       }
       if(p.agents){
-        const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
+        const n = document.createElement('div'); n.className = 'note wide'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;
         c.appendChild(n);
       }
@@ -1343,7 +1362,9 @@ async function tick(){
     }
     app.appendChild(c);
   }
-  document.getElementById('tsText').textContent = t().updated + new Date(d.ts*1000).toLocaleTimeString();
+  const pr = d.proc || {};
+  document.getElementById('tsText').textContent = t().updated + new Date(d.ts*1000).toLocaleTimeString() +
+    (pr.mb ? ` · ${t().usage(pr.mb, pr.cpu)}` : '');
 }
 
 // 갱신 주기는 사용자가 정한다. 3초는 켜두고 보는 화면에는 과할 수 있고,
