@@ -623,7 +623,11 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:28px;-webkit-font-smoothing:antialiased}
-h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin:0 0 4px}
+h1{margin:0;display:flex;align-items:baseline;gap:.26em;font-size:23px;letter-spacing:-.02em;line-height:1.1}
+h1 .wm-a{font-weight:300;color:var(--dim)}
+h1 .wm-b{font-weight:800;color:var(--text)}
+#h1sub{display:block;margin-top:5px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px;max-width:920px}
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
 .card.wide{grid-column:1/-1}
@@ -655,7 +659,7 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 .tab-opt.active{background:var(--accent);color:#fff}
 .sw-on{background:var(--on-tint);color:var(--on)}
 .sw-off{background:var(--off-tint);color:var(--off)}
-.note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.5}
+.note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;max-width:74ch;text-wrap:pretty}
 .clickable{cursor:pointer}
 .clickable:hover{color:var(--accent)}
 .content{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:6px 0 10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;max-height:360px;overflow:auto;display:none}
@@ -672,10 +676,16 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .card-action{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;white-space:nowrap}
 .card-action:hover{opacity:.75}
+.shortcut{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:14px 0}
+.shortcut-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.note+.shortcut{margin-top:12px}
 #ts{color:var(--dim);font-size:11px;margin-top:16px}
 </style></head><body>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
-  <h1 id="h1title">Agent HUD</h1>
+  <span>
+    <h1><span class="wm-a">Agent</span><span class="wm-b">HUD</span></h1>
+    <span id="h1sub"></span>
+  </span>
   <span style="display:flex;gap:8px">
     <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
@@ -694,23 +704,25 @@ h1{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin
 <script>
 const T = {
   en: {
-    banner: '⚠ Plugin changes apply <b>starting next session</b>. Skill overrides apply immediately.',
+    banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
+    tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
-  skills_note: 'The SKILL.md format is a shared standard, but each agent looks in different folders. A skill is only usable by the agents that read the folder it sits in.',
+  skills_note: 'Badges show which agents can see each skill in this project. An agent sees a skill only if it reads the folder the skill sits in.',
   no_skills: 'No skills found in any known folder.',
   link_group: n => `Use in this project (${n} skills)`,
-  link_group_named: (g,n) => `${g} (${n})`,
+  link_group_named: (g,n) => `${g} · ${n}`,
   unlink_group: 'Remove from this project',
-  link_confirm: (g, n, p) => `Link ${g}'s ${n} skills into ${p}?\n\nThis creates symlinks under .claude/skills and .agents/skills, so Claude Code, Codex, Cursor, Copilot and Gemini CLI can all use them here. Skills from other groups get unlinked. Originals are never moved.`,
-  unlink_confirm: p => `Remove this group's skill links from ${p}?`,
+  link_confirm: (g, n, p) => `Open "${g}" (${n} skills) to every agent in this project?\n\n${p}\n\nSymlinks go under .claude/skills and .agents/skills.\nOther groups' links are removed. Originals stay put.`,
+  unlink_confirm: p => `Close these skills to the other agents?\n\n${p}\n\nOnly the links are removed.`,
   link_failed: 'Could not update skill links: ',
-  linked_badge: 'in this project',
+  linked_badge: 'open',
   claude_only_tag: 'Claude Code only',
   loose_skills: 'Skills not from a plugin',
-  group_shortcut: 'Match this project to a group:',
-    active: 'ON EVERYWHERE', activate: 'OFF', activate_hover: 'TURN ON ONLY THIS →',
-    active_tip: 'Claude Code plugins: this group is on and every other plugin is off, on this computer',
-    activate_tip: "turn ON this group's Claude Code plugins and OFF all others, for this whole computer (next session)",
+  group_shortcut: 'Open a group to the other agents',
+  group_shortcut_sub: 'Links the group\u2019s skills into this project, so Codex, Cursor, Copilot and Gemini CLI can use them too.',
+    active: 'ON', activate: 'OFF', activate_hover: 'ONLY THIS →',
+    active_tip: 'On, and every plugin outside this group is off',
+    activate_tip: 'Turn this group on and the rest off (next session)',
     plugins_count: n => n + ' plugins',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
@@ -719,8 +731,8 @@ const T = {
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
     not_in_group: list => 'not in any group: ' + list,
-    groups_legend: 'A group is a working set of plugins. Turning one on turns every other plugin off -- for Claude Code, on this whole computer. To use a group in one project only, see the Skills tab.',
-    switch_confirm: (g,list) => `Switch to group "${g}"?\nThis turns ON: ${list}\nand turns OFF every other plugin.`,
+    groups_legend: 'A group is a set of plugins you use together. Turning one on turns the others off, everywhere on this computer.',
+    switch_confirm: (g,list) => `Turn on only "${g}"?\n\nOn: ${list}\nOff: every other plugin`,
     no_project: 'no project seen yet. start a Claude Code session inside a project folder and it will appear here automatically',
     project_label: 'project: ',
     click_to_open: 'click to open', not_found: 'not found',
@@ -740,30 +752,32 @@ const T = {
     allowed_tip: 'allowed in this project — click to block just this skill here (applies immediately)',
     read_full_tip: 'click to read the full description',
     no_skills_found: 'no skills found in this plugin',
-    plugin_note: 'Plugin switch: on/off for Claude Code, whole computer, next session. Skill switch: block/allow in the selected project, immediately. Badges: which agents can see that skill here.',
+    plugin_note: 'Plugin switch: on or off everywhere. Skill switch: block it in this project only.',
     updated: 'updated: ',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
     feedback_open: 'report an issue ↗',
   },
   ko: {
-    banner: '⚠ 플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 스킬 permission override는 즉시 적용됩니다.',
+    banner: '플러그인 변경은 <b>다음 세션부터</b> 적용됩니다. 나머지는 즉시 적용됩니다.',
+    tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
-  skills_note: 'SKILL.md 형식은 공통 표준이지만 도구마다 보는 폴더가 다릅니다. 스킬은 그 폴더를 읽는 에이전트만 쓸 수 있습니다.',
+  skills_note: '뱃지는 이 프로젝트에서 그 스킬을 볼 수 있는 에이전트입니다. 에이전트는 자기가 읽는 폴더에 있는 스킬만 봅니다.',
   no_skills: '알려진 폴더 어디에도 스킬이 없습니다.',
   link_group: n => `이 프로젝트에서 쓰기 (스킬 ${n}개)`,
-  link_group_named: (g,n) => `${g} (${n}개)`,
+  link_group_named: (g,n) => `${g} · ${n}개`,
   unlink_group: '이 프로젝트에서 빼기',
-  link_confirm: (g, n, p) => `${g} 그룹의 스킬 ${n}개를 ${p}에 연결할까요?\n\n.claude/skills와 .agents/skills에 바로가기를 만듭니다. 그러면 Claude Code·Codex·Cursor·Copilot·Gemini CLI가 여기서 그 스킬들을 씁니다. 다른 그룹의 바로가기는 빠집니다. 원본은 움직이지 않습니다.`,
-  unlink_confirm: p => `${p}에서 이 그룹의 스킬 바로가기를 뺄까요?`,
+  link_confirm: (g, n, p) => `"${g}" 스킬 ${n}개를 이 프로젝트의 모든 에이전트에게 열까요?\n\n${p}\n\n.claude/skills와 .agents/skills에 바로가기를 만듭니다.\n다른 그룹의 바로가기는 빠지고, 원본은 그대로입니다.`,
+  unlink_confirm: p => `이 스킬들을 다른 에이전트에서 뺄까요?\n\n${p}\n\n바로가기만 지웁니다.`,
   link_failed: '스킬 연결을 바꾸지 못했습니다: ',
-  linked_badge: '이 프로젝트에 적용됨',
+  linked_badge: '열림',
   claude_only_tag: 'Claude Code 전용',
   loose_skills: '플러그인에 속하지 않은 스킬',
-  group_shortcut: '이 프로젝트를 그룹에 맞추기:',
-    active: '컴퓨터 전체에 켜짐', activate: '꺼짐', activate_hover: '이 그룹만 켜기 →',
-    active_tip: 'Claude Code 플러그인: 이 그룹만 켜지고 나머지는 꺼진 상태입니다 (이 컴퓨터 전체)',
-    activate_tip: '이 그룹의 Claude Code 플러그인만 켜고 나머지는 전부 끕니다. 이 컴퓨터 전체에 적용됩니다 (다음 세션부터)',
+  group_shortcut: '다른 에이전트에서도 쓰기',
+  group_shortcut_sub: '그룹의 스킬을 이 프로젝트에 바로가기로 겁니다. Codex·Cursor·Copilot·Gemini CLI도 그 스킬을 쓰게 됩니다.',
+    active: '켜짐', activate: '꺼짐', activate_hover: '이 그룹만 →',
+    active_tip: '켜져 있고, 이 그룹 밖의 플러그인은 전부 꺼져 있습니다',
+    activate_tip: '이 그룹만 켜고 나머지는 끕니다 (다음 세션부터)',
     plugins_count: n => n + '개 플러그인',
     remove: '제거 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 제거`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m}를 제거할까요?`,
@@ -772,8 +786,8 @@ const T = {
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인으로 시작할까요?\n',
     not_in_group: list => '어느 그룹에도 속하지 않음: ' + list,
-    groups_legend: '그룹은 플러그인 작업 세트입니다. 하나를 켜면 나머지는 전부 꺼집니다 -- Claude Code 기준, 이 컴퓨터 전체에 적용됩니다. 한 프로젝트에서만 쓰려면 스킬 탭을 보세요.',
-    switch_confirm: (g,list) => `"${g}" 그룹으로 전환할까요?\n켜짐: ${list}\n나머지 플러그인은 전부 꺼집니다.`,
+    groups_legend: '그룹은 함께 쓰는 플러그인 묶음입니다. 하나를 켜면 나머지는 꺼지고, 이 컴퓨터 전체에 적용됩니다.',
+    switch_confirm: (g,list) => `"${g}" 그룹만 켤까요?\n\n켜짐: ${list}\n꺼짐: 나머지 플러그인 전부`,
     no_project: '아직 감지된 프로젝트가 없습니다. 프로젝트 폴더 안에서 Claude Code 세션을 시작하면 자동으로 여기 나타납니다',
     project_label: '프로젝트: ',
     click_to_open: '클릭해서 열기', not_found: '없음',
@@ -793,7 +807,7 @@ const T = {
     allowed_tip: '이 프로젝트에서 허용됨 — 클릭하면 이 스킬만 차단 (즉시 적용)',
     read_full_tip: '클릭하면 전체 설명 보기',
     no_skills_found: '이 플러그인에는 스킬이 없습니다',
-    plugin_note: '플러그인 스위치: Claude Code에서 켜고 끄기 · 컴퓨터 전체 · 다음 세션부터. 스킬 스위치: 선택한 프로젝트에서만 차단/허용 · 즉시. 뱃지: 그 스킬을 여기서 어떤 에이전트가 볼 수 있나.',
+    plugin_note: '플러그인 스위치는 컴퓨터 전체를 켜고 끕니다. 스킬 스위치는 이 프로젝트에서만 막습니다.',
     updated: '갱신: ',
     switching: '전환 중…',
     update_available: (v, latest, repo) => `↑ v${latest} 사용 가능 (현재 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
@@ -811,6 +825,7 @@ function setLang(l){
   localStorage.setItem('agent-hud-lang', lang);
   renderLangToggle();
   document.getElementById('applyBanner').innerHTML = t().banner;
+  document.getElementById('h1sub').textContent = t().tagline;
   renderTabs();
   tick();
 }
@@ -818,6 +833,7 @@ document.getElementById('langEn').onclick = () => setLang('en');
 document.getElementById('langKo').onclick = () => setLang('ko');
 renderLangToggle();
 document.getElementById('applyBanner').innerHTML = t().banner;
+document.getElementById('h1sub').textContent = t().tagline;
 
 let theme = localStorage.getItem('agent-hud-theme') || 'dark';
 function renderTheme(){
@@ -1134,14 +1150,18 @@ async function tick(){
         note.textContent = t().project_label + projectLabel(p.project_dir);
         c.appendChild(note);
       }
-      const swNote = document.createElement('div'); swNote.className='note'; swNote.style.marginBottom='10px';
+      const swNote = document.createElement('div'); swNote.className='note';
       swNote.textContent = t().plugin_note;
       c.appendChild(swNote);
       if(p.groups && p.groups.length){
+        const box = document.createElement('div'); box.className = 'shortcut';
+        const lab = document.createElement('div'); lab.className = 'shortcut-title';
+        lab.textContent = t().group_shortcut;
+        const sub = document.createElement('div'); sub.className = 'note';
+        sub.textContent = t().group_shortcut_sub;
+        box.appendChild(lab); box.appendChild(sub);
         const bar = document.createElement('div');
-        bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px';
-        const lab = document.createElement('span'); lab.className='note'; lab.textContent = t().group_shortcut;
-        bar.appendChild(lab);
+        bar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
         for(const g of p.groups){
           const b = document.createElement('span');
           b.className = 'switch ' + (g.linked ? 'sw-on' : 'sw-off');
@@ -1152,7 +1172,8 @@ async function tick(){
           };
           bar.appendChild(b);
         }
-        c.appendChild(bar);
+        box.appendChild(bar);
+        c.appendChild(box);
       }
       for(const row of p.rows){
         const wrap = document.createElement('div');
