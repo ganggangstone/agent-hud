@@ -810,7 +810,7 @@ const T = {
     no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
     project_label: 'project: ',
   not_found: 'not found',
-  agents_claude_only: 'Subagents below are Claude Code only.',
+  agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
   share_to: names => 'also use in ' + names.join(', '),
   share_done: 'in every agent',
   share_all_tip: 'Makes this skill usable by those agents in this project. Links it into the folders it is missing from; the original never moves.',
@@ -860,7 +860,7 @@ const T = {
     no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
   not_found: '없음',
-  agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
+  agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
   share_to: names => names.join('·') + '도 쓰기',
   share_done: '전부 쓰는 중',
   share_all_tip: '이 프로젝트에서 그 에이전트들도 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
@@ -1160,11 +1160,9 @@ async function tick(){
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
       }
-      if((p.agents||[]).length){
-        const an = document.createElement('div'); an.className='note'; an.style.marginTop='12px';
-        an.textContent = t().agents_claude_only;
-        c.appendChild(an);
-      }
+      const an = document.createElement('div'); an.className='note wide'; an.style.marginTop='14px';
+      an.textContent = t().agents_note;
+      c.appendChild(an);
       if(p.truncated){
         const w = document.createElement('div'); w.className = 'note';
         w.style.color = 'var(--text)';
