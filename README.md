@@ -7,7 +7,7 @@
 <p align="center">코딩 에이전트의 스킬·지침·플러그인 상태를 한 화면에 보여주는 로컬 대시보드</p>
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Agent HUD screenshot" width="560">
+  <img src="assets/screenshot.png" alt="Plugins &amp; skills tab: every skill with a badge per agent" width="640">
 </p>
 
 ## The problem / 배경
@@ -67,8 +67,14 @@ Dark mode by default (☀/☾ toggle) and an EN/한국어 toggle, both persisted
 > 기본값은 다크모드(☀/☾ 토글)이고 EN/한국어 토글도 있다. 둘 다 `localStorage`에 저장된다.
 
 <p align="center">
+  <img src="assets/screenshot-ko.png" alt="Plugins &amp; skills tab, Korean, light theme" width="560">
+</p>
+
+<p align="center"><sub>Same tab in 한국어 and the light theme. Both toggles are in the header.</sub></p>
+
+<p align="center">
   <img src="assets/screenshot-groups.png" alt="Groups tab" width="560">
-  <img src="assets/screenshot-instructions.png" alt="Instructions tab" width="560">
+  <img src="assets/screenshot-instructions.png" alt="Agent instructions tab" width="560">
 </p>
 
 ## Concepts / 개념
