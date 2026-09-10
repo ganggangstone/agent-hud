@@ -122,8 +122,10 @@ def collect_groups(ctx):
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
                      + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk)} for sk in skills],
         })
-    ungrouped = sorted(installed - {m for v in sets.values() for m in v["plugins"]})
-    return {"title": "Groups", "groups": groups, "ungrouped": ungrouped,
+    plugins = [{"name": m, "on": bool(enabled.get(m, False)),
+                "groups": sorted(g for g, v in sets.items() if m in v["plugins"])}
+               for m in sorted(installed)]
+    return {"title": "Groups", "groups": groups, "plugins": plugins,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
             "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
 
@@ -901,7 +903,7 @@ const T = {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
-  skills_note: 'Struck through = that agent cannot see the skill. Only Claude Code looks inside plugin folders. Tick the box to apply it to every agent.',
+  skills_note: 'Everything on this tab applies to the selected project only. Struck through = that agent cannot see the skill; only Claude Code looks inside plugin folders.',
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
@@ -921,7 +923,6 @@ const T = {
     new_group: '+ create a new group', new_group_tip: 'Plugins you switch on together. For example one set for coding, one for video work',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
-    not_in_group: list => 'Not in any group yet: ' + list,
     groups_legend: 'A set is the plugins and skills you use together. Applying one to a project links its skills there and turns its plugins on for Claude Code.',
     no_project: 'No projects yet. Run Claude Code inside a project folder and it will show up here',
     project_label: 'project: ',
@@ -935,6 +936,10 @@ const T = {
   share_done: 'applied everywhere',
   share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
   partly: 'Some skills only',
+  all_plugins_title: 'Plugins', 
+  all_plugins_note: 'On or off for Claude Code, on this whole computer. Takes effect next session.',
+  plugin_on_here: 'This plugin is on. Turn it off in the Groups tab',
+  plugin_off_here: 'This plugin is off, so Claude Code does not load its skills. Turn it on in the Groups tab',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -960,7 +965,7 @@ const T = {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
-  skills_note: '취소선 = 그 에이전트가 못 보는 스킬. 플러그인 폴더는 Claude Code만 봅니다. 체크박스를 켜면 모든 에이전트에 적용됩니다.',
+  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다. 취소선 = 그 에이전트가 못 보는 스킬이고, 플러그인 폴더는 Claude Code만 봅니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
@@ -980,7 +985,6 @@ const T = {
     new_group: '+ 새 그룹 만들기', new_group_tip: '함께 쓰는 플러그인과 스킬을 묶어둡니다. 예를 들어 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
-    not_in_group: list => '아직 어느 그룹에도 안 넣은 플러그인: ' + list,
     groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 스킬은 그 프로젝트에 걸리고, 플러그인은 Claude Code에서 켜집니다.',
     no_project: '아직 열어본 프로젝트가 없습니다. 프로젝트 폴더에서 Claude Code를 실행하면 여기 나타납니다',
     project_label: '프로젝트: ',
@@ -994,6 +998,10 @@ const T = {
   share_done: '전부 적용됨',
   share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   partly: '일부 스킬만',
+  all_plugins_title: '플러그인',
+  all_plugins_note: 'Claude Code에서 켜고 끕니다. 이 컴퓨터 전체에 적용되고 다음 세션부터 반영됩니다.',
+  plugin_on_here: '켜져 있는 플러그인입니다. 끄려면 그룹 탭으로 가세요',
+  plugin_off_here: '꺼져 있어서 Claude Code가 이 스킬들을 안 읽습니다. 켜려면 그룹 탭으로 가세요',
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -1275,10 +1283,41 @@ async function tick(){
         c.appendChild(wrap);
       }
 
-      if((p.ungrouped||[]).length){
-        const note = document.createElement('div'); note.className='note';
-        note.textContent = t().not_in_group(p.ungrouped.join(', '));
-        c.appendChild(note);
+      if((p.plugins||[]).length){
+        const wrap = document.createElement('div'); wrap.className = 'section';
+        wrap.style.marginTop = '18px';
+        const head = document.createElement('div'); head.className = 'row sec-head';
+        const hl = document.createElement('span'); hl.className = 'sec-left';
+        const ht = document.createElement('span'); ht.style.fontWeight='600';
+        ht.textContent = t().all_plugins_title;
+        hl.appendChild(ht);
+        head.appendChild(hl);
+        wrap.appendChild(head);
+        const hn = document.createElement('div'); hn.className='note';
+        hn.style.cssText = 'margin:0 0 8px';
+        hn.textContent = t().all_plugins_note;
+        wrap.appendChild(hn);
+        for(const pl of p.plugins){
+          const r = document.createElement('div'); r.className='row sub';
+          const l = document.createElement('span'); l.className='sec-left';
+          const sw = document.createElement('span');
+          sw.className = 'switch ' + (pl.on?'sw-on':'sw-off');
+          sw.textContent = pl.on ? t().on : t().off;
+          sw.title = pl.on ? t().plugin_on_tip : t().plugin_off_tip;
+          sw.onclick = () => toggle(pl.name, !pl.on, sw);
+          l.appendChild(sw);
+          const n = document.createElement('span'); n.textContent = pl.name;
+          l.appendChild(n);
+          const rt = document.createElement('span'); rt.className='sec-right';
+          for(const g of pl.groups){
+            const gt = document.createElement('span'); gt.className='tag';
+            gt.textContent = t().group_tag(g);
+            rt.appendChild(gt);
+          }
+          r.appendChild(l); r.appendChild(rt);
+          wrap.appendChild(r);
+        }
+        c.appendChild(wrap);
       }
     } else if(p.files){
       c.appendChild(h);
@@ -1377,12 +1416,12 @@ async function tick(){
         const el = document.createElement('div'); el.className = 'row sec-head';
         const left = document.createElement('span'); left.className = 'sec-left';
         if(isPlugin){
-          const sw = document.createElement('span');
-          sw.className = 'switch ' + (row.enabled?'sw-on':'sw-off');
-          sw.textContent = row.enabled ? t().on : t().off;
-          sw.title = row.enabled ? t().plugin_on_tip : t().plugin_off_tip;
-          sw.onclick = e => { e.stopPropagation(); toggle(row.name, !row.enabled, sw); };
-          left.appendChild(sw);
+          // 전역 설정이라 여기서는 못 바꾼다. 규칙대로 점으로 보여준다.
+          const dot = document.createElement('span');
+          dot.className = 'dot ' + (row.enabled ? 'on' : 'off');
+          dot.style.cursor = 'default';
+          dot.title = row.enabled ? t().plugin_on_here : t().plugin_off_here;
+          left.appendChild(dot);
         }
         const label = document.createElement('span');
         label.className = 'sec-name' + (hasSkills ? ' clickable' : '');
