@@ -469,10 +469,15 @@ def link_skill(name, on, project_dir):
     return True, ""
 
 
-def _common_agents(skills):
-    """섹션의 스킬이 모두 공유하는 에이전트. 줄마다 같은 뱃지를 되풀이하지 않기 위한 것."""
+def _section_state(skills):
+    """에이전트별로 all / some / none. 교집합만 쓰면 12개 중 3개가 막혔을 때
+    나머지 9개가 멀쩡한데도 섹션 전체가 '못 봄'으로 보인다."""
     sets = [set(sk["agents"]) for sk in skills]
-    return [a for a in SKILL_AGENTS if all(a in x for x in sets)] if sets else []
+    out = {}
+    for a in SKILL_AGENTS:
+        n = sum(1 for x in sets if a in x)
+        out[a] = "all" if sets and n == len(sets) else ("some" if n else "none")
+    return out
 
 
 def _skill_root_index(project_dir):
@@ -499,9 +504,12 @@ def collect_skills(ctx):
     denied = set(read_json(os.path.join(project_dir, ".claude", "settings.json"))
                  .get("permissions", {}).get("deny", []))
 
-    def decorate(skill, fallback_agents):
+    def decorate(skill, fallback_agents, blocked=False):
         hit = index.get(skill["id"])
         agents = hit["agents"] if hit else list(fallback_agents)
+        if blocked:
+            # 차단은 이 프로젝트의 Claude Code에만 건다. 다른 에이전트는 그대로 본다.
+            agents = [a for a in agents if a != "Claude Code"]
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
@@ -520,11 +528,11 @@ def collect_skills(ctx):
         for sk in skills:
             # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
             # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
-            decorate(sk, ["Claude Code"])
             sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
+            decorate(sk, ["Claude Code"], sk["blocked"])
         rows.append({
             "name": name,
-            "section_agents": _common_agents(skills),
+            "section_state": _section_state(skills),
             "components": plugin_components(install_path),
             "version": entry.get("version", "?"),
             "enabled": bool(enabled.get(name, False)),
@@ -546,7 +554,7 @@ def collect_skills(ctx):
     if loose:
         rows.append({
             "name": "", "version": "", "enabled": None, "claude_only": False,
-            "section_agents": _common_agents(loose),
+            "section_state": _section_state(loose),
             "modes": [], "source": ", ".join(sorted({r for sk in loose for r in sk["roots"]})),
             "skills": loose,
         })
@@ -775,9 +783,11 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
-.comp{border:1px dashed var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;
-  font-size:11px;white-space:nowrap;cursor:help}
-.comp.stays{border-style:dashed;color:var(--off)}
+.agenttag.partial{color:var(--dim);text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
+.comp{background:var(--off-tint);color:var(--dim);padding:2px 7px;border-radius:4px;
+  font-size:11px;white-space:nowrap;cursor:help;border:1px solid transparent}
+.comp.stays{color:var(--text);opacity:.75}
+.comp:hover{border-color:var(--border)}
 .tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap;margin-left:8px}
 .tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap}
 .tag.danger{cursor:pointer}
@@ -844,11 +854,12 @@ const T = {
   agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
     monitors: 'monitors', bin: 'binaries', settings: 'settings'},
-  comp_portable_tip: 'Other agents can read this format too, but the checkbox only moves skills.',
-  comp_stays_tip: 'This part stays in Claude Code. The checkbox moves skills only.',
+  comp_portable_tip: n => `${n} — other agents can read this format too, but the checkbox moves skills only.`,
+  comp_stays_tip: n => `${n} — a Claude Code feature. It does not apply to the other agents.`,
   share_to: names => 'also use in ' + names.join(', '),
   share_done: 'in every agent',
   share_all_tip: 'Makes this skill usable by those agents in this project. Links it into the folders it is missing from; the original never moves.',
+  partly: 'Some skills only',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -860,8 +871,8 @@ const T = {
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
     blocked: 'BLOCKED', allowed: 'ALLOWED',
-    blocked_tip: 'Blocked in this project. Click to allow it again',
-    allowed_tip: 'Click to block this one skill in this project',
+    blocked_tip: 'Blocked for Claude Code in this project. Other agents are unaffected. Click to allow',
+    allowed_tip: 'Click to block this skill for Claude Code in this project. Other agents are unaffected',
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
     updated: 'updated ', every_n: n => `every ${n}s`, paused: 'paused',
@@ -898,11 +909,12 @@ const T = {
   agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
     monitors: '모니터', bin: '실행파일', settings: '기본설정'},
-  comp_portable_tip: '다른 에이전트도 읽을 수 있는 형식이지만, 체크박스는 스킬만 옮깁니다.',
-  comp_stays_tip: '이건 Claude Code에만 남습니다. 체크박스는 스킬만 옮깁니다.',
+  comp_portable_tip: n => `${n} — 다른 에이전트도 읽을 수 있는 형식이지만, 체크박스는 스킬만 옮깁니다.`,
+  comp_stays_tip: n => `${n} — Claude Code에만 있는 기능입니다. 다른 에이전트에는 적용되지 않습니다.`,
   share_to: names => names.join('·') + '도 쓰기',
   share_done: '전부 쓰는 중',
   share_all_tip: '이 프로젝트에서 그 에이전트들도 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
+  partly: '일부 스킬만',
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -914,8 +926,8 @@ const T = {
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
     blocked: '차단', allowed: '허용',
-    blocked_tip: '이 프로젝트에서 막아둔 스킬입니다. 누르면 풉니다',
-    allowed_tip: '누르면 이 프로젝트에서만 막습니다',
+    blocked_tip: '이 프로젝트의 Claude Code에서만 막아둔 스킬입니다. 다른 에이전트는 그대로 씁니다. 누르면 풉니다',
+    allowed_tip: '누르면 이 프로젝트의 Claude Code에서만 막습니다. 다른 에이전트는 그대로 씁니다',
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
     updated: '갱신 ', every_n: n => `${n}초마다`, paused: '멈춤',
@@ -1308,18 +1320,22 @@ async function tick(){
         for(const comp of (row.components||[])){
           const tag = document.createElement('span');
           tag.className = 'comp' + (comp.portable ? '' : ' stays');
-          tag.textContent = t().comp[comp.name] || comp.name;
-          tag.title = comp.portable ? t().comp_portable_tip : t().comp_stays_tip;
+          const label = t().comp[comp.name] || comp.name;
+          tag.textContent = label;
+          tag.title = (comp.portable ? t().comp_portable_tip : t().comp_stays_tip)(label);
           badges.appendChild(tag);
         }
+        const st = row.section_state || {};
         for(const a of (p.agents||[])){
           const tag = document.createElement('span');
-          tag.className = 'agenttag ' + ((row.section_agents||[]).includes(a) ? 'yes' : 'no');
+          const v = st[a] || 'none';
+          tag.className = 'agenttag ' + (v === 'all' ? 'yes' : v === 'some' ? 'partial' : 'no');
           tag.textContent = shortAgent(a);
+          if(v === 'some') tag.title = t().partly;
           badges.appendChild(tag);
         }
         meta.appendChild(badges);
-        const secMiss = (p.agents||[]).filter(a => !(row.section_agents||[]).includes(a));
+        const secMiss = (p.agents||[]).filter(a => (st[a] || 'none') !== 'all');
         const ids = (row.skills||[]).filter(x => x.linkable).map(x => x.id);
         if(ids.length){
           const share = document.createElement('label');
@@ -1356,8 +1372,9 @@ async function tick(){
 
               // 섹션과 같으면 아무것도 안 그린다. 같은 사실을 줄마다 되풀이하지 않는다.
               const badges = document.createElement('span');
-              const sec = (row.section_agents||[]).join('|');
-              if((s.agents||[]).join('|') !== sec){
+              const secUniform = (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
+              const sec = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all').join('|');
+              if(!secUniform || (s.agents||[]).join('|') !== sec){
                 for(const a of (p.agents||[])){
                   const tag = document.createElement('span');
                   tag.className = 'agenttag ' + ((s.agents||[]).includes(a) ? 'yes' : 'no');
@@ -1369,7 +1386,9 @@ async function tick(){
               if(s.linkable){
                 // 섹션과 같은 말이면 글자를 반복하지 않는다. 뱃지와 같은 규칙.
                 const miss = (s.missing||[]).map(shortAgent);
-                const sameAsSection = (s.agents||[]).join('|') === (row.section_agents||[]).join('|');
+                const secAll = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all');
+                const uniform = (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
+                const sameAsSection = uniform && (s.agents||[]).join('|') === secAll.join('|');
                 const share = document.createElement('label');
                 share.className = 'share' + (miss.length ? '' : ' share-done');
                 const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!s.shared;
