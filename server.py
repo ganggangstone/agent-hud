@@ -742,7 +742,10 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .btn:hover{background:var(--accent);color:var(--panel)}
 .btn-on{border-color:var(--on);color:var(--on);background:var(--on-tint)}
 .btn-on:hover{background:var(--on);color:var(--panel)}
-#ts{color:var(--dim);font-size:11px;margin-top:16px}
+#ts{color:var(--dim);font-size:11px;margin-top:16px;display:flex;align-items:center;gap:8px}
+#period{background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:4px;
+  padding:1px 4px;font-size:11px;font-family:inherit;cursor:pointer}
+#period:hover{color:var(--text)}
 </style></head><body>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
   <span>
@@ -763,18 +766,18 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <div id="applyBanner" class="rule-note"></div>
 <div class="grid" id="app"></div>
 <div style="max-width:920px;margin-top:16px"><a id="fbLink" class="card-action" href="#" target="_blank" rel="noopener"></a></div>
-<div id="ts"></div>
+<div id="ts"><span id="tsText"></span><select id="period" title=""></select></div>
 <script>
 const T = {
   en: {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Instructions & agents', title_skills: 'Skills',
-  skills_note: 'A struck-through agent cannot see that skill in this project. Skills inside a plugin are read by Claude Code only.',
+  skills_note: 'A struck-through agent cannot see that skill here. Plugins are a Claude Code idea, so no other agent looks inside a plugin folder -- tick the box and the skill is linked into this project, where they all find it.',
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
-    on: 'ON', off: 'OFF', activate_hover: 'ONLY THIS GROUP →',
+    on: 'ON', off: 'OFF',
     active_tip: 'On, and every plugin outside this group is off',
     activate_tip: 'Turn this group on and every other plugin off (next session)',
     plugins_count: n => n + (n === 1 ? ' plugin' : ' plugins'),
@@ -809,7 +812,8 @@ const T = {
     allowed_tip: 'Click to block this one skill in this project',
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
-    updated: 'updated: ',
+    updated: 'updated ', every_n: n => `every ${n}s`, paused: 'paused',
+    period_tip: 'How often this page re-reads the files',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
     feedback_open: 'send feedback ↗',
@@ -818,11 +822,11 @@ const T = {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '지침 · 에이전트', title_skills: '스킬',
-  skills_note: '취소선이 그어진 에이전트는 이 프로젝트에서 그 스킬을 못 봅니다. 플러그인 안의 스킬은 원래 Claude Code만 읽습니다.',
+  skills_note: '취소선이 그어진 에이전트는 여기서 그 스킬을 못 봅니다. 플러그인은 Claude Code에만 있는 개념이라 다른 에이전트는 플러그인 폴더 자체를 들여다보지 않습니다. 체크박스를 켜면 스킬이 이 프로젝트 폴더에 걸려서 모두가 찾을 수 있게 됩니다.',
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
-    on: '켜짐', off: '꺼짐', activate_hover: '이 그룹만 →',
+    on: '켜짐', off: '꺼짐',
     active_tip: '지금 이 그룹만 켜져 있습니다',
     activate_tip: '이 그룹만 켜고 나머지는 끕니다. 다음 세션부터 반영됩니다',
     plugins_count: n => '플러그인 ' + n + '개',
@@ -857,7 +861,8 @@ const T = {
     allowed_tip: '누르면 이 프로젝트에서만 막습니다',
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
-    updated: '갱신: ',
+    updated: '갱신 ', every_n: n => `${n}초마다`, paused: '멈춤',
+    period_tip: '이 화면이 파일을 얼마나 자주 다시 읽을지',
     switching: '바꾸는 중…',
     update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
     feedback_open: '피드백 보내기 ↗',
@@ -876,6 +881,7 @@ function setLang(l){
   renderLangToggle();
   document.getElementById('applyBanner').innerHTML = t().banner;
   document.getElementById('h1sub').textContent = t().tagline;
+  renderPeriod();
   renderTabs();
   tick();
 }
@@ -1055,8 +1061,6 @@ async function tick(){
         act.textContent = g.active ? t().on : t().off;
         act.title = g.active ? t().active_tip : t().activate_tip;
         if(!g.active){
-          act.onmouseenter = () => { act.textContent = t().activate_hover; };
-          act.onmouseleave = () => { act.textContent = t().off; };
           act.onclick = () => { if(confirm(t().switch_confirm(g.name, g.members.map(m=>m.name).join(', ') || '(none)'))) activateGroup(g.name, act); };
         }
         left.className = 'sec-left';
@@ -1339,9 +1343,37 @@ async function tick(){
     }
     app.appendChild(c);
   }
-  document.getElementById('ts').textContent = t().updated + new Date(d.ts*1000).toLocaleTimeString();
+  document.getElementById('tsText').textContent = t().updated + new Date(d.ts*1000).toLocaleTimeString();
 }
-tick(); setInterval(tick, 3000);
+
+// 갱신 주기는 사용자가 정한다. 3초는 켜두고 보는 화면에는 과할 수 있고,
+// 파일을 계속 읽는 일이라 조용히 두고 싶을 때도 있다.
+const PERIODS = [1, 3, 10, 30, 60, 0];
+let period = +(localStorage.getItem('agent-hud-period') ?? 3);
+let timer = null;
+function applyPeriod(){
+  if(timer) clearInterval(timer);
+  timer = period > 0 ? setInterval(tick, period * 1000) : null;
+}
+function renderPeriod(){
+  const sel = document.getElementById('period');
+  sel.innerHTML = '';
+  for(const p of PERIODS){
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p ? t().every_n(p) : t().paused;
+    if(p === period) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.title = t().period_tip;
+}
+document.getElementById('period').onchange = e => {
+  period = +e.target.value;
+  localStorage.setItem('agent-hud-period', period);
+  applyPeriod();
+  if(period > 0) tick();
+};
+renderPeriod();
+tick(); applyPeriod();
 </script></body></html>"""
 
 
