@@ -2,9 +2,9 @@
   <img src="assets/banner.svg" alt="Agent HUD" width="100%">
 </p>
 
-<p align="center">A local dashboard for Claude Code plugin, marketplace, instruction, and permission state.</p>
+<p align="center">A local dashboard for your coding agents' skills, instructions, and plugin state.</p>
 
-<p align="center">Claude Code의 플러그인·마켓플레이스·지침·권한 상태를 보여주는 로컬 대시보드</p>
+<p align="center">코딩 에이전트의 스킬·지침·플러그인 상태를 한 화면에 보여주는 로컬 대시보드</p>
 
 <p align="center">
   <img src="assets/screenshot.png" alt="Agent HUD screenshot" width="560">
@@ -36,22 +36,33 @@ No accounts, no external services. It's a local HTTP server reading local files.
 
 Three tabs, one panel at a time.
 
-- **Plugins**: installed plugins, where each came from, on/off state, and the
-  skills inside each one. Two independent controls per plugin row
-- **Groups**: saved plugin sets. Activating one turns its plugins on and all
-  others off, in one click
-- **Instructions & agents**: global and per-project `CLAUDE.md`, registered subagents
+- **Skills**: every skill on the machine, grouped by where it came from -- each
+  plugin, plus the ones that belong to no plugin. Each skill carries a badge per
+  agent (Claude Code, Codex, Cursor, Copilot, Gemini CLI) showing which of them
+  can actually see it in the selected project. Plugin on/off and per-project skill
+  blocking live here too, labelled Claude Code only, because no other agent has
+  those concepts
+- **Groups**: saved plugin sets. Turning one on turns every other plugin off, for
+  Claude Code, on the whole computer
+- **Instructions & agents**: `CLAUDE.md`, `AGENTS.md`, `.clinerules`,
+  `.cursor/rules/` and 25 other instruction files, with size and modified time, so
+  you can see where they have drifted apart. Plus registered subagents
 
 Dark mode by default (☀/☾ toggle) and an EN/한국어 toggle, both persisted to
 `localStorage`.
 
 > 탭 세 개로 나뉘어 한 번에 한 패널만 보여준다.
 >
-> - **플러그인**: 설치된 플러그인, 각각의 출처, on/off 상태, 그 안에 든 스킬
->   목록까지 한 화면에 나온다. 플러그인 행마다 서로 독립된 두 개의 컨트롤이 있다
-> - **그룹**: 저장해둔 플러그인 묶음. 하나를 활성화하면 그 안의 플러그인은 켜지고
->   나머지는 전부 꺼진다
-> - **지침 · 에이전트**: 전역·프로젝트별 `CLAUDE.md`, 등록된 서브에이전트
+> - **스킬**: 이 기계의 모든 스킬을 출처별로 묶어서 보여준다 — 플러그인별 묶음과,
+>   플러그인에 속하지 않은 것들. 스킬마다 에이전트 뱃지(Claude Code·Codex·Cursor·
+>   Copilot·Gemini CLI)가 붙어서, 선택한 프로젝트에서 **누가 그 스킬을 볼 수 있는지**
+>   드러난다. 플러그인 on/off와 프로젝트별 스킬 차단도 여기 있고, 다른 에이전트엔
+>   대응 개념이 없으므로 `Claude Code 전용`이라고 표시된다
+> - **그룹**: 저장해둔 플러그인 묶음. 하나를 켜면 나머지는 전부 꺼진다.
+>   Claude Code 기준이고 이 컴퓨터 전체에 적용된다
+> - **지침 · 에이전트**: `CLAUDE.md`, `AGENTS.md`, `.clinerules`, `.cursor/rules/` 등
+>   29종을 크기·수정시각과 함께 보여준다. 어디가 갈라졌는지 눈에 보이게 하는 목적이다.
+>   등록된 서브에이전트도 함께
 >
 > 기본값은 다크모드(☀/☾ 토글)이고 EN/한국어 토글도 있다. 둘 다 `localStorage`에 저장된다.
 
