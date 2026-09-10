@@ -780,6 +780,7 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .share{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);
   white-space:nowrap;cursor:pointer;user-select:none;flex:0 0 auto}
 .share:hover{color:var(--text)}
+.share-done{color:var(--on)}
 .share input{accent-color:var(--accent);cursor:pointer;margin:0}
 .share.busy{opacity:.4;cursor:wait}
 .agenttag{border:1px solid var(--border);padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;white-space:nowrap}
@@ -864,8 +865,9 @@ const T = {
     project_label: 'project: ',
     click_to_open: 'click to open', not_found: 'not found',
   agents_claude_only: 'Subagents below are Claude Code only.',
-  share_all: 'all agents',
-  share_all_tip: 'Let every agent use this skill in this project. Links it into the folders it is missing from; the original never moves.',
+  share_to: names => 'also for ' + names.join(', '),
+  share_done: 'every agent',
+  share_all_tip: 'Makes this skill usable by those agents in this project. Links it into the folders it is missing from; the original never moves.',
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'no subagents registered',
     loading: 'loading…', error: 'error: ',
@@ -922,8 +924,9 @@ const T = {
     project_label: '프로젝트: ',
     click_to_open: '누르면 열립니다', not_found: '없음',
   agents_claude_only: '서브에이전트는 Claude Code만 읽습니다.',
-  share_all: '모두에게',
-  share_all_tip: '이 프로젝트에서 모든 에이전트가 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
+  share_to: names => names.join('·') + '도 쓰기',
+  share_done: '전부 쓰는 중',
+  share_all_tip: '이 프로젝트에서 그 에이전트들도 이 스킬을 쓰게 합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '등록된 서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
@@ -982,6 +985,7 @@ function setTheme(th){
 document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
+const shortAgent = a => a.replace(' CLI','');
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
 const TABS = ['Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
@@ -1050,10 +1054,10 @@ async function editGroup(action, group, plugin){
   polling = true;
   await tick();
 }
-async function linkSkill(name, on, el){
+async function linkSkill(names, on, el){
   polling = false; el.classList.add('busy');
   try{
-    const r = await fetch('/api/linkskill', {method:'POST', body: JSON.stringify({name, on, project: currentProjectDir})});
+    const r = await fetch('/api/linkskill', {method:'POST', body: JSON.stringify({names: [].concat(names), on, project: currentProjectDir})});
     const d = await r.json();
     if(!d.ok) alert(t().link_failed + (d.error || t().error));
   } catch(e){ alert(t().link_failed + e); }
@@ -1364,6 +1368,7 @@ async function tick(){
         left.appendChild(sw); left.appendChild(label);
 
         const right = document.createElement('span');
+        right.style.cssText = 'display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end';
         for(const a of (p.agents||[])){
           const tag = document.createElement('span');
           tag.className = 'agenttag ' + ((row.section_agents||[]).includes(a) ? 'yes' : 'no');
@@ -1375,6 +1380,20 @@ async function tick(){
           gtag.className = 'tag'; gtag.textContent = t().group_tag(g);
           gtag.title = t().group_tag_tip;
           right.appendChild(gtag);
+        }
+        const secMiss = (p.agents||[]).filter(a => !(row.section_agents||[]).includes(a));
+        const ids = (row.skills||[]).filter(x => x.linkable).map(x => x.id);
+        if(ids.length){
+          const share = document.createElement('label');
+          share.className = 'share' + (secMiss.length ? '' : ' share-done');
+          const cb = document.createElement('input'); cb.type = 'checkbox';
+          cb.checked = (row.skills||[]).every(x => x.shared);
+          cb.onclick = e => { e.stopPropagation(); linkSkill(ids, cb.checked, share); };
+          share.appendChild(cb);
+          share.appendChild(document.createTextNode(
+            secMiss.length ? t().share_to(secMiss.map(shortAgent)) : t().share_done));
+          share.title = t().share_all_tip;
+          right.appendChild(share);
         }
         el.appendChild(left); el.appendChild(right);
         wrap.appendChild(el);
@@ -1415,11 +1434,13 @@ async function tick(){
               }
               srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
               if(s.linkable){
-                const share = document.createElement('label'); share.className = 'share';
+                const miss = (s.missing||[]).map(shortAgent);
+                const share = document.createElement('label');
+                share.className = 'share' + (miss.length ? '' : ' share-done');
                 const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!s.shared;
                 cb.onclick = e => { e.stopPropagation(); linkSkill(s.id, cb.checked, share); };
                 share.appendChild(cb);
-                share.appendChild(document.createTextNode(t().share_all));
+                share.appendChild(document.createTextNode(miss.length ? t().share_to(miss) : t().share_done));
                 share.title = t().share_all_tip;
                 srow.appendChild(share);
               }
@@ -1524,8 +1545,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             project = payload.get("project", "") or PROJECT_DIR
             if project not in known_projects():
                 return self._send_json({"ok": False, "error": "unknown project"}, 400)
-            ok, err = link_skill(payload.get("name", ""), bool(payload.get("on")), project)
-            self._send_json({"ok": ok, "error": err})
+            names = payload.get("names") or [payload.get("name", "")]
+            on = bool(payload.get("on"))
+            errs = []
+            for n in names:
+                ok, err = link_skill(n, on, project)
+                if not ok:
+                    errs.append(f"{n}: {err}")
+            self._send_json({"ok": not errs, "error": "; ".join(errs[:3])})
         elif self.path == "/api/linkgroup":
             length = int(self.headers.get("Content-Length", 0))
             try:
