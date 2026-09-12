@@ -434,13 +434,21 @@ PLUGIN_PARTS = [
 
 
 def plugin_components(install_path):
-    """스킬 말고 이 플러그인에 또 뭐가 들어 있나."""
+    """스킬 말고 이 플러그인에 또 뭐가 들어 있나. 개수까지 센다 -- '커맨드'만 있으면
+    하나인지 스무 개인지 알 수 없다."""
     if not install_path:
         return []
     out = []
     for rel, name, portable in PLUGIN_PARTS:
-        if os.path.exists(os.path.join(install_path, rel)):
-            out.append({"name": name, "portable": portable})
+        path = os.path.join(install_path, rel)
+        if not os.path.exists(path):
+            continue
+        if os.path.isdir(path):
+            n = sum(1 for f in os.listdir(path) if not f.startswith("."))
+        else:
+            n = 1          # .mcp.json 처럼 파일 하나로 된 것
+        if n:
+            out.append({"name": name, "portable": portable, "n": n})
     return out
 
 
@@ -933,10 +941,9 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .loadline b{font-weight:700}
 .warn{margin-left:8px;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;
   background:var(--off-tint);color:var(--text);cursor:help;white-space:nowrap;vertical-align:middle}
-.comp{background:var(--off-tint);color:var(--dim);padding:2px 7px;border-radius:4px;
-  font-size:11px;white-space:nowrap;cursor:help;border:1px solid transparent}
-.comp.stays{color:var(--text);opacity:.75}
-.comp:hover{border-color:var(--border)}
+.comp{color:var(--dim);font-size:11px;white-space:nowrap;cursor:help;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;border-bottom:1px dotted var(--border)}
+.comp:hover{color:var(--text);border-bottom-color:var(--dim)}
 .tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap;margin-left:8px}
 .tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap}
 .tag.danger{cursor:pointer}
@@ -980,12 +987,14 @@ const T = {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
-  skills_note: 'Everything on this tab applies to the selected project only. Struck through = that agent cannot see the skill; only Claude Code looks inside plugin folders.',
+  skills_note: 'Everything on this tab applies to the selected project only.',
+  badge_off_tip: a => `${a} cannot see this skill`,
+  badge_on_tip: a => `${a} can use this skill`,
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
     set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
-    set_apply: 'Apply to this project', set_applied: 'Applied here',
+    set_apply: 'Apply to this project', set_applied: 'Applied to this project',
     set_apply_tip: 'Applies to this project only. Other projects are untouched.',
     assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\n${sk} skills are linked here.\nPlugins on: ${pl}\nEvery other plugin is turned off, in this project only.`,
     unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins stay as they are.`,
@@ -1002,21 +1011,22 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     groups_legend: 'The plugins and skills you use together. Applying one sets up that project and leaves the others alone.',
   not_found: 'not found',
-  agents_note: 'Subagents live in .claude/agents. Cursor and Copilot read that folder as well; Codex uses its own TOML format in .codex/agents.',
+  agents_note: '.claude/agents/*.md · Cursor and Copilot read the same folder',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
     monitors: 'monitors', bin: 'binaries', settings: 'settings'},
-  comp_portable_tip: n => `${n} — other agents can read this format too, but the checkbox moves skills only.`,
-  comp_stays_tip: n => `${n} — a Claude Code feature. It does not apply to the other agents.`,
+  comp_count: (label, n) => `${n} ${label}`,
+  comp_portable_tip: n => `This plugin ships ${n}. The checkbox moves skills only`,
+  comp_stays_tip: n => `This plugin ships ${n}. They work wherever the plugin is on; the checkbox moves skills only`,
   share_to: names => 'apply to ' + names.join(', '),
   share_done: 'applied everywhere',
   share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
   partly: 'Some skills only',
-  inherited_note: 'Nothing has been set for this project yet, so it uses the defaults.',
+  inherited_note: 'Nothing set for this project yet, using defaults',
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
   no_project_yet: 'no folders yet',
-  loaded: (n, tok) => `This project loads <b>${n} skills</b> — roughly <b>${tok.toLocaleString()} tokens</b> in every session.`,
+  loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
   loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
   spec_issue: 'spec',
   issue: {
@@ -1029,7 +1039,7 @@ const T = {
     desc_long: i => `description is ${i.len} characters (limit 1024)`,
   },
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
-    no_subagents: 'No subagents registered',
+    no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ', skill_update_failed: 'Could not change that skill: ',
     plugin_on_tip: 'On in this project. Click to turn it off (next session)',
@@ -1053,12 +1063,14 @@ const T = {
     banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
-  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다. 취소선 = 그 에이전트가 못 보는 스킬이고, 플러그인 폴더는 Claude Code만 봅니다.',
+  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다.',
+  badge_off_tip: a => `${a}는 이 스킬을 못 봅니다`,
+  badge_on_tip: a => `${a}가 이 스킬을 씁니다`,
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
     set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
-    set_apply: '이 프로젝트에 적용', set_applied: '적용됨',
+    set_apply: '이 프로젝트에 적용', set_applied: '이 프로젝트에 적용됨',
     set_apply_tip: '이 프로젝트에만 적용됩니다. 다른 프로젝트는 그대로입니다.',
     assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개가 여기 걸립니다.\n켜지는 플러그인: ${pl}\n나머지 플러그인은 꺼집니다. 이 프로젝트에서만요.`,
     unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인은 그대로 둡니다.`,
@@ -1075,21 +1087,22 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 그 프로젝트만 바뀌고 나머지는 그대로입니다.',
   not_found: '없음',
-  agents_note: '서브에이전트는 .claude/agents에 있습니다. Cursor와 Copilot도 이 폴더를 읽고, Codex는 .codex/agents에 TOML로 따로 씁니다.',
+  agents_note: '.claude/agents/*.md · Cursor와 Copilot도 같은 폴더를 읽습니다',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
     monitors: '모니터', bin: '실행파일', settings: '기본설정'},
-  comp_portable_tip: n => `${n} — 다른 에이전트도 읽을 수 있는 형식이지만, 체크박스는 스킬만 옮깁니다.`,
-  comp_stays_tip: n => `${n} — Claude Code에만 있는 기능입니다. 다른 에이전트에는 적용되지 않습니다.`,
+  comp_count: (label, n) => `${label} ${n}개`,
+  comp_portable_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 체크박스는 스킬만 옮깁니다`,
+  comp_stays_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
   share_to: names => names.join('·') + '에도 적용하기',
   share_done: '전부 적용됨',
   share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   partly: '일부 스킬만',
-  inherited_note: '이 프로젝트에 아직 정한 것이 없어 기본값을 씁니다.',
+  inherited_note: '아직 이 프로젝트에 정한 것이 없어 기본값을 씁니다',
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
   no_project_yet: '아직 폴더가 없습니다',
-  loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 — 세션마다 약 <b>${tok.toLocaleString()}토큰</b>.`,
+  loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
   loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
   spec_issue: '명세 위반',
   issue: {
@@ -1102,7 +1115,7 @@ const T = {
     desc_long: i => `description이 ${i.len}자입니다 (상한 1024)`,
   },
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
-    no_subagents: '등록된 서브에이전트 없음',
+    no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
     plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
@@ -1435,9 +1448,6 @@ async function tick(){
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
       }
-      const an = document.createElement('div'); an.className='note'; an.style.marginTop='14px';
-      an.textContent = t().agents_note;
-      c.appendChild(an);
       if(p.truncated){
         const w = document.createElement('div'); w.className = 'note';
         w.style.color = 'var(--text)';
@@ -1459,9 +1469,15 @@ async function tick(){
       }
       if(!(p.agents||[]).length){
         const note = document.createElement('div'); note.className = 'empty';
+        note.style.marginTop = '14px';
         note.innerHTML = `<span>${t().no_subagents}</span>`;
         c.appendChild(note);
       }
+      // 목록 아래 캡션. 위에 두면 목록보다 먼저 읽혀서 "그래서 뭘 하라는 건지"가 된다.
+      const an = document.createElement('div'); an.className='note';
+      an.style.cssText = 'margin-top:4px;font-size:11px;opacity:.75';
+      an.textContent = t().agents_note;
+      c.appendChild(an);
     } else {
       c.appendChild(h);
       c.appendChild(projectPicker(p));
@@ -1480,7 +1496,7 @@ async function tick(){
       }
       if(p.has_local === false){
         const d = document.createElement('div'); d.className='note';
-        d.style.marginBottom = '10px';
+        d.style.cssText = 'margin:-4px 0 10px;font-size:11px;opacity:.8';
         d.textContent = t().inherited_note;
         c.appendChild(d);
       }
@@ -1545,23 +1561,24 @@ async function tick(){
           const tag = document.createElement('span');
           tag.className = 'comp' + (comp.portable ? '' : ' stays');
           const label = t().comp[comp.name] || comp.name;
-          tag.textContent = label;
+          tag.textContent = t().comp_count(label, comp.n || 1);
           tag.title = (comp.portable ? t().comp_portable_tip : t().comp_stays_tip)(label);
           badges.appendChild(tag);
         }
         const st = row.section_state || {};
-        for(const a of (p.agents||[])){
+        // 플러그인 밖 스킬은 출처도 대상도 제각각이라 한 줄로 요약할 수 없다.
+        for(const a of (isPlugin ? (p.agents||[]) : [])){
           const tag = document.createElement('span');
           const v = st[a] || 'none';
           tag.className = 'agenttag ' + (v === 'all' ? 'yes' : v === 'some' ? 'partial' : 'no');
           tag.textContent = shortAgent(a);
-          if(v === 'some') tag.title = t().partly;
+          tag.title = v === 'some' ? t().partly : v === 'all' ? t().badge_on_tip(a) : t().badge_off_tip(a);
           badges.appendChild(tag);
         }
         meta.appendChild(badges);
         const secMiss = (p.agents||[]).filter(a => (st[a] || 'none') !== 'all');
         const ids = (row.skills||[]).filter(x => x.linkable).map(x => x.id);
-        if(ids.length){
+        if(ids.length && isPlugin){
           const share = document.createElement('label');
           share.className = 'share' + (secMiss.length ? '' : ' share-done');
           const cb = document.createElement('input'); cb.type = 'checkbox';
@@ -1603,13 +1620,15 @@ async function tick(){
 
               // 섹션과 같으면 아무것도 안 그린다. 같은 사실을 줄마다 되풀이하지 않는다.
               const badges = document.createElement('span');
-              const secUniform = (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
+              const secUniform = isPlugin && (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
               const sec = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all').join('|');
               if(!secUniform || (s.agents||[]).join('|') !== sec){
                 for(const a of (p.agents||[])){
                   const tag = document.createElement('span');
-                  tag.className = 'agenttag ' + ((s.agents||[]).includes(a) ? 'yes' : 'no');
-                  tag.textContent = a;
+                  const on = (s.agents||[]).includes(a);
+                  tag.className = 'agenttag ' + (on ? 'yes' : 'no');
+                  tag.textContent = shortAgent(a);
+                  tag.title = on ? t().badge_on_tip(a) : t().badge_off_tip(a);
                   badges.appendChild(tag);
                 }
               }
@@ -1618,7 +1637,7 @@ async function tick(){
                 // 섹션과 같은 말이면 글자를 반복하지 않는다. 뱃지와 같은 규칙.
                 const miss = (s.missing||[]).map(shortAgent);
                 const secAll = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all');
-                const uniform = (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
+                const uniform = isPlugin && (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
                 const sameAsSection = uniform && (s.agents||[]).join('|') === secAll.join('|');
                 const share = document.createElement('label');
                 share.className = 'share' + (miss.length ? '' : ' share-done');
