@@ -63,6 +63,13 @@ PY
 Several strings share a line. Delete a key by name, not by line, or you will
 take its neighbour with it.
 
+## Where its data lives
+
+`projects.json`, `modes.json`, `project-sets.json` and `.port` sit next to
+`server.py` by default. Set `AGENT_HUD_HOME` to put them somewhere else — the
+Homebrew formula does exactly that, because a package manager replaces the code
+directory on every upgrade and would take your groups with it.
+
 ## Adding a panel
 
 Write `collect_x(ctx) -> dict` and add it to `PANELS`. The dict is handed to

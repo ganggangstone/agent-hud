@@ -10,7 +10,11 @@ import json, os, re, socket, http.server, socketserver, threading, webbrowser, s
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
-TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
+# 기본값은 스크립트 옆이다 -- 저장소에서 바로 실행하거나 install.sh로 복사해 쓰는 경우.
+# AGENT_HUD_HOME으로 옮길 수 있다. 패키지 매니저로 설치하면 코드가 업그레이드마다 통째로
+# 갈리는 곳에 놓이므로, 사용자 데이터를 거기 두면 그룹과 프로젝트 목록이 날아간다.
+TOOL_DIR = os.environ.get("AGENT_HUD_HOME") or os.path.dirname(os.path.abspath(__file__))
+os.makedirs(TOOL_DIR, exist_ok=True)
 PORT_FILE = os.path.join(TOOL_DIR, ".port")
 PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
