@@ -510,6 +510,25 @@ def link_skill(name, on, project_dir):
     return True, ""
 
 
+def _loaded_count(rows):
+    """이 프로젝트에서 Claude Code가 실제로 읽는 스킬 수.
+
+    스킬은 본문이 아니라 **이름과 설명이 세션 시작 때 전부** 컨텍스트에 올라간다
+    (agentskills.io 명세의 progressive disclosure). 그래서 안 쓰는 스킬도 비용이다.
+    꺼진 플러그인의 스킬과 이 프로젝트에서 차단한 스킬은 빠진다.
+    """
+    n = 0
+    for row in rows:
+        if row["enabled"] is False:          # 꺼진 플러그인
+            continue
+        for sk in row["skills"]:
+            if sk.get("blocked"):
+                continue
+            if "Claude Code" in (sk.get("agents") or []):
+                n += 1
+    return n
+
+
 def _section_state(skills):
     """에이전트별로 all / some / none. 교집합만 쓰면 12개 중 3개가 막혔을 때
     나머지 9개가 멀쩡한데도 섹션 전체가 '못 봄'으로 보인다."""
@@ -603,6 +622,7 @@ def collect_skills(ctx):
         "title": "Skills (who can see them)",
         "rows": rows,
         "agents": SKILL_AGENTS,
+        "loaded": _loaded_count(rows),
         "has_local": has_local,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -908,6 +928,9 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag.yes{color:var(--text)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
 .agenttag.partial{color:var(--dim);text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
+.loadline{font-size:13px;color:var(--text);background:var(--off-tint);border:1px solid var(--border);
+  border-radius:6px;padding:8px 11px;margin:2px 0 10px;cursor:help;line-height:1.6}
+.loadline b{font-weight:700}
 .warn{margin-left:8px;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;
   background:var(--off-tint);color:var(--text);cursor:help;white-space:nowrap;vertical-align:middle}
 .comp{background:var(--off-tint);color:var(--dim);padding:2px 7px;border-radius:4px;
@@ -993,6 +1016,8 @@ const T = {
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
   no_project_yet: 'no folders yet',
+  loaded: (n, tok) => `This project loads <b>${n} skills</b> — roughly <b>${tok.toLocaleString()} tokens</b> in every session.`,
+  loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
   spec_issue: 'spec',
   issue: {
     unreadable: () => 'SKILL.md could not be read',
@@ -1064,6 +1089,8 @@ const T = {
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
   no_project_yet: '아직 폴더가 없습니다',
+  loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 — 세션마다 약 <b>${tok.toLocaleString()}토큰</b>.`,
+  loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
   spec_issue: '명세 위반',
   issue: {
     unreadable: () => 'SKILL.md를 읽지 못했습니다',
@@ -1438,6 +1465,14 @@ async function tick(){
     } else {
       c.appendChild(h);
       c.appendChild(projectPicker(p));
+      if(typeof p.loaded === 'number'){
+        // 스킬은 이름과 설명이 세션 시작 때 전부 올라간다. 안 쓰는 것도 자리를 차지하므로,
+        // 주장하지 말고 지금 이 프로젝트의 숫자를 그대로 보여준다.
+        const l = document.createElement('div'); l.className = 'loadline';
+        l.title = t().loaded_tip;
+        l.innerHTML = t().loaded(p.loaded, p.loaded * 100);
+        c.appendChild(l);
+      }
       if(p.agents){
         const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;

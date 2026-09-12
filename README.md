@@ -12,15 +12,38 @@
 
 ## The problem / 배경
 
-Claude Code's configuration is split across several files. `~/.claude/settings.json`
-holds which plugins are enabled. `~/.claude/plugins/` holds what's installed and
-where it came from. Each project's `CLAUDE.md` and `.claude/settings.json` hold
-instructions and permission overrides. `.claude/agents/*.md` holds subagent
-definitions. None of it is visible in one place while you work, and plugin
-enable state doesn't distinguish "on for this kind of work" from "on everywhere."
+Different projects need different skills. Writing, app work and infrastructure
+have almost nothing in common — but every skill you have installed is loaded in
+every session regardless, because a skill's name and description go into context
+at startup whether you use it or not.
 
-Agent HUD reads all of it live and renders it as a small always-on status page.
-No accounts, no external services. It's a local HTTP server reading local files.
+Three plugins on this machine turned out to carry **60 skills** between them,
+plus commands and hooks. At roughly 100 tokens of metadata per skill — the figure
+the [Agent Skills spec](https://agentskills.io/specification) gives — that is
+**5,000–9,000 tokens spent in every session**, most of it on skills irrelevant to
+whatever the project is.
+
+You can turn plugins off, but the switch is one setting shared by every project,
+so "on for this kind of work" and "on everywhere" are the same thing. Doing it by
+hand at the start of each session gets old fast.
+
+Agent HUD shows what each project actually loads, and lets you save the set you
+use for that kind of work and apply it per project. It reads local files and
+renders them; no accounts, no external services.
+
+> 프로젝트마다 쓰는 스킬이 다릅니다. 글쓰기, 앱 개발, 인프라는 겹치는 게 거의 없는데,
+> 설치한 스킬은 **쓰든 안 쓰든 전부** 세션에 올라갑니다 — 스킬의 이름과 설명이 시작할 때
+> 컨텍스트에 들어가기 때문입니다.
+>
+> 이 기계에서는 플러그인 3개가 스킬 **60개**를 들고 있었습니다(커맨드와 훅은 별도).
+> [명세](https://agentskills.io/specification)가 말하는 스킬당 약 100토큰으로 치면
+> **세션마다 5,000~9,000토큰**이고, 대부분은 그 프로젝트와 상관없는 스킬입니다.
+>
+> 플러그인을 끌 수는 있지만 그 스위치는 모든 프로젝트가 공유합니다. "이 작업에만 켠다"와
+> "어디서나 켠다"가 같은 뜻이 되고, 세션마다 손으로 바꾸는 건 금방 질립니다.
+>
+> Agent HUD는 지금 이 프로젝트가 무엇을 로드하는지 보여주고, 작업 종류별로 묶어서
+> 프로젝트마다 적용하게 합니다. 로컬 파일을 읽어서 그리는 게 전부입니다.
 
 > Claude Code의 설정은 여러 파일에 나뉘어 있다. `~/.claude/settings.json`은 어떤
 > 플러그인이 켜져 있는지 담고, `~/.claude/plugins/`는 무엇이 설치돼 있고 어디서
