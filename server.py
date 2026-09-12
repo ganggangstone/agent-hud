@@ -27,6 +27,22 @@ UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 12 * 60 * 60
 
 
+def remember_project(path):
+    """이미 아는 프로젝트면 아무것도 하지 않는다. 발견할 때마다 시각을 갱신하면
+    자동 발견된 폴더가 매번 목록 맨 위로 올라온다."""
+    if path in ("/", HOME):
+        return
+    projects = read_json(PROJECTS_FILE, {})
+    if path in projects:
+        return
+    projects[path] = time.time() - 86400        # 직접 연 프로젝트보다 뒤에 놓는다
+    try:
+        with open(PROJECTS_FILE, "w") as f:
+            json.dump(projects, f)
+    except Exception:
+        pass
+
+
 def register_project(path):
     """Record a project dir as 'seen' so the dashboard can offer it in the project dropdown."""
     if path in ("/", HOME):
@@ -325,9 +341,19 @@ for _rel, _tool in INSTRUCTION_SOURCES:
 _DIR_SOURCES = [(r, t) for r, t in INSTRUCTION_SOURCES if r.endswith("/")]
 
 
+PROJECT_MARKERS = [
+    os.path.join(".claude", "skills"), os.path.join(".claude", "agents"),
+    os.path.join(".claude", "settings.json"), os.path.join(".claude", "settings.local.json"),
+    os.path.join(".agents", "skills"), os.path.join(".cursor", "skills"),
+    os.path.join(".codex", "skills"), os.path.join(".github", "skills"),
+    os.path.join(".gemini", "skills"),
+]
+
+
 def _scan_tree(project_dir):
-    """project_dir 아래 전체에서 지침 파일을 찾는다. -> (행 목록, 잘렸는지)"""
-    rows, dirs, truncated = [], 0, False
+    """project_dir 아래 전체에서 지침 파일과 하위 프로젝트를 찾는다.
+    -> (행 목록, 잘렸는지, 하위 프로젝트 경로)"""
+    rows, dirs, truncated, subprojects = [], 0, False, []
     for cur, subs, files in os.walk(project_dir):
         dirs += 1
         if dirs > SCAN_DIR_BUDGET or len(rows) > SCAN_ROW_CAP:
@@ -344,6 +370,8 @@ def _scan_tree(project_dir):
             path = os.path.join(cur, rel.replace("/", os.sep))
             if os.path.isfile(path):
                 rows.append(_file_row(prefix + rel, path, tool))
+        if cur != project_dir and any(os.path.exists(os.path.join(cur, mk)) for mk in PROJECT_MARKERS):
+            subprojects.append(cur)             # 자기 .claude/ 를 가진 폴더 = 별개 프로젝트
         for rel, tool in _DIR_SOURCES:          # .cursor/rules/ 같은 디렉터리형 (점 폴더라 위 가지치기에 걸린다)
             d = os.path.join(cur, rel.replace("/", os.sep).rstrip(os.sep))
             if not os.path.isdir(d):
@@ -351,7 +379,7 @@ def _scan_tree(project_dir):
             for fn in sorted(os.listdir(d)):
                 if fn.endswith(RULE_EXTS):
                     rows.append(_file_row(prefix + rel + fn, os.path.join(d, fn), tool))
-    return rows, truncated
+    return rows, truncated, subprojects
 
 
 def _instruction_rows(project_dir):
@@ -360,8 +388,10 @@ def _instruction_rows(project_dir):
     hit = _scan_cache.get(project_dir)
     if hit and now - hit[0] < SCAN_TTL:
         return hit[1]
-    rows, truncated = _scan_tree(project_dir)
+    rows, truncated, subprojects = _scan_tree(project_dir)
     rows = [r for r in rows if r["name"] != "CLAUDE.md"]  # 루트 것은 위쪽 고정 행이 보여준다
+    for sub in subprojects:
+        remember_project(sub)                   # 목록에 올려두면 골라서 볼 수 있다
     _scan_cache[project_dir] = (now, (rows, truncated))
     return rows, truncated
 
