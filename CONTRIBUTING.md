@@ -63,6 +63,19 @@ PY
 Several strings share a line. Delete a key by name, not by line, or you will
 take its neighbour with it.
 
+## Command line
+
+```
+agent-hud                      start the dashboard
+agent-hud groups               list groups, and which one this folder uses
+agent-hud apply <group> [dir]  apply a group to a folder (default: cwd)
+agent-hud apply --off [dir]    stop using one here
+```
+
+`apply` calls the same `assign_set()` the dashboard does and needs no running
+server, so it works in a setup script. Running from the checkout, prefix it
+with `AGENT_HUD_HOME=~/.claude/tools/agent-hud` to act on the installed data.
+
 ## Where its data lives
 
 `projects.json`, `modes.json`, `project-sets.json` and `.port` sit next to

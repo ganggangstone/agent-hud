@@ -64,6 +64,10 @@ class AgentHud < Formula
       The hook does not start a server; it only tells a running one which folder
       you are in. You can also add folders from the dashboard itself.
 
+      From a terminal:
+        agent-hud groups               list groups
+        agent-hud apply <group>        apply one to the current folder
+
       Data (projects, groups) lives in ~/.claude/tools/agent-hud and survives
       upgrades. Set AGENT_HUD_HOME to move it.
     EOS

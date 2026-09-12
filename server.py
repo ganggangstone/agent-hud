@@ -1778,10 +1778,65 @@ def port_alive(port):
         return False
 
 
+def cli_groups():
+    """설정해둔 그룹과, 지금 폴더에 무엇이 적용돼 있는지."""
+    sets = read_sets()
+    if not sets:
+        print("정의된 그룹이 없습니다. 대시보드에서 만들 수 있습니다.")
+        return 0
+    here = os.path.abspath(os.getcwd())
+    assigned = read_json(SETS_FILE, {}).get(here, "")
+    for name, entry in sets.items():
+        mark = " ← 이 폴더에 적용됨" if name == assigned else ""
+        print(f"{name}  플러그인 {len(entry['plugins'])} · 스킬 {len(entry['skills'])}{mark}")
+    return 0
+
+
+def cli_apply(group, project_dir):
+    """그룹을 폴더에 적용한다. 서버가 떠 있지 않아도 된다 -- 같은 함수를 직접 부른다."""
+    project_dir = os.path.abspath(project_dir)
+    if not os.path.isdir(project_dir):
+        print(f"폴더가 없습니다: {project_dir}", file=sys.stderr)
+        return 1
+    if group and group not in read_sets():
+        print(f"그런 그룹이 없습니다: {group}", file=sys.stderr)
+        print("agent-hud groups 로 목록을 볼 수 있습니다.", file=sys.stderr)
+        return 1
+    register_project(project_dir)      # 대시보드 목록에도 올려둔다
+    ok, err = assign_set(group, project_dir)
+    if not ok:
+        print(f"적용하지 못했습니다: {err}", file=sys.stderr)
+        return 1
+    what = f'"{group}" 적용' if group else "적용 해제"
+    print(f"{what} — {project_dir}")
+    print("플러그인 변경은 다음 세션부터 반영됩니다.")
+    return 0
+
+
+USAGE = """agent-hud                      대시보드를 띄웁니다
+agent-hud groups               그룹 목록
+agent-hud apply <그룹> [폴더]   그룹을 폴더에 적용 (기본: 현재 폴더)
+agent-hud apply --off [폴더]    적용 해제"""
+
+
 def main():
     if os.environ.get("CLAUDE_HUD_DISABLE") == "1":
         return
     global PROJECT_DIR
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("groups", "apply", "-h", "--help", "help"):
+        if argv[0] in ("-h", "--help", "help"):
+            print(USAGE)
+            sys.exit(0)
+        if argv[0] == "groups":
+            sys.exit(cli_groups())
+        rest = argv[1:]
+        if not rest:
+            print(USAGE, file=sys.stderr)
+            sys.exit(1)
+        group = "" if rest[0] == "--off" else rest[0]
+        target = rest[1] if len(rest) > 1 else os.getcwd()
+        sys.exit(cli_apply(group, target))
     if len(sys.argv) > 2 and sys.argv[1] == "--register":
         PROJECT_DIR = os.path.abspath(sys.argv[2])
 
