@@ -1105,7 +1105,7 @@ const T = {
     usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · ${cpu}% CPU`),
     period_tip: 'How often this page re-reads the files',
     switching: 'switching…',
-    update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in this folder`,
+    update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in your clone and run <code>./install.sh</code> (Homebrew: <code>brew upgrade agent-hud</code>)`,
     feedback_open: 'send feedback ↗',
   },
   ko: {
@@ -1181,7 +1181,7 @@ const T = {
     usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · CPU ${cpu}%`),
     period_tip: '이 화면이 파일을 얼마나 자주 다시 읽을지',
     switching: '바꾸는 중…',
-    update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 이 폴더에서 <code>git pull</code>`,
+    update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 클론한 폴더에서 <code>git pull</code>, <code>./install.sh</code> 실행 (Homebrew: <code>brew upgrade agent-hud</code>)`,
     feedback_open: '피드백 보내기 ↗',
   },
 };

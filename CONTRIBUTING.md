@@ -49,6 +49,9 @@ No framework, no dependencies — each file runs on its own and asserts.
   Skills spec.
 - **`tests/test_subprojects.py`** — subfolders that are projects of their own
   show up in the folder picker.
+- **`tests/test_update_hint.py`** — the update notice tells people to rerun
+  `install.sh` (or `brew upgrade`), since the service runs an installed copy
+  that `git pull` alone does not change.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.
