@@ -21,7 +21,6 @@ MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
 VERSION = "0.1.0"
-# TODO: 실제로 push하는 저장소로 확정되면 이 값을 바꾼다.
 UPDATE_REPO = "ganggangstone/agent-hud"
 UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 12 * 60 * 60
@@ -793,8 +792,8 @@ def modify_group(action, group, member, kind="plugin"):
 
 
 def assign_set(name, project_dir):
-    """세트를 프로젝트에 적용한다. 스킬은 이 프로젝트에만, 플러그인은 컴퓨터 전체에 걸린다 --
-    Claude Code의 enabledPlugins가 사용자 전역 값 하나뿐이라 그렇다(ADR 10).
+    """세트를 프로젝트에 적용한다. 스킬 링크도 플러그인 on/off도 이 프로젝트에만 걸린다
+    (플러그인은 settings.local.json의 enabledPlugins에 쓴다).
     name이 빈 문자열이면 이 프로젝트의 배정을 푼다."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
@@ -811,7 +810,7 @@ def assign_set(name, project_dir):
         if not ok and sk in wanted:
             errors.append(f"{sk}: {err}")
 
-    # 2) 플러그인: 전역이다. 세트를 배정하지 않을 때는 건드리지 않는다.
+    # 2) 플러그인: 세트를 배정하지 않을 때는 건드리지 않는다.
     if name:
         # 설치된 플러그인 전부에 값을 적는다. 하나라도 빠뜨리면 그건 전역 값을 물려받아
         # "왜 이게 켜져 있지"가 된다.
