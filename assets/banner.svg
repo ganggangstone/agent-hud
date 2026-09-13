@@ -57,6 +57,6 @@
   <!-- title -->
   <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
     <text x="120" y="90" font-size="52" font-weight="600" fill="#e6edf3">Agent HUD</text>
-    <text x="120" y="122" font-size="18" fill="#8b949e">live status for your Claude Code setup</text>
+    <text x="120" y="122" font-size="18" fill="#8b949e">live status for your coding agents' setup</text>
   </g>
 </svg>

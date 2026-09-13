@@ -10,6 +10,21 @@
   <img src="assets/screenshot.png" alt="Plugins &amp; skills tab: every skill with a badge per agent" width="640">
 </p>
 
+## Contents / 목차
+
+- [The problem / 배경](#the-problem--배경)
+- [What it shows / 화면 구성](#what-it-shows--화면-구성)
+- [Concepts / 개념](#concepts--개념)
+- [Setting up groups / 그룹 설정하기](#setting-up-groups--그룹-설정하기)
+- [Install (macOS) / 설치](#install-macos--설치)
+- [Behavior across projects and sessions / 여러 프로젝트·세션에서의 동작](#behavior-across-projects-and-sessions--여러-프로젝트세션에서의-동작)
+- [Managing the service / 서비스 관리](#managing-the-service--서비스-관리)
+- [Update checks / 업데이트 확인](#update-checks--업데이트-확인)
+- [Extend / 확장하기](#extend--확장하기)
+- [Feedback / 피드백](#feedback--피드백)
+- [Why it's built this way / 설계 근거](#why-its-built-this-way--설계-근거)
+- [License / 라이선스](#license--라이선스)
+
 ## The problem / 배경
 
 Different projects need different skills. Writing, app work and infrastructure
@@ -31,29 +46,20 @@ Agent HUD shows what each project actually loads, and lets you save the set you
 use for that kind of work and apply it per project. It reads local files and
 renders them; no accounts, no external services.
 
-> 프로젝트마다 쓰는 스킬이 다릅니다. 글쓰기, 앱 개발, 인프라는 겹치는 게 거의 없는데,
-> 설치한 스킬은 **쓰든 안 쓰든 전부** 세션에 올라갑니다 — 스킬의 이름과 설명이 시작할 때
-> 컨텍스트에 들어가기 때문입니다.
+> 프로젝트마다 쓰는 스킬이 다르다. 글쓰기, 앱 개발, 인프라는 겹치는 게 거의 없는데,
+> 설치한 스킬은 쓰든 안 쓰든 전부 세션에 올라간다. 스킬의 이름과 설명이 시작할 때
+> 컨텍스트에 들어가기 때문이다.
 >
-> 이 기계에서는 플러그인 3개가 스킬 **60개**를 들고 있었습니다(커맨드와 훅은 별도).
+> 이 기계에서는 플러그인 3개가 스킬 60개를 들고 있었다(커맨드와 훅은 별도).
 > [명세](https://agentskills.io/specification)가 말하는 스킬당 약 100토큰으로 치면
-> **세션마다 5,000~9,000토큰**이고, 대부분은 그 프로젝트와 상관없는 스킬입니다.
+> 세션마다 5,000~9,000토큰이고, 대부분은 그 프로젝트와 상관없는 스킬이다.
 >
-> 플러그인을 끌 수는 있지만 그 스위치는 모든 프로젝트가 공유합니다. "이 작업에만 켠다"와
-> "어디서나 켠다"가 같은 뜻이 되고, 세션마다 손으로 바꾸는 건 금방 질립니다.
+> 플러그인을 끌 수는 있지만 그 스위치는 모든 프로젝트가 공유한다. "이 작업에만 켠다"와
+> "어디서나 켠다"가 같은 뜻이 되고, 세션마다 손으로 바꾸는 건 금방 질린다.
 >
 > Agent HUD는 지금 이 프로젝트가 무엇을 로드하는지 보여주고, 작업 종류별로 묶어서
-> 프로젝트마다 적용하게 합니다. 로컬 파일을 읽어서 그리는 게 전부입니다.
-
-> Claude Code의 설정은 여러 파일에 나뉘어 있다. `~/.claude/settings.json`은 어떤
-> 플러그인이 켜져 있는지 담고, `~/.claude/plugins/`는 무엇이 설치돼 있고 어디서
-> 왔는지 담는다. 프로젝트별 `CLAUDE.md`와 `.claude/settings.json`은 지침과 권한
-> 오버라이드를, `.claude/agents/*.md`는 서브에이전트 정의를 담는다. 이 상태는
-> 작업 중엔 한 곳에 보이지 않는다. 플러그인 활성 여부만으로는 "이 작업에는
-> 켜고 저 작업에는 끈다"는 구분도 안 된다.
->
-> Agent HUD는 이 정보를 전부 실시간으로 읽어서 작은 상시 상태 페이지로
-> 보여준다. 계정도 외부 서비스도 없다. 로컬 파일을 읽는 로컬 HTTP 서버다.
+> 프로젝트마다 적용하게 한다. 로컬 파일을 읽어서 그리는 게 전부다. 계정도 외부
+> 서비스도 없다.
 
 ## What it shows / 화면 구성
 
@@ -180,16 +186,15 @@ every session.
 
 ## Setting up groups / 그룹 설정하기
 
-A group is just a named set of plugins. In the Groups tab, click "+ create a new
-group", give it a name, and pick which plugin it starts with. Click INACTIVE on a
-group to switch to it: every plugin in that group turns on, every plugin not in it
-turns off, in one action.
+In the Groups tab, click "+ create a new group", give it a name, and pick which
+plugin it starts with. Click INACTIVE on a group to switch to it: every plugin
+in that group turns on, every plugin not in it turns off, in one action.
 
 You can skip the UI and edit `modes.json` directly instead:
 
-> 그룹은 그냥 이름 붙인 플러그인 묶음이다. Groups 탭에서 "+ 새 그룹"을 누르고 이름을
-> 정한 다음 시작할 플러그인 하나를 고르면 된다. 그룹의 "비활성" 표시를 클릭하면 그
-> 그룹으로 전환된다. 그룹 안 플러그인은 켜지고 나머지는 전부 꺼진다.
+> Groups 탭에서 "+ 새 그룹"을 누르고 이름을 정한 다음 시작할 플러그인 하나를 고르면
+> 된다. 그룹의 "비활성" 표시를 클릭하면 그 그룹으로 전환된다. 그룹 안 플러그인은
+> 켜지고 나머지는 전부 꺼진다.
 >
 > UI 대신 `modes.json`을 직접 편집해도 된다:
 
