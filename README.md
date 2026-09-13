@@ -3,7 +3,11 @@
   <a href="README.ko.md"><img src="https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-%EC%9D%BD%EA%B8%B0-555?style=for-the-badge" alt="한국어"></a>
 </p>
 
-<h1 align="center">Agent HUD</h1>
+<p align="center"><b>한국어 설명은 위의 <a href="README.ko.md">한국어</a> 버튼을 누르세요.</b></p>
+
+<p align="center">
+  <img src="docs/images/banner.svg" alt="Agent HUD" width="100%">
+</p>
 
 <p align="center">A local dashboard for your coding agents' skills, instructions, and plugin state.</p>
 
@@ -30,8 +34,8 @@ model needs that list to choose a skill during the conversation. The agent reads
 skill's full body only when the skill is used, but it adds the name and description of
 every installed skill to the context, including skills the session never uses.
 
-The [Agent Skills spec](https://agentskills.io/specification) puts one skill's name and
-description at about 100 tokens. On the author's machine, three plugins had installed
+The [Agent Skills specification](https://agentskills.io/specification), an open standard
+originally developed by Anthropic, puts one skill's name and description at about 100 tokens. On the author's machine, three plugins had installed
 60 skills. Measured by their actual names and descriptions, that came to 5,000–9,000
 tokens per session. An app project loaded the writing skills and the infrastructure
 skills too.
@@ -54,7 +58,7 @@ leaves the computer is the GitHub Releases lookup that checks for a new version.
 </p>
 
 The dashboard has three tabs, Groups, Plugins & skills and Agent instructions, and shows
-one at a time. It opens on the Groups tab.
+one at a time. It opens on the Groups tab the first time, then on the last tab you used.
 
 - **Groups**: lists of plugins and skills you use together. Applying a group to a project
   links the group's skills into that project's skill folders, turns the group's plugins
@@ -63,10 +67,10 @@ one at a time. It opens on the Groups tab.
   skills that belong to no plugin in a separate section. Each skill has a badge for
   Claude Code, Codex, Cursor, Copilot and Gemini CLI. A badge is shown in plain text
   when that agent can read the skill in the selected project, and struck through when
-  it can't. This tab also turns plugins on and off (ON/OFF switch) and blocks skills
-  (ALLOWED/BLOCKED switch). Both features exist only in Claude Code; hovering a switch
-  shows that it applies to Claude Code only.
-- **Agent instructions**: finds 29 kinds of instruction files in the project folder,
+  it can't. This tab also turns plugins on and off (ON/OFF switch) and blocks individual
+  plugin skills (ALLOWED/BLOCKED switch). Both features exist only in Claude Code;
+  hovering the ALLOWED/BLOCKED switch says it applies to Claude Code only.
+- **Agent instructions**: finds 30 kinds of instruction files in the project folder,
   including `CLAUDE.md`, `AGENTS.md`, `.clinerules` and `.cursor/rules/`, and shows their
   size and modified time. Each agent has its own instruction file, so the modified times
   show, for example, that you updated `CLAUDE.md` but `AGENTS.md` still has the old
@@ -120,7 +124,7 @@ the change takes effect from the next session.
 ### Marketplace [Claude Code]
 
 The source plugins are downloaded from: a git repository or a local path, registered
-with `claude marketplace add`. Agent HUD shows a plugin's source when you hover its name,
+with `claude plugin marketplace add`. Agent HUD shows a plugin's source when you hover its name,
 but does not add or remove marketplaces. You decide which sources to trust, with the `claude` CLI.
 
 ### Permission override [Claude Code]
@@ -142,7 +146,8 @@ together, for example a "writing" group and a "video editing" group. Groups are 
 1. In the Groups tab, click "+ create a new group".
 2. Enter a name and choose the first plugin to add.
 3. Add more plugins and skills from "+ add a plugin or skill…" under the group.
-4. Select a project and click "Apply to this project".
+4. Select a project on the Plugins & skills tab, then click "Apply to this project" in the
+   Groups tab.
 
 Applying links the group's skills into that project's skill folders, turns the group's
 plugins on and every other plugin off. Other projects' settings are not changed. Plugin
@@ -206,8 +211,9 @@ the current project path; if not, it starts a new server. Opening or closing a t
 in the same project does not restart the server or change its port. Starting a new server
 opens the dashboard in a browser tab.
 
-Each tab has a project dropdown under its title. "+ add a folder" adds a project without
-the hook.
+The Plugins & skills and Agent instructions tabs have a project dropdown under the title;
+the Groups tab applies to the project selected there. "+ add a folder" adds a project
+without the hook.
 
 ## Managing the service
 
@@ -226,7 +232,9 @@ commands also do nothing while it is set. A server that is already running keeps
 
 Every 12 hours the dashboard checks GitHub Releases for a new version tag and shows a
 notice at the top of the page when one exists. It never downloads or installs anything.
-To update, run `git pull` in the folder you cloned and restart the service.
+To update, run `git pull` in the folder you cloned, then run `./install.sh` again. The
+service runs the copy in `~/.claude/tools/agent-hud/`, so `git pull` alone does not change
+it.
 
 ## Extend
 
