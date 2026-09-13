@@ -45,6 +45,12 @@ Agent HUD는 선택한 프로젝트에서 스킬이 몇 개 로드되는지 보�
 
 ## 화면 구성
 
+<p align="center">
+  <img src="docs/images/groups-ko.png" alt="그룹 탭" width="560">
+  <img src="docs/images/skills-ko.png" alt="플러그인 &amp; 스킬 탭: 스킬마다 에이전트 뱃지가 있다" width="560">
+  <img src="docs/images/instructions-ko.png" alt="에이전트 지침 탭" width="560">
+</p>
+
 탭은 그룹, 플러그인 & 스킬, 에이전트 지침 세 개이고, 한 번에 한 탭만 표시된다. 처음 열면
 그룹 탭이 표시된다.
 

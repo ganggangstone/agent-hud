@@ -47,6 +47,12 @@ leaves the computer is the GitHub Releases lookup that checks for a new version.
 
 ## What it shows
 
+<p align="center">
+  <img src="docs/images/groups.png" alt="Groups tab" width="560">
+  <img src="docs/images/skills.png" alt="Plugins &amp; skills tab: every skill with a badge per agent" width="560">
+  <img src="docs/images/instructions.png" alt="Agent instructions tab" width="560">
+</p>
+
 The dashboard has three tabs, Groups, Plugins & skills and Agent instructions, and shows
 one at a time. It opens on the Groups tab.
 
