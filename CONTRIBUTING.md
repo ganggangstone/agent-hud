@@ -101,12 +101,12 @@ the browser as JSON and rendered by the branch that matches its shape.
 - **Korean word order for counts**: `스킬 43개`, not `43개 스킬`.
 - **Never truncate silently.** When the instruction scan hits its budget, the
   panel says so. A quiet cap reads as "that was all of them".
-- Screenshots for the README are taken from a throwaway instance serving fake
-  data — never from a real one. See `assets/screenshot-source.html`.
+- Screenshots are taken from a throwaway instance serving fake data, never from
+  a real one.
 
 ## Scope
 
-Plugins, groups and per-skill blocking are Claude Code concepts; this dashboard
-reads Claude Code's copies of them. Skills and instruction files are read for
-every supported agent. Don't invent equivalents for tools that have none — say
+Plugins and per-skill blocking are Claude Code concepts; this dashboard reads
+Claude Code's copies of them. Groups are Agent HUD's own. Skills and instruction
+files are read for every supported agent. Don't invent equivalents for tools that have none — say
 which agent a control applies to instead.

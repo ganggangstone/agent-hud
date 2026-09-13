@@ -61,8 +61,9 @@ class AgentHud < Formula
           ]
         }
 
-      The hook does not start a server; it only tells a running one which folder
-      you are in. You can also add folders from the dashboard itself.
+      If the service is running, the hook only tells it which folder you are in.
+      If not, the hook starts a server and opens a browser tab. You can also add
+      folders from the dashboard itself.
 
       From a terminal:
         agent-hud groups               list groups
