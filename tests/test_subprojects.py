@@ -1,9 +1,9 @@
 """자기 에이전트 설정을 가진 하위 폴더를 프로젝트로 찾아내는지 본다.
-   python3 test_subprojects.py"""
+   python3 tests/test_subprojects.py"""
 import importlib.util, json, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

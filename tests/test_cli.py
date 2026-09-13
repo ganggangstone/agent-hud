@@ -1,9 +1,9 @@
 """CLI가 서버 없이도 그룹을 적용하는지 본다.
-   python3 test_cli.py"""
+   python3 tests/test_cli.py"""
 import json, os, shutil, subprocess, sys, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SERVER = os.path.join(HERE, "server.py")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SERVER = os.path.join(ROOT, "server.py")
 
 
 def run(args, home, cwd=None):

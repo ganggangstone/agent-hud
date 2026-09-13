@@ -1,10 +1,10 @@
 """_instruction_rows()가 목록에 있는 것만, 있는 것은 전부, 밑까지 찾는지 본다.
    그리고 가지치기·상한이 실제로 걸리는지도 본다.
-   python3 test_instructions.py"""
+   python3 tests/test_instructions.py"""
 import importlib.util, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

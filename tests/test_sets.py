@@ -1,10 +1,10 @@
 """세트가 옛 modes.json을 그대로 읽는지, 프로젝트에 적용할 때 이 세트 스킬만 남기는지,
    그리고 어느 세트에도 없는 링크(사용자가 직접 건 것)는 건드리지 않는지 본다.
-   python3 test_sets.py"""
+   python3 tests/test_sets.py"""
 import importlib.util, json, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

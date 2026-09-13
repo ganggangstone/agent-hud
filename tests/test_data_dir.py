@@ -1,10 +1,10 @@
 """AGENT_HUD_HOME이 사용자 데이터 위치를 옮기는지 본다.
    패키지로 설치하면 코드 폴더가 업그레이드마다 갈리므로, 데이터가 거기 있으면 안 된다.
-   python3 test_data_dir.py"""
+   python3 tests/test_data_dir.py"""
 import importlib.util, os, shutil, subprocess, sys, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SERVER = os.path.join(HERE, "server.py")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SERVER = os.path.join(ROOT, "server.py")
 
 
 def load(env_home):
@@ -30,7 +30,7 @@ def main():
     try:
         # 기본값: 스크립트 옆
         default = load(None)
-        assert default[0] == HERE, f"기본 위치가 스크립트 옆이 아니다: {default[0]}"
+        assert default[0] == ROOT, f"기본 위치가 스크립트 옆이 아니다: {default[0]}"
 
         # 환경변수로 옮긴다
         moved = os.path.join(tmp, "data")

@@ -1,10 +1,10 @@
 """_skill_meta()가 공개 명세 위반을 잡는지 본다.
    위반은 '로드 실패'가 아니라 '명세 위반'이다 -- 이름을 그렇게 유지할 것.
-   python3 test_skill_spec.py"""
+   python3 tests/test_skill_spec.py"""
 import importlib.util, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

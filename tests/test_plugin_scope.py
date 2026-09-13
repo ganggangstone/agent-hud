@@ -1,9 +1,9 @@
 """플러그인 on/off가 프로젝트 단위인지 본다. 사용자 전역 파일은 절대 건드리면 안 된다.
-   python3 test_plugin_scope.py"""
+   python3 tests/test_plugin_scope.py"""
 import importlib.util, json, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

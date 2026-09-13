@@ -21,25 +21,34 @@ launchctl kickstart -k gui/$(id -u)/com.agent-hud
 ## Checks
 
 ```bash
-for t in test_*.py; do python3 "$t" || echo "FAIL $t"; done
+for t in tests/test_*.py; do python3 "$t" || echo "FAIL $t"; done
 ```
 
 No framework, no dependencies — each file runs on its own and asserts.
 
-- **`test_page_js.py`** runs `node --check` over every `<script>` block in the
+- **`tests/test_page_js.py`** runs `node --check` over every `<script>` block in the
   page. The UI is one Python string, so a stray quote makes the server answer
   200, render the header, and draw nothing else. Nothing else catches that.
-- **`test_instructions.py`** — instruction-file discovery: depth, pruning, the
+- **`tests/test_instructions.py`** — instruction-file discovery: depth, pruning, the
   scan budget.
-- **`test_link_skill.py`** — linking a skill must create only symlinks and
+- **`tests/test_link_skill.py`** — linking a skill must create only symlinks and
   remove only symlinks. A real directory a user placed is never touched.
-- **`test_sets.py`** — group format compatibility, switching groups, leaving
+- **`tests/test_sets.py`** — group format compatibility, switching groups, leaving
   links the user made by hand alone.
-- **`test_plugin_scope.py`** — plugin state is per project. The user-wide
+- **`tests/test_plugin_scope.py`** — plugin state is per project. The user-wide
   settings file must come out byte-identical.
-- **`test_skill_deny_scope.py`** — blocking a skill writes only to the
+- **`tests/test_skill_deny_scope.py`** — blocking a skill writes only to the
   uncommitted `settings.local.json`. Allowing it also clears a block an older
   version left in the shared `settings.json`, without touching other rules.
+- **`tests/test_cli.py`** — the `groups` and `apply` subcommands, run as a
+  subprocess against a throwaway home.
+- **`tests/test_data_dir.py`** — data files sit next to `server.py` by default
+  and move with `AGENT_HUD_HOME`.
+- **`tests/test_loaded.py`** — the count of skills a project loads.
+- **`tests/test_skill_spec.py`** — detection of skills that break the Agent
+  Skills spec.
+- **`tests/test_subprojects.py`** — subfolders that are projects of their own
+  show up in the folder picker.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.

@@ -1,10 +1,10 @@
 """_loaded_count()가 실제로 로드되는 스킬만 세는지 본다.
    꺼진 플러그인과 차단한 스킬은 컨텍스트에 안 올라가므로 세면 안 된다.
-   python3 test_loaded.py"""
+   python3 tests/test_loaded.py"""
 import importlib.util, os
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

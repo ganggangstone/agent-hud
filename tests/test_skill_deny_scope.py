@@ -1,9 +1,9 @@
 """스킬 차단은 커밋되지 않는 settings.local.json에 써야 한다(ADR 3). 공유 settings.json은 만들지 않는다.
-   python3 test_skill_deny_scope.py"""
+   python3 tests/test_skill_deny_scope.py"""
 import importlib.util, json, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 

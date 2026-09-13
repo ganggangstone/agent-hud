@@ -1,10 +1,10 @@
 """link_skill()이 원본 위치와 무관하게 빈 폴더만 채우는지, 그리고 링크만 지우는지 본다.
    방향(claude->agents, agents->claude)을 따지지 않는 것이 이 함수의 요점이다.
-   python3 test_link_skill.py"""
+   python3 tests/test_link_skill.py"""
 import importlib.util, os, shutil, tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("hud", os.path.join(HERE, "server.py"))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
 
