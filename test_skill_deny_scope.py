@@ -35,7 +35,7 @@ def main():
         d = json.load(open(local)); d["enabledPlugins"] = {"p@m": True}; json.dump(d, open(local, "w"))
         hud.modify_skill_permission("unblock", "p@m", "s1", proj)
         assert json.load(open(local))["enabledPlugins"] == {"p@m": True}, "로컬의 다른 설정을 날렸다"
-        assert hud.skill_denies(proj) == set(), hud.skill_denies(proj)
+        assert hud.skill_denies(proj) == {"Bash(rm:*)"}, hud.skill_denies(proj)
         print("PASS")
     finally:
         shutil.rmtree(tmp)

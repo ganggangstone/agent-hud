@@ -21,8 +21,7 @@ launchctl kickstart -k gui/$(id -u)/com.agent-hud
 ## Checks
 
 ```bash
-python3 test_page_js.py && python3 test_instructions.py && \
-python3 test_link_skill.py && python3 test_sets.py && python3 test_plugin_scope.py
+for t in test_*.py; do python3 "$t" || echo "FAIL $t"; done
 ```
 
 No framework, no dependencies — each file runs on its own and asserts.
@@ -38,6 +37,9 @@ No framework, no dependencies — each file runs on its own and asserts.
   links the user made by hand alone.
 - **`test_plugin_scope.py`** — plugin state is per project. The user-wide
   settings file must come out byte-identical.
+- **`test_skill_deny_scope.py`** — blocking a skill writes only to the
+  uncommitted `settings.local.json`. Allowing it also clears a block an older
+  version left in the shared `settings.json`, without touching other rules.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.

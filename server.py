@@ -597,8 +597,7 @@ def collect_skills(ctx):
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
     modes = read_json(MODES_FILE)
-    denied = set(read_json(os.path.join(project_dir, ".claude", "settings.json"))
-                 .get("permissions", {}).get("deny", []))
+    denied = skill_denies(project_dir)
 
     def decorate(skill, fallback_agents, blocked=False):
         hit = index.get(skill["id"])
@@ -832,35 +831,56 @@ def assign_set(name, project_dir):
     return (not errors), "; ".join(errors)[:300]
 
 
+SHARED_SETTINGS = os.path.join(".claude", "settings.json")
+
+
+def skill_denies(project_dir):
+    """이 프로젝트에서 차단된 항목. 예전 버전이 공유 settings.json에 쓴 차단도 함께 읽는다."""
+    out = set()
+    for rel in (SHARED_SETTINGS, LOCAL_SETTINGS):
+        out.update(read_json(os.path.join(project_dir, rel)).get("permissions", {}).get("deny", []))
+    return out
+
+
+def _edit_deny(path, entry, add):
+    """path의 permissions.deny에 entry를 넣거나 뺀다. 바뀐 게 없으면 파일을 쓰지 않는다."""
+    settings = read_json(path, {})
+    perms = settings.setdefault("permissions", {})
+    deny = perms.setdefault("deny", [])
+    if (entry in deny) == add:
+        return True, ""
+    deny.append(entry) if add else deny.remove(entry)
+    if not deny:
+        perms.pop("deny", None)
+    if not perms:
+        settings.pop("permissions", None)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return False, str(e)
+    return True, ""
+
+
 def modify_skill_permission(action, plugin, skill, project_dir):
     project_dir = project_dir or PROJECT_DIR
     if plugin not in known_plugin_names():
         return False, "unknown plugin"
     if not skill:
         return False, "skill id required"
-    settings_path = os.path.join(project_dir, ".claude", "settings.json")
-    settings = read_json(settings_path, {})
-    perms = settings.setdefault("permissions", {})
-    deny = perms.setdefault("deny", [])
-    entry = f"Skill({plugin}:{skill})"
-    if action == "block":
-        if entry not in deny:
-            deny.append(entry)
-    elif action == "unblock":
-        if entry in deny:
-            deny.remove(entry)
-    else:
+    if action not in ("block", "unblock"):
         return False, "unknown action"
-    if not deny:
-        perms.pop("deny", None)
-    if not perms:
-        settings.pop("permissions", None)
-    try:
-        os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-        with open(settings_path, "w") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        return False, str(e)
+    entry = f"Skill({plugin}:{skill})"
+    local = os.path.join(project_dir, LOCAL_SETTINGS)
+    if action == "block":
+        # 커밋되지 않는 개인 파일에만 쓴다(ADR 3). 공유 settings.json은 만들지 않는다.
+        return _edit_deny(local, entry, True)
+    # 허용은 두 파일 모두에서 지운다. 공유 파일에 남은 옛 차단을 두면 허용해도 계속 막힌다.
+    for path in (local, os.path.join(project_dir, SHARED_SETTINGS)):
+        ok, err = _edit_deny(path, entry, False)
+        if not ok:
+            return False, err
     return True, ""
 
 
