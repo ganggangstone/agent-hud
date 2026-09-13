@@ -23,4 +23,7 @@ assets/promo.md
 .claude/skills/
 .agents/skills/
 
+# bkit 플러그인이 이 저장소에 PDCA를 써보면서 남기는 런타임 상태 — 개인 실행 이력, 소스 아님.
+.bkit/
+
 .DS_Store

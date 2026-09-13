@@ -210,7 +210,7 @@ restart needed.
 ## Install (macOS) / 설치
 
 ```bash
-git clone <this-repo> agent-hud && cd agent-hud
+git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
 ./install.sh
 ```
 
