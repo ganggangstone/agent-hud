@@ -41,7 +41,6 @@ HTML은 실재하는 단점이라 `tests/test_page_js.py`로 막는다 — 자�
 | 대상 | 쓰는 곳 |
 |---|---|
 | 플러그인 on/off | `<프로젝트>/.claude/settings.local.json`의 `enabledPlugins` |
-| 스킬 차단/허용 | `<프로젝트>/.claude/settings.local.json`의 `permissions.deny` |
 | 스킬을 다른 에이전트에 적용 | `<프로젝트>/.claude/skills/`, `<프로젝트>/.agents/skills/`에 심볼릭 링크 |
 
 `settings.local.json`은 에이전트가 스스로 만드는 개인용 파일이고 커밋되지 않는다. 그래서
@@ -52,6 +51,14 @@ HTML은 실재하는 단점이라 `tests/test_page_js.py`로 막는다 — 자�
 > 그래서 프로젝트마다 다른 플러그인 구성을 만들 수 없었고, 화면 절반이 "이 컴퓨터 전체"라는
 > 다른 범위를 말해야 했다. `enabledPlugins`가 어느 설정 파일에나 들어간다는 것을 확인한 뒤
 > (→ 9번) 프로젝트 파일 쓰기로 바꿨다. **제약인 줄 알았던 것이 우리가 고른 수단의 성질이었다.**
+
+> **없앤 기능 (2026-09)**: 스킬 단위 차단 스위치가 있었다. `permissions.deny`에
+> `Skill(플러그인@마켓플레이스:스킬)`을 썼는데, 센티널 실측(→ 10번)에서 두 가지가 드러났다.
+> 이 형식은 Claude Code가 인식하지 않아 **호출도 막지 못했다.** 올바른 형식(`Skill(플러그인:스킬)`)도
+> 호출만 막고 **스킬 목록에서는 빠지지 않아** 토큰이 줄지 않는다. 이 도구의 목적은 토큰 절감이라
+> 스위치를 없앴다. 예전 버전이 쓴 `@`가 든 항목은 서버 시작과 프로젝트 등록 때 두 설정 파일에서
+> 지우고 로그에 남긴다(`tests/test_stale_deny_cleanup.py`). **문서에 "스킬 하나만 끄는 방법"이라고
+> 적혀 있어도, 목록에서 빠지는지는 재 봐야 안다.**
 
 링크를 지울 때는 **심볼릭 링크만** 지운다. 같은 이름의 진짜 폴더가 있으면 사용자가 직접 둔
 것이므로 건드리지 않는다. `tests/test_link_skill.py`가 이걸 검사한다.
@@ -150,7 +157,7 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 
 **지원한다.** 처음에는 하지 않기로 했다가 뒤집었다.
 
-**하지 않기로 했던 이유(초기)**: 이 도구가 보여주던 것(플러그인 on/off, 그룹, 스킬 차단)이
+**하지 않기로 했던 이유(초기)**: 이 도구가 보여주던 것(플러그인 on/off, 그룹, 당시의 스킬 차단)이
 전부 Claude Code 개념이라 옮길 대상이 없었다. 설정 형식도 갈린다 — JSON, TOML, Markdown 룰
 파일. 공통 파서를 만들 표준이 없었다.
 
@@ -168,7 +175,7 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 같은 규칙을 다른 문장으로 쓴 경우를 못 잡고, 제목·빈 줄에서 오탐이 난다. **못 잡는 게 더
 많은 검사는 "표시가 없으니 괜찮다"는 잘못된 안심을 준다.** 색인으로 두고 대조는 사람이 한다.
 
-**하지 않을 것**: 플러그인·그룹·스킬 차단을 다른 도구로 확장하는 것. 대응 개념이 없다.
+**하지 않을 것**: 플러그인 on/off를 다른 도구로 확장하는 것. 대응 개념이 없다.
 화면에서 어느 에이전트에 적용되는지 밝히는 편이 정직하다.
 
 ### 부수 효과: 읽을 수 있는 파일 이름이 늘었다
@@ -194,9 +201,10 @@ GitHub이 느린 날 대시보드 전체가 멈춘다.
 | Cursor | `.agents/skills/`, `.cursor/skills/` (+호환 `.claude/`, `.codex/`) | 동일 |
 | VS Code·Copilot | `.github/skills/`, `.claude/skills/`, `.agents/skills/` | `~/.copilot/`, `~/.claude/`, `~/.agents/` |
 | Gemini CLI | `.agents/skills/`(우선), `.gemini/skills/` | `~/.agents/skills/`, `~/.gemini/skills/` |
+| Antigravity (`agy`) | `.agents/skills/` (+`.agents/skills.json`에 적은 경로) | `~/.gemini/config/skills/` (`~/.agents/skills/`는 안 읽음, 실측) |
 
 **`.agents/skills`로 수렴하는데 Claude Code만 그걸 읽지 않는다.** 그래서 폴더 둘
-(`.claude/skills`, `.agents/skills`)에 링크를 걸면 다섯 도구가 전부 켜진다.
+(`.claude/skills`, `.agents/skills`)에 링크를 걸면 여섯 도구가 전부 켜진다.
 
 프로젝트별 on/off 설정은 도구마다 제각각이거나 아예 없다 — Codex는 사용자 전역만, Cursor와
 Copilot은 없고, Gemini CLI는 슬래시 커맨드로 workspace 범위를 지원한다. **반면 모든 도구가
@@ -218,6 +226,7 @@ Copilot은 없고, Gemini CLI는 슬래시 커맨드로 workspace 범위를 지�
 | Gemini CLI | `gemini skills list` | 나옴 | 안 나옴 |
 | Codex | `codex debug prompt-input` | 나옴 | 안 나옴 |
 | Copilot | `copilot skill list` | 나옴 | 안 나옴 |
+| Antigravity | `agy -p "..." --add-dir <폴더>` | 나옴 | (진짜 폴더 대조군: 나옴) |
 
 **Cursor는 미확인** — CLI가 npm에 없어 설치 스크립트가 필요했다. 서로 다른 구현체
 (TypeScript·Rust)에서 넷이 전부 따라간 점, 링크를 안 따라가려면 일부러 그렇게 써야 하는 점을
@@ -230,6 +239,46 @@ Copilot은 없고, Gemini CLI는 슬래시 커맨드로 workspace 범위를 지�
 - **센티널 이름을 프롬프트에 흘리면 검사가 검사 노릇을 못 한다.** 첫 확인에서 *"이름에 X가
   든 스킬을 나열하라"*고 물었는데, 모델은 목록에 없어도 그 이름을 뱉을 수 있다. 그 확인은
   버리고, 아무 데도 없는 이름으로 다시 했다.
+- **agy는 `-p`만으로는 현재 폴더의 프로젝트 스킬을 읽지 않았다.** `--add-dir`로 폴더를 지정하자
+  대조군이 잡혔다. 대조군이 비면 결론을 내지 말 것.
+
+### 스킬을 목록에서 빼는 방법 — 실측 (2026-09)
+
+토큰 절감은 **스킬 이름과 설명이 세션 시작 때 들어가지 않아야** 생긴다. 호출을 막는 것과는
+다르다. 위와 같은 센티널 방식으로, 조건마다 모델에게 사용 가능한 스킬 이름을 나열하게 해 비교했다.
+스크립트는 `tests/manual/skill_visibility.sh`(agy 조건은 `AGY=1`, 전역 조건은 `ALLOW_GLOBAL=1`). 조건마다 한 번씩 실행했고 대화형 `/skills` 화면은
+따로 확인하지 않았다.
+
+**Claude Code** (대조군에서 사용자 스킬·플러그인 스킬·내장 `dataviz` 모두 목록에 있음)
+
+| 설정 (`.claude/settings.local.json`) | 사용자·프로젝트 스킬 | 플러그인 스킬 | 호출 |
+|---|---|---|---|
+| `permissions.deny: ["Skill(이름)"]` | **남음** | – | 막힘 |
+| `permissions.deny: ["Skill(플러그인:스킬)"]` | – | **남음** | 막힘 |
+| `permissions.deny: ["Skill(플러그인@마켓플레이스:스킬)"]` | – | 남음 | **안 막힘** |
+| `skillOverrides: {"이름": "off"}` | **빠짐** | – | – |
+| `skillOverrides: {"스킬": "off"}` / `{"플러그인:스킬": "off"}` | – | **남음** (두 키 형식 모두) | – |
+| `skillOverrides: {"이름": "user-invocable-only"}` | 빠짐 | – | – |
+| `skillOverrides: {"이름": "name-only"}` | 남음 (문서상 설명만 빠짐) | – | – |
+| `skillOverrides: {"dataviz": "off"}` (내장) | 빠짐 | – | – |
+| 공유 `settings.json`에 `off`, 로컬에 `on` | 남음 → **로컬이 이김** | – | – |
+
+- 플러그인 스킬을 목록에서 빼는 방법은 **플러그인을 끄는 것뿐이었다.**
+- 공식 문서 조사가 "`Skill(name)` deny는 컨텍스트에서도 뺀다"고 결론 냈지만, 그건 `Bash` 같은
+  도구 이름에 대한 문장을 스킬에 넓힌 추론이었고 실측과 달랐다.
+
+**Antigravity (`agy`)**
+
+| 설정 | 전역 스킬 (`~/.gemini/config/skills`) | `skills.json`으로 추가한 스킬 |
+|---|---|---|
+| 없음 | 남음 | – |
+| 프로젝트 `.agents/skills.json`의 `entries`에 전역 경로 + `exclude` | **남음** | – |
+| 같은 경로 + `include_only` (아무것도 안 맞는 패턴) | **남음** | – |
+| `skills.json`으로 추가한 경로 + `exclude` | – | exclude한 것만 **빠짐** |
+
+- 프로젝트 설정으로 **전역 스킬은 뺄 수 없다.** 전역에 두지 않고 프로젝트에 넣은 스킬만 조절된다.
+- 그래서 에이전트를 가리지 않고 토큰을 줄이는 방법은 **"전역에 두지 않고, 쓰는 프로젝트에만
+  넣는다"** 하나다. 폴더를 훑는 동작이 도구 공통이라 이 방식만 모든 도구에서 같다.
 
 ### 취소된 발견: "에이전트가 스킬을 조용히 건너뛴다"
 

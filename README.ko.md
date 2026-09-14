@@ -63,11 +63,9 @@ Agent HUD는 선택한 프로젝트에서 스킬이 몇 개 로드되는지 보�
   다른 프로젝트의 설정은 바꾸지 않는다.
 - **플러그인 & 스킬**: 이 컴퓨터에 설치된 스킬 목록. 플러그인별로 나누고, 플러그인에
   속하지 않은 스킬은 별도 항목에 표시한다. 스킬마다 Claude Code·Codex·Cursor·
-  Copilot·Gemini CLI 뱃지가 있다. 선택한 프로젝트에서 그 에이전트가 스킬을 읽을 수
-  있으면 뱃지가 일반 글자로, 읽을 수 없으면 취소선으로 표시된다. 이 탭에서 플러그인
-  켜기·끄기(켜짐/꺼짐 스위치)와 플러그인 스킬 차단(허용/차단 스위치)도 할 수 있다. 두
-  기능은 Claude Code에만 있으며, 허용/차단 스위치에 마우스를 올리면 Claude Code에만
-  적용된다는 설명이 표시된다.
+  Copilot·Gemini CLI·Antigravity 뱃지가 있다. 선택한 프로젝트에서 그 에이전트가 스킬을
+  읽을 수 있으면 뱃지가 일반 글자로, 읽을 수 없으면 취소선으로 표시된다. 이 탭에서
+  Claude Code 플러그인을 켜고 끌 수도 있다(켜짐/꺼짐 스위치).
 - **에이전트 지침**: 프로젝트 폴더에서 `CLAUDE.md`, `AGENTS.md`, `.clinerules`,
   `.cursor/rules/` 등 30종의 지침 파일을 찾아 크기와 수정 시각을 표시한다. 에이전트마다
   지침 파일이 따로 있어서, 예를 들어 `CLAUDE.md`는 고쳤는데 `AGENTS.md`는 옛 내용으로
@@ -87,16 +85,17 @@ Agent HUD는 선택한 프로젝트에서 스킬이 몇 개 로드되는지 보�
 | [지침 파일](#지침-파일-에이전트별) | 에이전트별: 도구마다 파일 이름이 다름 |
 | [플러그인](#플러그인-claude-code) | Claude Code |
 | [마켓플레이스](#마켓플레이스-claude-code) | Claude Code |
-| [권한 오버라이드](#권한-오버라이드-claude-code) | Claude Code |
 | [그룹](#그룹-agent-hud) | Agent HUD |
 
 ### 스킬 [공통]
 
 `SKILL.md` 파일과 필요한 부속 파일을 담은 폴더. [Agent Skills](https://agentskills.io)
-표준 형식이라 Claude Code, Codex, Cursor, Copilot, Gemini CLI가 같은 폴더를 변환 없이
-읽는다. 다만 에이전트마다 스킬을 찾는 폴더가 다르다. Claude Code는 `.claude/skills/`만,
-Codex와 Gemini CLI는 `.agents/skills/`를, Cursor와 Copilot은 두 폴더를 모두 읽는다.
-Agent HUD는 두 폴더에 심볼릭 링크를 만들어 스킬 하나를 다섯 에이전트가 모두 읽게 한다.
+표준 형식이라 Claude Code, Codex, Cursor, Copilot, Gemini CLI, Antigravity가 같은 폴더를
+변환 없이 읽는다. 다만 에이전트마다 스킬을 찾는 폴더가 다르다. 프로젝트 안에서는 Claude
+Code가 `.claude/skills/`만, Codex·Gemini CLI·Antigravity는 `.agents/skills/`를, Cursor와
+Copilot은 두 폴더를 모두 읽는다. Antigravity의 전역 스킬은 `~/.gemini/config/skills/`에
+있다. Agent HUD는 프로젝트의 두 폴더에 심볼릭 링크를 만들어 스킬 하나를 여섯 에이전트가
+모두 읽게 한다.
 
 플러그인에 들어 있는 스킬은 그 플러그인을 켠 Claude Code만 읽는다. 플러그인 & 스킬 탭의
 체크박스를 누르면 다른 에이전트의 스킬 폴더에도 연결된다. Agent HUD에서 플러그인 이름을
@@ -116,19 +115,16 @@ Agent HUD는 두 폴더에 심볼릭 링크를 만들어 스킬 하나를 다섯
 플러그인 옆 켜짐/꺼짐 스위치를 누르면 선택한 프로젝트의 `.claude/settings.local.json`에
 이 값을 기록한다. 다른 프로젝트에는 영향이 없고, 다음 세션부터 적용된다.
 
+플러그인에 든 스킬 하나만 컨텍스트에서 뺄 수는 없고, 플러그인을 꺼야 빠진다.
+`permissions.deny`에 `"Skill(플러그인:스킬)"`을 넣으면 호출은 막히지만, 스킬 이름과
+설명은 세션마다 그대로 로드된다(실측, [docs/ADR.md](docs/ADR.md) 10번). 토큰이 줄지 않으므로
+Agent HUD에는 스킬 단위 차단 스위치를 두지 않는다.
+
 ### 마켓플레이스 [Claude Code]
 
 플러그인을 내려받는 출처. git 저장소나 로컬 경로를 `claude plugin marketplace add`로 등록한다.
 Agent HUD에서 플러그인 이름에 마우스를 올리면 출처가 표시된다. 마켓플레이스를 추가하거나
 삭제하는 기능은 없다. 어떤 출처를 신뢰할지는 사용자가 `claude` CLI로 직접 결정해야 하기 때문이다.
-
-### 권한 오버라이드 [Claude Code]
-
-설정 파일의 `permissions.deny`에 `"Skill(플러그인:스킬)"` 형식으로 추가하는 항목.
-플러그인 전체를 끄지 않고 스킬 하나만 막는 방법이다. Agent HUD에서 스킬 옆 허용/차단
-스위치를 누르면
-선택한 프로젝트의 `.claude/settings.local.json`에 이 항목을 추가하거나 삭제한다. 이 파일은
-git에 커밋되지 않으므로 팀 저장소는 바뀌지 않는다. 플러그인 설정과 달리 바로 적용된다.
 
 ### 그룹 [Agent HUD]
 
@@ -187,7 +183,7 @@ Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등�
 있는 다른 훅을 덮어쓰지 않도록 스크립트는 파일에 직접 쓰지 않는다. 출력된 내용을 직접
 복사해 넣는다.
 
-자동 등록은 Claude Code 세션에서만 된다. Gemini CLI, Codex, Cursor로만 작업하는 프로젝트는
+자동 등록은 Claude Code 세션에서만 된다. Gemini CLI, Antigravity, Codex, Cursor로만 작업하는 프로젝트는
 대시보드의 "+ 폴더 추가"로 직접 추가한다. 추가한 뒤에는 그 에이전트의 스킬 뱃지와 그룹
 적용이 똑같이 동작한다.
 
@@ -202,6 +198,11 @@ Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등�
 등록하고, 없으면 서버를 새로 실행한다. 같은 프로젝트에서 터미널을 열거나 닫아도 서버는
 재시작되지 않고 포트도 바뀌지 않는다. 서버를 새로 실행할 때는 브라우저에 대시보드 탭이
 열린다.
+
+예전 버전은 스킬 차단 항목을 `Skill(플러그인@마켓플레이스:스킬)` 형식으로 썼는데, Claude
+Code는 이 형식을 인식하지 않는다. 서버가 시작되거나 프로젝트가 등록될 때 Agent HUD는
+프로젝트의 `.claude/settings.local.json`과 `.claude/settings.json`에서 이 형식의 항목만
+지우고, 지운 항목을 로그에 남긴다. 다른 규칙은 그대로 둔다.
 
 플러그인 & 스킬 탭과 에이전트 지침 탭의 제목 아래 드롭다운에서 프로젝트를 선택한다. 그룹
 탭은 거기서 선택한 프로젝트에 적용된다. "+ 폴더 추가"로 훅 없이도 프로젝트를 추가할 수 있다.
