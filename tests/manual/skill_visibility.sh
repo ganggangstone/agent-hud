@@ -15,7 +15,9 @@ GLOBAL_SK="$HOME/.gemini/config/skills/zqg-global-5521"
 GLOBAL_DIR_CREATED=""
 cleanup() {
   rm -rf "$W"
-  if [ -n "$GLOBAL_DIR_CREATED" ]; then rm -rf "$HOME/.gemini/config/skills"; else rm -rf "$GLOBAL_SK"; fi
+  rm -rf "$GLOBAL_SK"
+  # 우리가 만든 폴더면 비어 있을 때만 지운다 -- 그사이 다른 스킬이 생겼으면 건드리지 않는다.
+  [ -n "$GLOBAL_DIR_CREATED" ] && rmdir "$HOME/.gemini/config/skills" 2>/dev/null
 }
 trap cleanup EXIT
 

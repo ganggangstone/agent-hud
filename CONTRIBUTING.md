@@ -40,6 +40,8 @@ No framework, no dependencies — each file runs on its own and asserts.
 - **`tests/test_stale_deny_cleanup.py`** — removes the no-op `Skill(plugin@marketplace:skill)`
   deny entries older versions wrote, from both project settings files, keeping every
   other rule and key and leaving files with nothing to remove untouched.
+- **`tests/test_skill_roots_agy.py`** — Antigravity (agy) is in the agent list and reads
+  `~/.gemini/config/skills` and project `.agents/skills`, not `~/.agents/skills`.
 - **`tests/test_cli.py`** — the `groups` and `apply` subcommands, run as a
   subprocess against a throwaway home.
 - **`tests/test_data_dir.py`** — data files sit next to `server.py` by default

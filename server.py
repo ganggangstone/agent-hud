@@ -845,6 +845,8 @@ def remove_stale_skill_denies(project_dir):
         if not os.path.isfile(path):
             continue
         settings = read_json(path, {})
+        if not isinstance(settings, dict):
+            continue
         perms = settings.get("permissions")
         deny = perms.get("deny") if isinstance(perms, dict) else None
         if not isinstance(deny, list):

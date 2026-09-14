@@ -58,8 +58,6 @@ def main():
         other = os.path.join(tmp, "other")
         write(os.path.join(other, ".claude", "settings.local.json"),
               {"permissions": {"deny": ["Skill(q@n:t1)"]}})
-        hud.PROJECTS_FILE = os.path.join(tmp, "projects.json")
-        json.dump([proj, other], open(hud.PROJECTS_FILE, "w"))
         hud.known_projects = lambda: [proj, other]
         hud.cleanup_known_projects()
         assert "permissions" not in json.load(open(os.path.join(other, ".claude", "settings.local.json")))
