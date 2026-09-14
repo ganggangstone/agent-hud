@@ -552,15 +552,14 @@ def _loaded_count(rows):
 
     스킬은 본문이 아니라 **이름과 설명이 세션 시작 때 전부** 컨텍스트에 올라간다
     (agentskills.io 명세의 progressive disclosure). 그래서 안 쓰는 스킬도 비용이다.
-    꺼진 플러그인의 스킬과 이 프로젝트에서 차단한 스킬은 빠진다.
+    꺼진 플러그인의 스킬은 빠진다. permissions.deny로 차단한 스킬은 목록에 남으므로
+    빼지 않는다(센티널 실측, ADR 10).
     """
     n = 0
     for row in rows:
         if row["enabled"] is False:          # 꺼진 플러그인
             continue
         for sk in row["skills"]:
-            if sk.get("blocked"):
-                continue
             if "Claude Code" in (sk.get("agents") or []):
                 n += 1
     return n
@@ -599,12 +598,9 @@ def collect_skills(ctx):
     modes = read_json(MODES_FILE)
     denied = skill_denies(project_dir)
 
-    def decorate(skill, fallback_agents, blocked=False):
+    def decorate(skill, fallback_agents):
         hit = index.get(skill["id"])
         agents = hit["agents"] if hit else list(fallback_agents)
-        if blocked:
-            # 차단은 이 프로젝트의 Claude Code에만 건다. 다른 에이전트는 그대로 본다.
-            agents = [a for a in agents if a != "Claude Code"]
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
@@ -624,7 +620,7 @@ def collect_skills(ctx):
             # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
             # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
             sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
-            decorate(sk, ["Claude Code"], sk["blocked"])
+            decorate(sk, ["Claude Code"])
         rows.append({
             "name": name,
             "section_state": _section_state(skills),
