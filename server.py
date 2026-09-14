@@ -403,11 +403,12 @@ def _instruction_rows(project_dir):
 # 출처(2026-09 공식 문서): code.claude.com/docs/en/skills,
 # learn.chatgpt.com/docs/build-skills, cursor.com/docs/context/skills,
 # code.visualstudio.com/docs/copilot/customization/agent-skills, geminicli.com/docs/cli/skills
-SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI"]
+# Antigravity(agy)는 CLI에 들어 있는 문서와 2026-09 센티널 실측으로 확인했다(ADR 10).
+SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]
 
 SKILL_ROOTS_PROJECT = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor"]),
     (".github/skills", ["Copilot"]),
@@ -421,6 +422,7 @@ SKILL_ROOTS_HOME = [
     (".codex/skills", ["Cursor"]),
     (".copilot/skills", ["Copilot"]),
     (".gemini/skills", ["Gemini CLI"]),
+    (".gemini/config/skills", ["Antigravity"]),  # agy는 ~/.agents/skills를 읽지 않는다
 ]
 
 
