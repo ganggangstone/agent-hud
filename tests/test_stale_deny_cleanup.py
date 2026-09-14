@@ -49,6 +49,11 @@ def main():
         assert hud.remove_stale_skill_denies(empty) == []
         assert not os.path.exists(os.path.join(empty, ".claude")), "없는 설정 파일을 만들었다"
 
+        # 설정 파일이 JSON 객체가 아니어도 죽지 않는다
+        weird = os.path.join(tmp, "weird")
+        write(os.path.join(weird, ".claude", "settings.local.json"), ["not", "a", "dict"])
+        assert hud.remove_stale_skill_denies(weird) == []
+
         # 서버 시작 시 등록된 프로젝트 전부를 정리한다
         other = os.path.join(tmp, "other")
         write(os.path.join(other, ".claude", "settings.local.json"),
