@@ -53,6 +53,8 @@ def register_project(path):
             json.dump(projects, f)
     except Exception:
         pass
+    if os.path.isdir(path):
+        remove_stale_skill_denies(path)
 
 
 def known_projects():
@@ -596,7 +598,6 @@ def collect_skills(ctx):
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
     modes = read_json(MODES_FILE)
-    denied = skill_denies(project_dir)
 
     def decorate(skill, fallback_agents):
         hit = index.get(skill["id"])
@@ -619,7 +620,6 @@ def collect_skills(ctx):
         for sk in skills:
             # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
             # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
-            sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
             decorate(sk, ["Claude Code"])
         rows.append({
             "name": name,
@@ -829,55 +829,46 @@ def assign_set(name, project_dir):
 
 SHARED_SETTINGS = os.path.join(".claude", "settings.json")
 
-
-def skill_denies(project_dir):
-    """이 프로젝트에서 차단된 항목. 예전 버전이 공유 settings.json에 쓴 차단도 함께 읽는다."""
-    out = set()
-    for rel in (SHARED_SETTINGS, LOCAL_SETTINGS):
-        out.update(read_json(os.path.join(project_dir, rel)).get("permissions", {}).get("deny", []))
-    return out
+# 예전 버전은 스킬 차단을 Skill(플러그인@마켓플레이스:스킬)로 썼다. Claude Code는 스킬 이름에 @를 쓰지 않아
+# 이 항목은 목록에서도 빠지지 않고 호출도 막지 못했다(센티널 실측, ADR 10). 그 형식만 골라 지운다.
+_STALE_SKILL_DENY = re.compile(r"^Skill\([^()@:]+@[^()@:]+:[^()]+\)$")
 
 
-def _edit_deny(path, entry, add):
-    """path의 permissions.deny에 entry를 넣거나 뺀다. 바뀐 게 없으면 파일을 쓰지 않는다."""
-    settings = read_json(path, {})
-    perms = settings.setdefault("permissions", {})
-    deny = perms.setdefault("deny", [])
-    if (entry in deny) == add:
-        return True, ""
-    deny.append(entry) if add else deny.remove(entry)
-    if not deny:
-        perms.pop("deny", None)
-    if not perms:
-        settings.pop("permissions", None)
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        return False, str(e)
-    return True, ""
+def remove_stale_skill_denies(project_dir):
+    """이 프로젝트 설정에서 효과 없던 스킬 차단 항목을 지우고, 지운 항목을 돌려준다.
+    지울 게 없는 파일은 다시 쓰지 않는다."""
+    removed = []
+    for rel in (LOCAL_SETTINGS, SHARED_SETTINGS):
+        path = os.path.join(project_dir, rel)
+        if not os.path.isfile(path):
+            continue
+        settings = read_json(path, {})
+        perms = settings.get("permissions")
+        deny = perms.get("deny") if isinstance(perms, dict) else None
+        if not isinstance(deny, list):
+            continue
+        stale = [e for e in deny if isinstance(e, str) and _STALE_SKILL_DENY.match(e)]
+        if not stale:
+            continue
+        perms["deny"] = [e for e in deny if e not in stale]
+        if not perms["deny"]:
+            perms.pop("deny")
+        if not perms:
+            settings.pop("permissions")
+        try:
+            with open(path, "w") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"agent-hud: {path} 정리 실패: {e}", file=sys.stderr)
+            continue
+        removed += stale
+        print(f"agent-hud: {path}에서 효과 없는 스킬 차단 {len(stale)}개 삭제: {', '.join(stale)}", file=sys.stderr)
+    return removed
 
 
-def modify_skill_permission(action, plugin, skill, project_dir):
-    project_dir = project_dir or PROJECT_DIR
-    if plugin not in known_plugin_names():
-        return False, "unknown plugin"
-    if not skill:
-        return False, "skill id required"
-    if action not in ("block", "unblock"):
-        return False, "unknown action"
-    entry = f"Skill({plugin}:{skill})"
-    local = os.path.join(project_dir, LOCAL_SETTINGS)
-    if action == "block":
-        # 커밋되지 않는 개인 파일에만 쓴다(ADR 3). 공유 settings.json은 만들지 않는다.
-        return _edit_deny(local, entry, True)
-    # 허용은 두 파일 모두에서 지운다. 공유 파일에 남은 옛 차단을 두면 허용해도 계속 막힌다.
-    for path in (local, os.path.join(project_dir, SHARED_SETTINGS)):
-        ok, err = _edit_deny(path, entry, False)
-        if not ok:
-            return False, err
-    return True, ""
+def cleanup_known_projects():
+    for project_dir in known_projects():
+        remove_stale_skill_denies(project_dir)
 
 
 _last_cpu = [time.monotonic(), sum(os.times()[:2])]
@@ -1086,15 +1077,12 @@ const T = {
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
-    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ', skill_update_failed: 'Could not change that skill: ',
+    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
     plugin_on_tip: 'On in this project. Click to turn it off (next session)',
     plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
-    blocked: 'BLOCKED', allowed: 'ALLOWED',
-    blocked_tip: 'Blocked for Claude Code in this project. Other agents are unaffected. Click to allow',
-    allowed_tip: 'Click to block this skill for Claude Code in this project. Other agents are unaffected',
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
     updated: 'updated ', every_n: n => `every ${n}s`, paused: 'paused',
@@ -1162,15 +1150,12 @@ const T = {
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
-    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
+    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
     plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
-    blocked: '차단', allowed: '허용',
-    blocked_tip: '이 프로젝트의 Claude Code에서만 막아둔 스킬입니다. 다른 에이전트는 그대로 씁니다. 누르면 풉니다',
-    allowed_tip: '누르면 이 프로젝트의 Claude Code에서만 막습니다. 다른 에이전트는 그대로 씁니다',
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
     updated: '갱신 ', every_n: n => `${n}초마다`, paused: '멈춤',
@@ -1305,18 +1290,6 @@ async function assignSet(name, btn){
     const d = await r.json();
     if(!d.ok) alert(t().assign_failed + (d.error || t().error));
   } catch(e){ alert(t().assign_failed + e); }
-  polling = true;
-  await tick();
-}
-async function toggleSkill(plugin, skill, block, dotEl){
-  polling = false; dotEl.classList.add('busy');
-  try{
-    const r = await fetch('/api/skill', {method:'POST', body: JSON.stringify({
-      action: block ? 'block' : 'unblock', plugin, skill, project: currentProjectDir
-    })});
-    const d = await r.json();
-    if(!d.ok) alert(t().skill_update_failed + (d.error || t().error));
-  } catch(e){ alert(t().skill_update_failed + e); }
   polling = true;
   await tick();
 }
@@ -1641,12 +1614,6 @@ async function tick(){
           if(hasSkills){
             for(const s of row.skills){
               const srow = document.createElement('div'); srow.className = 'row sub skill-row';
-              const ssw = document.createElement('span');
-              ssw.className = 'switch ' + (s.blocked ? 'sw-off' : 'sw-on');
-              ssw.textContent = s.blocked ? t().blocked : t().allowed;
-              ssw.title = s.blocked ? t().blocked_tip : t().allowed_tip;
-              if(isPlugin){ ssw.onclick = () => toggleSkill(row.name, s.id, !s.blocked, ssw); }
-              else { ssw.className = 'switch sw-on'; ssw.textContent = t().allowed; }
 
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
@@ -1677,7 +1644,7 @@ async function tick(){
                   badges.appendChild(tag);
                 }
               }
-              srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
+              srow.appendChild(stext); srow.appendChild(badges);
               if(s.linkable){
                 // 섹션과 같은 말이면 글자를 반복하지 않는다. 뱃지와 같은 규칙.
                 const miss = (s.missing||[]).map(shortAgent);
@@ -1842,17 +1809,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not ok:
                     errs.append(f"{n}: {err}")
             self._send_json({"ok": not errs, "error": "; ".join(errs[:3])})
-        elif self.path == "/api/skill":
-            length = int(self.headers.get("Content-Length", 0))
-            try:
-                payload = json.loads(self.rfile.read(length) or b"{}")
-            except Exception:
-                return self._send_json({"ok": False, "error": "bad request"}, 400)
-            ok, err = modify_skill_permission(
-                payload.get("action", ""), payload.get("plugin", ""),
-                payload.get("skill", ""), payload.get("project", ""),
-            )
-            self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/register":
             length = int(self.headers.get("Content-Length", 0))
             try:
@@ -1957,6 +1913,7 @@ def main():
         return
 
     register_project(PROJECT_DIR)
+    cleanup_known_projects()
     port = base_port
     for _ in range(10):
         if not port_alive(port):

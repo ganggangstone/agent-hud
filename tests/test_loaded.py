@@ -65,7 +65,6 @@ def end_to_end():
         state = hud.collect_skills({"project_dir": proj})
         row = next(r for r in state["rows"] if r["name"] == "p@m")
         s1 = next(s for s in row["skills"] if s["id"] == "s1")
-        assert s1["blocked"], "차단 표시가 사라졌다"
         assert "Claude Code" in s1["agents"], "차단했다고 Claude Code가 못 보는 것처럼 표시한다"
         assert state["loaded"] == 2, f"차단한 스킬도 로드되므로 2여야 하는데 {state['loaded']}"
     finally:
