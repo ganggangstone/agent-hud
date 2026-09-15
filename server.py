@@ -900,16 +900,45 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <style>
 :root{
   --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
-  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
   --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
 }
 :root[data-theme="dark"]{
   --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
-  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0 auto;padding:28px;max-width:976px;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+.page{display:flex;align-items:flex-start;max-width:1180px;margin:0 auto}
+.main{flex:1;min-width:0;padding:28px 28px 28px 18px}
+.sidebar{flex:0 0 220px;padding:28px 12px 28px 28px;position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.sb-list{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sb-search{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:7px 9px;background:var(--panel)}
+.sb-search svg{flex-shrink:0;color:var(--dim)}
+.sb-search input{border:0;background:transparent;outline:0;font:inherit;font-size:12.5px;color:var(--text);width:100%}
+.sb-search input::placeholder{color:var(--dim)}
+.sb-group{display:flex;flex-direction:column;gap:2px}
+.sb-label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);padding:4px 8px 2px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);position:relative}
+.sb-item:hover{background:var(--off-tint)}
+.sb-item.active{background:var(--accent-tint);color:var(--accent);font-weight:600}
+.sb-item.active::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--accent)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--on);flex-shrink:0}
+.sb-dot.idle{background:var(--dim);opacity:.5}
+.sb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-pin{margin-left:auto;background:none;border:0;padding:2px;color:var(--dim);cursor:pointer;opacity:0;flex-shrink:0;line-height:0}
+.sb-item:hover .sb-pin{opacity:1}
+.sb-item.active .sb-pin{opacity:1;color:var(--accent)}
+.sb-item.pinned .sb-pin{opacity:1;color:var(--accent)}
+.sb-empty{font-size:12px;color:var(--dim);padding:6px 8px}
+.sb-add{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;padding:0 8px}
+.sb-add:hover{opacity:.75}
+@media (max-width:640px){
+  .page{flex-direction:column}
+  .sidebar{position:static;width:100%;padding:16px;max-height:none;border-bottom:1px solid var(--border)}
+  .main{padding:16px}
+}
 h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--text)}
 #h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
@@ -1001,6 +1030,9 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
   padding:1px 4px;font-size:11px;font-family:inherit;cursor:pointer}
 #period:hover{color:var(--text)}
 </style></head><body>
+<div class="page">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="main">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
   <span>
     <h1>Agent HUD</h1>
@@ -1021,6 +1053,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <div class="grid" id="app"></div>
 <div style="max-width:920px;margin-top:16px"><a id="fbLink" class="card-action" href="#" target="_blank" rel="noopener"></a></div>
 <div id="ts"><span id="tsText"></span><select id="period" title=""></select></div>
+</main>
+</div>
 <script>
 const T = {
   en: {
@@ -1066,6 +1100,10 @@ const T = {
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
   no_project_yet: 'no folders yet',
+  sidebar_search_ph: 'Search folders…',
+  sidebar_favorites: 'Favorites', sidebar_recent: 'Recent', sidebar_all: 'All',
+  sidebar_no_match: 'No folder matches that search',
+  pin_tip: 'Pin to favorites', unpin_tip: 'Remove from favorites',
   loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
   loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
   spec_issue: 'spec',
@@ -1139,6 +1177,10 @@ const T = {
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
   no_project_yet: '아직 폴더가 없습니다',
+  sidebar_search_ph: '폴더 검색…',
+  sidebar_favorites: '즐겨찾기', sidebar_recent: '최근 사용', sidebar_all: '전체',
+  sidebar_no_match: '검색 결과가 없습니다',
+  pin_tip: '즐겨찾기에 추가', unpin_tip: '즐겨찾기에서 제거',
   loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
   loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
   spec_issue: '명세 위반',
@@ -1235,6 +1277,116 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
+// 사이드바 상태: 지금 프로젝트 선택(agent-hud-project)과 같은 자리(localStorage)에 둔다.
+// 서버 쪽 파일을 늘리지 않아도 되고, 기기별로 다른 즐겨찾기를 갖는 게 오히려 자연스럽다.
+function readJSON(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch(e){ return fallback; } }
+let favorites = readJSON('agent-hud-favorites', []);
+let recents = readJSON('agent-hud-recents', {});
+function saveFavorites(){ localStorage.setItem('agent-hud-favorites', JSON.stringify(favorites)); }
+function toggleFavorite(path){
+  favorites = favorites.includes(path) ? favorites.filter(p => p !== path) : [...favorites, path];
+  saveFavorites(); renderSidebar(lastPanels);
+}
+function chooseProject(path){
+  selectedProject = path; localStorage.setItem('agent-hud-project', path);
+  recents[path] = Date.now(); localStorage.setItem('agent-hud-recents', JSON.stringify(recents));
+  rerender();
+}
+function baseName(p){ return (p||'').split('/').filter(Boolean).pop() || p; }
+let sidebarQuery = '';
+let lastPanels = null;
+// 프로젝트 선택기. 사이드바 하나가 모든 탭을 대표한다 -- 예전엔 탭마다 드롭다운을 복제해 갖고 있었다.
+// 검색창(input)은 언어가 안 바뀌는 한 한 번만 만들고 다시는 지우지 않는다.
+// 예전엔 keystroke마다, 그리고 1초 폴링 tick마다 사이드바 전체(input 포함)를 지우고 새로 만들었는데,
+// 그러면 한글 입력 중 조합 상태를 쥔 DOM 노드가 통째로 사라져서 조합이 깨졌다(agy로도 같은 진단 확인).
+// 목록(.sb-list)만 다시 그리고, input 노드 자체는 절대 건드리지 않는다.
+let sidebarShellLang = null;
+function renderSidebar(p){
+  lastPanels = p;
+  const side = document.getElementById('sidebar');
+  if(sidebarShellLang !== lang){
+    side.innerHTML = '';
+    const search = document.createElement('div'); search.className = 'sb-search';
+    search.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
+    const input = document.createElement('input');
+    input.id = 'sbSearchInput';
+    input.placeholder = t().sidebar_search_ph; input.value = sidebarQuery;
+    input.oninput = () => { sidebarQuery = input.value; renderSidebarList(); };
+    search.appendChild(input);
+    side.appendChild(search);
+    const listWrap = document.createElement('div'); listWrap.className = 'sb-list';
+    side.appendChild(listWrap);
+    sidebarShellLang = lang;
+  }
+  renderSidebarList();
+}
+function renderSidebarList(){
+  const p = lastPanels;
+  const listWrap = document.getElementById('sidebar').querySelector('.sb-list');
+  listWrap.innerHTML = '';
+  const list = (p && p.known_projects) || [];
+  const q = sidebarQuery.trim().toLowerCase();
+  const matches = pr => !q || pr.toLowerCase().includes(q);
+
+  function group(labelKey, paths){
+    const shown = paths.filter(matches);
+    if(!shown.length) return;
+    const g = document.createElement('div'); g.className = 'sb-group';
+    const label = document.createElement('div'); label.className = 'sb-label'; label.textContent = t()[labelKey];
+    g.appendChild(label);
+    for(const path of shown){
+      const it = document.createElement('div');
+      it.className = 'sb-item' + (path === p.project_dir ? ' active' : '') + (favorites.includes(path) ? ' pinned' : '');
+      it.title = path;
+      const dot = document.createElement('span'); dot.className = 'sb-dot' + (path === p.project_dir ? '' : ' idle');
+      const name = document.createElement('span'); name.className = 'sb-name'; name.textContent = baseName(path);
+      const pin = document.createElement('button'); pin.className = 'sb-pin';
+      pin.title = favorites.includes(path) ? t().unpin_tip : t().pin_tip;
+      pin.innerHTML = favorites.includes(path)
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>';
+      pin.onclick = (e) => { e.stopPropagation(); toggleFavorite(path); };
+      it.appendChild(dot); it.appendChild(name); it.appendChild(pin);
+      it.onclick = () => chooseProject(path);
+      g.appendChild(it);
+    }
+    listWrap.appendChild(g);
+  }
+
+  const pinned = list.filter(pr => favorites.includes(pr));
+  const recent = list.filter(pr => !favorites.includes(pr) && recents[pr])
+    .sort((a, b) => (recents[b]||0) - (recents[a]||0)).slice(0, 5);
+  const rest = list.filter(pr => !favorites.includes(pr) && !recent.includes(pr));
+
+  group('sidebar_favorites', pinned);
+  group('sidebar_recent', recent);
+  group('sidebar_all', rest);
+
+  if(!list.length){
+    const empty = document.createElement('div'); empty.className = 'sb-empty'; empty.textContent = t().no_project_yet;
+    listWrap.appendChild(empty);
+  } else if(q && !pinned.some(matches) && !recent.some(matches) && !rest.some(matches)){
+    const empty = document.createElement('div'); empty.className = 'sb-empty'; empty.textContent = t().sidebar_no_match;
+    listWrap.appendChild(empty);
+  }
+
+  const add = document.createElement('div'); add.className = 'sb-add'; add.textContent = t().add_project;
+  add.title = t().add_project_tip;
+  add.onclick = async () => {
+    const path = (prompt(t().add_project_prompt) || '').trim();
+    if(!path) return;
+    polling = false;
+    try{
+      const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
+      const d = await r.json();
+      if(!d.ok){ alert(t().add_project_failed + (d.error || t().error)); }
+      else chooseProject(path);
+    } catch(e){ alert(t().add_project_failed + e); }
+    polling = true;
+    await tick();
+  };
+  listWrap.appendChild(add);
+}
 // ?open=<플러그인> 으로 펼친 채 열 수 있다 (?tab= 과 같은 이유)
 const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get('open')||'')
   .split(',').filter(Boolean).map(k => [k, true]));
@@ -1305,42 +1457,6 @@ function renderFeedback(upd){
   a.textContent = t().feedback_open;
   a.href = `https://github.com/${upd.repo}/issues/new?template=feedback.yml&version=${encodeURIComponent(upd.version)}`;
 }
-// 프로젝트 선택기. 두 탭이 같은 코드를 복사해 갖고 있었다.
-// 목록이 비어도 보여준다 -- 폴더를 직접 더할 수 있어야 시작이 되기 때문이다.
-function projectPicker(p){
-  const box = document.createElement('div');
-  box.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:10px';
-  const sel = document.createElement('select');
-  sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;flex:1;min-width:0';
-  const list = p.known_projects || [];
-  if(!list.length){
-    const o = document.createElement('option'); o.textContent = t().no_project_yet; sel.appendChild(o);
-    sel.disabled = true;
-  }
-  for(const pr of list){
-    const o = document.createElement('option'); o.value = pr; o.textContent = pr;
-    if(pr === p.project_dir) o.selected = true;
-    sel.appendChild(o);
-  }
-  sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
-  const add = document.createElement('span'); add.className = 'card-action';
-  add.textContent = t().add_project; add.title = t().add_project_tip;
-  add.onclick = async () => {
-    const path = (prompt(t().add_project_prompt) || '').trim();
-    if(!path) return;
-    polling = false;
-    try{
-      const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
-      const d = await r.json();
-      if(!d.ok){ alert(t().add_project_failed + (d.error || t().error)); }
-      else { selectedProject = path; localStorage.setItem('agent-hud-project', path); }
-    } catch(e){ alert(t().add_project_failed + e); }
-    polling = true;
-    await tick();
-  };
-  box.appendChild(sel); box.appendChild(add);
-  return box;
-}
 async function tick(){
   if(!polling) return;
   const r = await fetch(stateUrl()); const d = await r.json();
@@ -1353,6 +1469,7 @@ async function tick(){
     updEl.style.display = 'none';
   }
   if(upd) renderFeedback(upd);
+  renderSidebar(d.panels.find(p => p.known_projects) || {known_projects: [], project_dir: selectedProject});
   const app = document.getElementById('app'); app.innerHTML='';
   for(const p of d.panels){
     if(p.project_dir) currentProjectDir = p.project_dir;
@@ -1454,7 +1571,6 @@ async function tick(){
 
     } else if(p.files){
       c.appendChild(h);
-      c.appendChild(projectPicker(p));
       for(const f of p.files){
         const el = document.createElement('div'); el.className = 'row' + (f.exists ? ' clickable' : '');
         const left = document.createElement('span');
@@ -1502,7 +1618,6 @@ async function tick(){
       c.appendChild(an);
     } else {
       c.appendChild(h);
-      c.appendChild(projectPicker(p));
       if(typeof p.loaded === 'number'){
         // 스킬은 이름과 설명이 세션 시작 때 전부 올라간다. 안 쓰는 것도 자리를 차지하므로,
         // 주장하지 말고 지금 이 프로젝트의 숫자를 그대로 보여준다.
