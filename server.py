@@ -1289,7 +1289,11 @@ function toggleFavorite(path){
 }
 function chooseProject(path){
   selectedProject = path; localStorage.setItem('agent-hud-project', path);
-  recents[path] = Date.now(); localStorage.setItem('agent-hud-recents', JSON.stringify(recents));
+  recents[path] = Date.now();
+  // 화면엔 최근 5개만 보이므로(renderSidebarList) 저장도 5개로 자른다 -- 안 그러면
+  // 연 적 있는 프로젝트 전부가 지워지지 않고 계속 쌓인다.
+  recents = Object.fromEntries(Object.entries(recents).sort((a, b) => b[1] - a[1]).slice(0, 5));
+  localStorage.setItem('agent-hud-recents', JSON.stringify(recents));
   rerender();
 }
 function baseName(p){ return (p||'').split('/').filter(Boolean).pop() || p; }
