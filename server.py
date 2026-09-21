@@ -927,6 +927,7 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro 
 .sb-dot{width:6px;height:6px;border-radius:50%;background:var(--on);flex-shrink:0}
 .sb-dot.idle{background:var(--dim);opacity:.5}
 .sb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-parent{color:var(--dim);font-size:11px;font-weight:400;flex-shrink:0}
 .sb-pin{margin-left:auto;background:none;border:0;padding:2px;color:var(--dim);cursor:pointer;opacity:0;flex-shrink:0;line-height:0}
 .sb-item:hover .sb-pin{opacity:1}
 .sb-item.active .sb-pin{opacity:1;color:var(--accent)}
@@ -1297,6 +1298,7 @@ function chooseProject(path){
   rerender();
 }
 function baseName(p){ return (p||'').split('/').filter(Boolean).pop() || p; }
+function parentName(p){ const parts = (p||'').split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : ''; }
 let sidebarQuery = '';
 let lastPanels = null;
 // 프로젝트 선택기. 사이드바 하나가 모든 탭을 대표한다 -- 예전엔 탭마다 드롭다운을 복제해 갖고 있었다.
@@ -1331,6 +1333,9 @@ function renderSidebarList(){
   const list = (p && p.known_projects) || [];
   const q = sidebarQuery.trim().toLowerCase();
   const matches = pr => !q || pr.toLowerCase().includes(q);
+  // 이름이 같은 폴더가 둘 이상이면(예: 여러 워크스페이스의 build/) 상위 폴더명을 옆에 붙인다.
+  const nameCounts = {};
+  for(const pr of list) nameCounts[baseName(pr)] = (nameCounts[baseName(pr)] || 0) + 1;
 
   function group(labelKey, paths){
     const shown = paths.filter(matches);
@@ -1344,13 +1349,18 @@ function renderSidebarList(){
       it.title = path;
       const dot = document.createElement('span'); dot.className = 'sb-dot' + (path === p.project_dir ? '' : ' idle');
       const name = document.createElement('span'); name.className = 'sb-name'; name.textContent = baseName(path);
+      it.appendChild(dot); it.appendChild(name);
+      if(nameCounts[baseName(path)] > 1){
+        const parent = document.createElement('span'); parent.className = 'sb-parent'; parent.textContent = parentName(path);
+        it.appendChild(parent);
+      }
       const pin = document.createElement('button'); pin.className = 'sb-pin';
       pin.title = favorites.includes(path) ? t().unpin_tip : t().pin_tip;
       pin.innerHTML = favorites.includes(path)
         ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>'
         : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>';
       pin.onclick = (e) => { e.stopPropagation(); toggleFavorite(path); };
-      it.appendChild(dot); it.appendChild(name); it.appendChild(pin);
+      it.appendChild(pin);
       it.onclick = () => chooseProject(path);
       g.appendChild(it);
     }
