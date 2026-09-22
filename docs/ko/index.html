@@ -220,7 +220,7 @@ cd agent-hud &amp;&amp; ./install.sh
     </button>
   </div>
   <p class="plat"><span class="badge">지금은 macOS만 지원</span></p>
-  <p class="fine">브라우저에서 <span class="mono">127.0.0.1:7717</span>로 열리고, 백그라운드에서 계속 켜져 있습니다. Linux에서는 <span class="mono">server.py</span>를 직접 실행하면 되고, Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+  <p class="fine">브라우저에서 <span class="mono">127.0.0.1:7717</span>로 열리고, 백그라운드에서 계속 켜져 있습니다.</p>
 </header>
 
 <div class="w">
@@ -298,11 +298,11 @@ cd agent-hud &amp;&amp; ./install.sh
     <rect class="cell" x="746" y="176" width="56" height="22" rx="3"/>
   <line class="load" x1="8" y1="170" x2="832" y2="170"/>
   <text class="m" x="170" y="16">설치 60개</text>
-  <text class="ma" x="170" y="216">여기서 로드 6개</text>
+  <text class="ma" x="170" y="216">이 프로젝트에 필요한 건 6개</text>
   <text class="m" x="8" y="230">예시</text>
 </svg>
   </figure>
-  <p class="small dim col-m" style="margin-top:26px">플러그인 3개가 깔린 컴퓨터 한 대에서 재본 예시 값입니다. <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 스킬 하나에 약 100토큰씩 잡습니다. 스킬 개수와 설명 길이에 따라 값은 달라집니다. 내 프로젝트의 실제 값은 대시보드가 세어서 보여줍니다.</p>
+  <p class="small dim col-m" style="margin-top:26px">컴퓨터 한 대에서 직접 재본 예시 값입니다. <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 스킬 하나에 약 100토큰씩 잡습니다. 스킬 개수와 설명 길이에 따라 값은 달라집니다. 내 프로젝트의 실제 값은 대시보드가 세어서 보여줍니다.</p>
 </section>
 
 <section class="w tell">
@@ -331,29 +331,20 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">그룹은 함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 고른 프로젝트만 바뀌고 다른 프로젝트는 그대로입니다. 플러그인은 다음 세션부터 반영됩니다.</p>
-  <div class="col-m push" style="margin-top:26px;border-top:1px solid var(--border);padding-top:22px">
-    <pre>{
-  <span class="s">"dev"</span>: {
-    <span class="s">"plugins"</span>: [<span class="s">"mattpocock-skills@mattpocock"</span>],
-    <span class="s">"skills"</span>: [<span class="s">"diagnosing-bugs"</span>]
-  },
-  <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
-}</pre>
-    <p class="small dim" style="margin-top:16px">그룹 탭에서 고쳐도 되고 <span class="mono">modes.json</span>을 직접 고쳐도 됩니다.</p>
-  </div>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">그룹은 함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 고른 프로젝트만 바뀌고 다른 프로젝트는 그대로입니다. 플러그인은 다음 세션부터 반영됩니다. 그룹은 그룹 탭에서 만들어도 되고 <span class="mono">modes.json</span>을 직접 고쳐도 됩니다.</p>
+  
 </section>
 
 <section class="w tell" style="text-align:center">
   <p class="say" style="max-width:24em;margin-left:auto;margin-right:auto">한 에이전트용으로 만든 스킬을 여섯 곳에서 그대로 쓸 수 있습니다.</p>
   <figure class="dgm" style="margin:clamp(26px,4vw,44px) auto 0;max-width:820px">
-<svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나가 .claude/skills와 .agents/skills에 심볼릭 링크로 걸리고, 그 두 폴더를 에이전트 여섯 개가 읽습니다.">
+<svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나를 .claude/skills와 .agents/skills 양쪽에서 가리키고, 그 두 폴더를 에이전트 여섯 개가 읽습니다.">
   <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>
   <text class="t" x="28" y="164">diagnosing-bugs/</text>
   <text class="m" x="28" y="188">SKILL.md</text>
   <path class="wire on" d="M208 170 C 252 170, 258 96, 300 96"/>
   <path class="wire on" d="M208 170 C 252 170, 258 236, 300 236"/>
-  <text class="ma mid halo" x="254" y="178">심볼릭 링크</text>
+  <text class="ma mid halo" x="254" y="178">같은 폴더</text>
   <rect class="box acc" x="300" y="70" width="190" height="52" rx="8"/>
   <text class="ma" x="318" y="101">.claude/skills/</text>
   <rect class="box acc" x="300" y="210" width="190" height="52" rx="8"/>
@@ -380,12 +371,12 @@ cd agent-hud &amp;&amp; ./install.sh
   <path class="wire" d="M490 236 C 540 236, 550 295, 600 295"/>
 </svg>
   </figure>
-  <p class="small dim" style="max-width:34em;margin:22px auto 0">스킬 형식은 공개 표준입니다. 에이전트마다 읽는 경로가 달라서, 대시보드가 스킬 하나를 두 폴더에 심볼릭 링크로 겁니다. 한 번 만들어 두면 다시 복사할 일이 없습니다.</p>
+  <p class="small dim" style="max-width:34em;margin:22px auto 0">같은 스킬 파일인데 에이전트마다 찾아보는 폴더가 다릅니다. 그래서 Claude Code용으로 만들어둔 스킬을 Codex나 Cursor는 못 봅니다. 체크박스 하나면 나머지 에이전트도 그 파일을 그대로 읽습니다. 복사본이 생기지 않으니 고칠 때도 한 군데만 고치면 됩니다.</p>
 </section>
 
 <section class="w tell">
   <p class="say col-n">흩어져 있는 지침 파일도 찾아줍니다.</p>
-  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span> 같은 지침 파일 30종을 찾아 크기와 수정 시각을 보여줍니다. 색인이고, 내용 대조는 사람이 합니다.</p>
+  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span> 같은 지침 파일 30종을 찾아 크기와 수정 시각을 보여줍니다. CLAUDE.md는 고쳐뒀는데 AGENTS.md는 예전 내용 그대로인 것이 수정 시각에서 드러납니다.</p>
   <figure style="margin-top:clamp(26px,4vw,44px)">
     <div class="shot"><img src="../images/instructions-ko.png" loading="lazy" decoding="async" alt="에이전트 지침 탭" width="1469" height="580"></div>
   </figure>
@@ -397,7 +388,7 @@ cd agent-hud &amp;&amp; ./install.sh
     <p class="q">왜 macOS만 지원하나요?</p>
     <p class="small dim">설치 스크립트가 등록하는 <span class="mono">launchd</span> 서비스가 macOS 전용입니다. <span class="mono">server.py</span> 자체에는 OS를 타는 코드가 없어서, Linux에서는 <span class="mono">systemd --user</span> 유닛이 이 파일을 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
     <p class="q">내 컴퓨터에서 무엇이 바뀌나요?</p>
-    <p class="small dim">그룹을 적용한 프로젝트 안의 플러그인 상태와 스킬 심볼릭 링크입니다. 지침 파일은 목록만 보여줄 뿐 고치지 않습니다.</p>
+    <p class="small dim">그룹을 적용한 프로젝트 안의 플러그인 켜짐·꺼짐 상태와, 스킬 폴더로 연결되는 링크입니다. 지침 파일은 목록만 보여줄 뿐 고치지 않습니다.</p>
     <p class="q">다른 에이전트도 따로 설정해야 하나요?</p>
     <p class="small dim">Claude Code는 프로젝트를 알아서 등록합니다. Cursor·Codex·Gemini CLI·Antigravity로만 쓰는 프로젝트는 대시보드에서 &#8220;+ 폴더 추가&#8221;로 넣으면 되고, 그 뒤로는 스킬 배지와 그룹 적용이 똑같이 동작합니다.</p>
   </div>
