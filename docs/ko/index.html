@@ -43,7 +43,7 @@ a{color:var(--accent)}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
 
 /* 폭: 본문 텍스트는 좁게, 스크린샷은 넓게 */
-.wide{max-width:1040px;margin:0 auto;padding:0 24px}
+.wide{max-width:1040px;margin:0 auto;padding-inline:24px}
 .col{max-width:620px}
 
 header{border-bottom:1px solid var(--border)}
@@ -59,7 +59,7 @@ header{border-bottom:1px solid var(--border)}
 .ghost:hover{color:var(--text)}
 
 /* 히어로: 텍스트는 좁게, 그 아래 스크린샷은 화면폭을 쓴다 */
-.hero{padding:72px 0 0}
+.hero{padding-block:72px 0}
 .eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--dim);margin:0 0 14px}
 h1{font-size:40px;font-weight:800;letter-spacing:-.025em;line-height:1.12;margin:0}
@@ -134,6 +134,50 @@ pre .s{color:var(--on)}
 .label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
   font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 10px}
 
+/* 다이어그램: 장식이 아니라 구조를 그린다. 인라인 SVG뿐이고 색은 :root 변수를 그대로 쓴다 */
+.dgm{margin:0}
+.dgm svg{display:block;width:100%;height:auto;overflow:visible}
+.dgm .box{fill:var(--panel);stroke:var(--border);stroke-width:1}
+.dgm .box.acc{stroke:var(--accent)}
+.dgm .boxq{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:5 5}
+.dgm .boxq.on{stroke:var(--accent);stroke-dasharray:none}
+.dgm .pill{fill:var(--accent-tint);stroke:var(--accent)}
+.dgm .pill.off{fill:none;stroke:var(--border)}
+.dgm .wire{fill:none;stroke:var(--border);stroke-width:1.5}
+.dgm .wire.on{stroke:var(--accent)}
+.dgm .wire.arrow{marker-end:url(#ah)}
+.dgm .cell{fill:none;stroke:var(--border)}
+.dgm .cell.on{fill:var(--accent);stroke:var(--accent)}
+.dgm .load{stroke:var(--accent);stroke-width:2}
+.dgm .ring{fill:none;stroke:var(--text);stroke-width:5}
+.dgm .fill{fill:var(--accent)}
+.dgm text{font-family:-apple-system,"SF Pro Text","Pretendard",Inter,sans-serif}
+.dgm .t{fill:var(--text);font-size:14px;font-weight:600;letter-spacing:-.01em}
+.dgm .t.s{font-size:13px;font-weight:500}
+.dgm .m,.dgm .ma{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px}
+.dgm .m{fill:var(--dim)}
+.dgm .ma{fill:var(--accent)}
+.dgm .ma.off{fill:var(--dim)}
+.dgm .mid{text-anchor:middle}
+/* 선 위에 글자가 놓이는 자리. 배경색 테두리를 먼저 칠해 글자를 띄운다 */
+.dgm .halo{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round}
+.dgm .end{text-anchor:end}
+
+/* 다이어그램이 주인공인 섹션: 그림이 먼저 오고 글은 그 아래 두 단으로 */
+.figrow{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:baseline;
+  margin-top:20px;padding-top:18px;border-top:1px solid var(--border)}
+.figrow .fk{font-size:12px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.figrow p{font-size:13.5px;line-height:1.7;margin:0 0 10px}
+.figrow p:last-child{margin-bottom:0}
+
+/* 큰 인용 한 줄. 섹션이 전부 "제목 위, 본문 아래"로 반복되던 것을 끊는다 */
+.pull{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.3;
+  margin:0 0 22px;max-width:780px;text-wrap:pretty}
+.pull .q{color:var(--accent)}
+.eyeh{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 14px}
+.eyeh:lang(ko){letter-spacing:.06em;text-transform:none;font-size:11px}
+
 /* 설치 */
 .install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
 .spec{margin:0;font-size:12.5px}
@@ -157,11 +201,16 @@ footer{border-top:1px solid var(--border)}
 @media (max-width:760px){
   .split,.install,.honest{grid-template-columns:minmax(0,1fr);gap:28px}
   .shots figcaption{grid-template-columns:1fr;gap:4px}
+  .figrow{grid-template-columns:minmax(0,1fr);gap:6px}
+  .dgm .t{font-size:19px}
+  .dgm .t.s{font-size:18px}
+  .dgm .m,.dgm .ma{font-size:16px}
+  .pull{font-size:21px}
   h1{font-size:30px}
   h2{font-size:21px}
   .hero{padding-top:44px}
-  section{padding:52px 0}
-  .wide{padding:0 18px}
+  section{padding-block:52px}
+  .wide{padding-inline:18px}
   blockquote{font-size:17px}
 }
 
@@ -190,6 +239,7 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 </header>
 
 <main>
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker></defs></svg>
 
 <div class="wide hero">
   <p class="eyebrow">로컬 대시보드 · macOS · MIT</p>
@@ -217,24 +267,118 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 </section>
 
 <section class="wide rule">
-  <div class="col">
-    <h2>한 대의 컴퓨터에서 재보니</h2>
-    <p class="small dim">플러그인 3개가 설치돼 있었다. 특별히 많이 깔아둔 상태가 아니다.</p>
-  </div>
-  <div class="ledger">
-    <div class="lrow"><span class="k">설치된 스킬</span><span class="v">60개</span></div>
-    <div class="lrow"><span class="k">그 스킬들의 이름과 설명을 합친 글자 수</span><span class="v">18,938자</span></div>
-    <div class="lrow key"><span class="k">세션마다 거기 쓰이는 토큰</span><span class="v">5,000~9,000</span></div>
+  <p class="eyeh">한 대의 컴퓨터에서 재보니</p>
+  <p class="pull"><span class="q">&ldquo;</span>특별히 많이 깔아둔 상태가 아니다.<span class="q">&rdquo;</span></p>
+  <p class="small dim" style="max-width:620px">플러그인 3개가 설치돼 있었다.</p>
+  <figure class="dgm" style="margin-top:34px">
+<svg viewBox="0 0 840 250" role="img" aria-label="다이어그램: 설치된 스킬 60개를 사각형 60개로 그리고, 흘수선 아래에 이 프로젝트가 실제로 로드하는 6개를 둔다.">
+  <circle class="ring" cx="70" cy="170" r="30"/>
+  <path class="fill" d="M40 170 A 30 30 0 0 0 100 170 Z"/>
+    <rect class="cell" x="170" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="234" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="298" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="362" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="426" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="490" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="26" width="56" height="22" rx="3"/>
+    <rect class="cell" x="170" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="234" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="298" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="362" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="426" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="490" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="56" width="56" height="22" rx="3"/>
+    <rect class="cell" x="170" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="234" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="298" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="362" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="426" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="490" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="86" width="56" height="22" rx="3"/>
+    <rect class="cell" x="170" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="234" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="298" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="362" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="426" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="490" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="116" width="56" height="22" rx="3"/>
+    <rect class="cell" x="170" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="234" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="298" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="362" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="426" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="490" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="146" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="170" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="234" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="298" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="362" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="426" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell on" x="490" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell" x="554" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell" x="618" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell" x="682" y="176" width="56" height="22" rx="3"/>
+    <rect class="cell" x="746" y="176" width="56" height="22" rx="3"/>
+  <line class="load" x1="8" y1="170" x2="832" y2="170"/>
+  <text class="m" x="170" y="16">설치 60개</text>
+  <text class="ma" x="170" y="216">여기서 로드 6개</text>
+  <text class="m" x="8" y="230">예시</text>
+</svg>
+  </figure>
+  <div class="figrow">
+    <span class="fk">흘수선</span>
+    <p>선 위는 설치만 돼 있고 놀고 있는 것이다. 선 아래가 이번 세션 컨텍스트에 실려 가는 것이다.</p>
   </div>
   <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 본다. 실제 값은 설치된 스킬들의 설명이 얼마나 긴지에 따라 달라진다. 그래서 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여준다.</p>
 </section>
 
 <section class="wide rule">
+  <p class="eyeh">없던 단위가 그룹이다</p>
+  <p class="pull"><span class="q">&ldquo;</span>다른 프로젝트는 그대로다.<span class="q">&rdquo;</span></p>
+  <figure class="dgm" style="margin:0 0 14px">
+<svg viewBox="0 0 840 330" role="img" aria-label="다이어그램: modes.json이 그룹을 갖고 있고, 적용하면 프로젝트 하나의 설정과 스킬 폴더에만 쓰며 다른 프로젝트는 그대로 둔다.">
+  <rect class="box" x="310" y="6" width="220" height="62" rx="8"/>
+  <text class="t" x="330" y="32">modes.json</text>
+  <text class="m" x="330" y="54">dev · video</text>
+  <path class="wire on arrow" d="M340 68 C 280 96, 230 100, 202 126"/>
+  <rect class="boxq on" x="8" y="130" width="390" height="184" rx="10"/>
+  <text class="t" x="32" y="166">~/work/app/</text>
+  <rect class="pill" x="246" y="146" width="128" height="26" rx="13"/>
+  <text class="ma mid" x="310" y="164">여기에만 적용</text>
+  <text class="m" x="32" y="204">.claude/settings.local.json</text>
+  <text class="ma" x="32" y="236">enabledPlugins: dev</text>
+  <text class="ma" x="32" y="262">.claude/skills/ → 링크 3개</text>
+  <text class="ma" x="32" y="288">.agents/skills/ → 링크 3개</text>
+  <rect class="boxq" x="442" y="130" width="390" height="184" rx="10"/>
+  <text class="t" x="466" y="166">~/work/video/</text>
+  <rect class="pill off" x="712" y="146" width="96" height="26" rx="13"/>
+  <text class="ma off mid" x="760" y="164">그대로</text>
+  <text class="m" x="466" y="204">.claude/settings.local.json</text>
+  <text class="m" x="466" y="236">enabledPlugins: video</text>
+  <text class="m" x="466" y="262">.claude/skills/ → 링크 2개</text>
+  <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
+</svg>
+  </figure>
+  <div class="figrow" style="margin-bottom:38px"><span class="fk">적용 범위</span><p>그룹을 적용하면 프로젝트 하나 안에만 쓴다. 다른 프로젝트는 갖고 있던 것을 그대로 갖는다.</p></div>
   <div class="split">
     <div>
-      <h2>없던 단위가 그룹이다</h2>
       <p>함께 쓰는 플러그인과 스킬에 이름을 붙여둔다. 적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼지며, 그 내용이 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적힌다.</p>
-      <p class="small dim">다른 프로젝트의 설정은 바뀌지 않는다. 세션이 끝나도 남아 있어서 다음 세션도 같은 상태로 시작한다. 플러그인 변경은 다음 세션부터 반영된다.</p>
+      <p class="small dim">설정은 세션이 끝나도 남아 있어서 다음 세션도 같은 상태로 시작한다. 플러그인 변경은 다음 세션부터 반영된다.</p>
       <ol class="steps">
         <li>그룹을 만들고 플러그인과 스킬을 담는다.</li>
         <li>사이드바에서 프로젝트를 고른다.</li>
@@ -272,18 +416,47 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 </section>
 
 <section class="wide rule">
-  <div class="split">
+  <p class="eyeh">폴더 하나, 링크 둘, 에이전트 여섯</p>
+  <p class="pull"><span class="q">&ldquo;</span>폴더째 옮겨진다.<span class="q">&rdquo;</span></p>
+  <figure class="dgm" style="margin-top:26px">
+<svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나가 .claude/skills와 .agents/skills에 심볼릭 링크로 걸리고, 그 두 폴더를 에이전트 여섯 개가 읽는다.">
+  <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>
+  <text class="t" x="28" y="164">diagnosing-bugs/</text>
+  <text class="m" x="28" y="188">SKILL.md</text>
+  <path class="wire on" d="M208 170 C 252 170, 258 96, 300 96"/>
+  <path class="wire on" d="M208 170 C 252 170, 258 236, 300 236"/>
+  <text class="ma mid halo" x="254" y="178">심볼릭 링크</text>
+  <rect class="box acc" x="300" y="70" width="190" height="52" rx="8"/>
+  <text class="ma" x="318" y="101">.claude/skills/</text>
+  <rect class="box acc" x="300" y="210" width="190" height="52" rx="8"/>
+  <text class="ma" x="318" y="241">.agents/skills/</text>
+  <rect class="box" x="600" y="40" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="60">Claude Code</text>
+  <rect class="box" x="600" y="96" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="116">Cursor</text>
+  <rect class="box" x="600" y="136" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="156">Copilot</text>
+  <rect class="box" x="600" y="200" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="220">Codex</text>
+  <rect class="box" x="600" y="240" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="260">Gemini CLI</text>
+  <rect class="box" x="600" y="280" width="232" height="30" rx="15"/>
+  <text class="t s" x="624" y="300">Antigravity</text>
+  <path class="wire" d="M490 96 C 540 96, 550 55, 600 55"/>
+  <path class="wire" d="M490 96 C 540 96, 550 111, 600 111"/>
+  <path class="wire" d="M490 96 C 540 96, 550 151, 600 151"/>
+  <path class="wire" d="M490 236 C 540 236, 550 111, 600 111"/>
+  <path class="wire" d="M490 236 C 540 236, 550 151, 600 151"/>
+  <path class="wire" d="M490 236 C 540 236, 550 215, 600 215"/>
+  <path class="wire" d="M490 236 C 540 236, 550 255, 600 255"/>
+  <path class="wire" d="M490 236 C 540 236, 550 295, 600 295"/>
+</svg>
+  </figure>
+  <div class="figrow">
+    <span class="fk">심볼릭 링크</span>
     <div>
-      <h2>스킬 폴더 하나, 에이전트 여섯 개</h2>
-      <p>스킬 형식은 공개 표준이라 폴더째 옮겨진다. 에이전트마다 읽는 경로가 다르므로 대시보드가 심볼릭 링크를 걸고, 열어둔 프로젝트 기준으로 스킬마다 에이전트별 뱃지를 보여준다.</p>
-      <p class="small dim">이 기능은 덤이고, 만든 이유는 위쪽에 있다. 지침 파일은 에이전트마다 따로 두고 대시보드는 목록만 보여준다.</p>
-    </div>
-    <div>
-      <p class="label">현재 지원 에이전트</p>
-      <div class="badges">
-        <span class="b yes">Claude Code</span><span class="b yes">Codex</span><span class="b yes">Copilot</span>
-        <span class="b yes">Gemini CLI</span><span class="b yes">Antigravity</span><span class="b">Cursor</span>
-      </div>
+      <p>스킬 형식은 공개 표준이다. 에이전트마다 읽는 경로가 다르므로, 대시보드가 스킬 하나를 프로젝트의 스킬 폴더 두 곳에 심볼릭 링크로 건다. 링크 두 개가 에이전트 여섯 개를 덮는다. Cursor와 Copilot은 두 폴더를 다 읽는다.</p>
+      <p class="dim">이 기능은 덤이고, 만든 이유는 위쪽에 있다. 지침 파일은 에이전트마다 따로 두고 대시보드는 목록만 보여준다.</p>
     </div>
   </div>
 </section>
