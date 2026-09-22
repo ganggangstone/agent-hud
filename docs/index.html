@@ -18,20 +18,20 @@
 <style>
 /* 색 변수 출처: server.py :root (docs/landing-page-plan.md 3절) — 사본 갈라지면 여기부터 맞춘다 */
 :root{
-  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
-  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
-  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+  --bg:#faf8f5;--panel:#ffffff;--border:#e9e3da;--text:#1c1a17;--dim:#79736a;
+  --accent:#c2410c;--on:#2f7a4f;--off:#6b645a;--on-tint:#e8f3ec;--off-tint:#f1ede7;--accent-tint:#fdeee4;
+  --shadow:0 1px 2px rgba(28,26,23,.04),0 1px 6px rgba(28,26,23,.03);
 }
 :root[data-theme="dark"]{
-  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
-  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  --bg:#12100e;--panel:#1a1815;--border:#2b2723;--text:#f2efe9;--dim:#948c80;
+  --accent:#e8875c;--on:#6bbf8a;--off:#948c80;--on-tint:rgba(107,191,138,.13);--off-tint:rgba(148,140,128,.11);--accent-tint:rgba(232,135,92,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.34),0 1px 6px rgba(0,0,0,.26);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
-    --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+    --bg:#12100e;--panel:#1a1815;--border:#2b2723;--text:#f2efe9;--dim:#948c80;
+    --accent:#e8875c;--on:#6bbf8a;--off:#948c80;--on-tint:rgba(107,191,138,.13);--off-tint:rgba(148,140,128,.11);--accent-tint:rgba(232,135,92,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.34),0 1px 6px rgba(0,0,0,.26);
   }
 }
 *{box-sizing:border-box}
@@ -52,9 +52,9 @@ header{border-bottom:1px solid var(--border)}
 .hdr-right{display:flex;gap:8px;align-items:center}
 .pill{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700}
 .pill a,.pill button{padding:5px 10px;color:var(--dim);text-decoration:none;background:transparent;border:0;font:inherit;cursor:pointer;line-height:1.4}
-.pill a.active,.pill button.active{background:var(--accent);color:#fff}
+.pill a.active,.pill button.active{background:var(--accent);color:var(--bg)}
 .pill a:hover,.pill button:hover{color:var(--text)}
-.pill a.active:hover,.pill button.active:hover{color:#fff}
+.pill a.active:hover,.pill button.active:hover{color:var(--bg)}
 .ghost{font-size:12px;font-weight:600;color:var(--dim);text-decoration:none}
 .ghost:hover{color:var(--text)}
 
@@ -66,7 +66,7 @@ h1{font-size:40px;font-weight:800;letter-spacing:-.025em;line-height:1.12;margin
 h1 .soft{color:var(--dim)}
 .lead{font-size:17px;line-height:1.55;color:var(--text);opacity:.82;margin:16px 0 0;max-width:560px}
 .cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:26px}
-.btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;
+.btn{display:inline-block;background:var(--accent);color:var(--bg);text-decoration:none;font-weight:700;
   font-size:13px;padding:9px 16px;border-radius:8px}
 .cta .mono{font-size:12px;color:var(--dim)}
 .frame{border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
