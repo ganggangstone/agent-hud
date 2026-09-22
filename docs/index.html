@@ -94,11 +94,6 @@ pre{margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px
   overflow-x:auto;color:var(--text)}
 pre .s{color:var(--on)}
 
-/* 색 블록 하나로 끝을 닫는다. 3열 카드 대신 이어지는 글 */
-.band{background:var(--off-tint);margin-top:clamp(74px,10vw,132px);padding:clamp(52px,7vw,88px) 0}
-.band .say{margin-top:0}
-.band p{margin:18px 0 0}
-
 footer{padding:30px 0 56px;font-size:12.5px;color:var(--dim)}
 footer a{color:var(--dim);text-decoration:none;margin-left:16px}
 footer a:hover{color:var(--text)}
@@ -339,12 +334,9 @@ cd agent-hud &amp;&amp; ./install.sh
   </figure>
 </section>
 
-<section class="band">
-  <div class="w">
-    <p class="say col-n">Everything happens on this computer.</p>
-    <p class="col-m small">It reads and writes settings files on your machine. Nothing is uploaded and there is no account to make. One request leaves the computer: a GitHub Releases check every 12 hours, to tell you a newer version exists. It writes plugin state and skill symlinks, and instruction files are only ever listed.</p>
-  </div>
-</section>
+<div class="w" style="margin-top:clamp(74px,10vw,132px)">
+  <p class="fine">One Python file, standard library only, running on your own computer. Nothing is uploaded and there is no account to make. One request leaves the machine: a GitHub Releases check every 12 hours, to tell you a newer version exists. It writes plugin state and skill symlinks, and instruction files are only ever listed.</p>
+</div>
 
 <footer class="w">
   MIT License
