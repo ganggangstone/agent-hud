@@ -899,15 +899,20 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <title>Agent HUD</title>
 <link rel="manifest" href="/manifest.json">
 <style>
+/* 팔레트: GitHub Primer 토큰을 그대로 쓰고 있던 걸 우리 값으로 교체(2026-09).
+   변수 이름·개수는 그대로, 값만 바꿨다 -- getdesign.md의 PostHog/OpenCode/Linear
+   DESIGN.md를 참고해 올리브 쪽으로 따뜻한 중성색 + 황토 accent 하나로.
+   중성색을 분홍 쪽(#faf9f5 계열)으로 두면 Claude 브랜드와 사촌이 된다. 이 도구는
+   서드파티 개인 프로젝트라 그렇게 보이면 안 된다. */
 :root{
-  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
-  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
-  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+  --bg:#eeefe9;--panel:#ffffff;--border:#d3d6ca;--text:#23251d;--dim:#6c6e63;
+  --accent:#836313;--on:#2f7a4f;--off:#62655a;--on-tint:#e6f2ea;--off-tint:#e7e9df;--accent-tint:#f6efd9;
+  --shadow:0 1px 2px rgba(35,37,29,.05),0 1px 6px rgba(35,37,29,.04);
 }
 :root[data-theme="dark"]{
-  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
-  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  --bg:#14150f;--panel:#1c1e17;--border:#2c2e25;--text:#eceee4;--dim:#8f9284;
+  --accent:#e8bb4e;--on:#6bbf8a;--off:#8f9284;--on-tint:rgba(107,191,138,.13);--off-tint:rgba(143,146,132,.11);--accent-tint:rgba(232,187,78,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.34),0 1px 6px rgba(0,0,0,.26);
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:0;-webkit-font-smoothing:antialiased}
@@ -934,14 +939,14 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro 
 .sb-item.active .sb-pin{opacity:1;color:var(--accent)}
 .sb-item.pinned .sb-pin{opacity:1;color:var(--accent)}
 .sb-empty{font-size:12px;color:var(--dim);padding:6px 8px}
-.sb-add{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;padding:0 8px}
+.sb-add{font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:0 8px}
 .sb-add:hover{opacity:.75}
 @media (max-width:640px){
   .page{flex-direction:column}
   .sidebar{position:static;width:100%;padding:16px;max-height:none;border-bottom:1px solid var(--border)}
   .main{padding:16px}
 }
-h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--text)}
+h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1;color:var(--text)}
 #h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
 .rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
@@ -952,7 +957,7 @@ h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
 .card.wide{grid-column:1/-1}
 .empty{color:var(--dim);font-size:13px;padding:6px 0;display:flex;align-items:center;gap:8px}
-.card h2{font-size:12px;color:var(--dim);margin:0 0 10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.card h2{font-size:11px;color:var(--dim);margin:0 0 10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase}
 .row{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
 .row:last-child{border-bottom:none}
 .row.sub{padding-left:18px;font-size:13px;font-weight:500}
@@ -973,19 +978,19 @@ h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1
 .dot:hover{transform:scale(1.4)}
 .dot.busy{opacity:.4;cursor:wait}
 .on{background:var(--on)} .off{background:var(--off)}
-.switch{display:inline-flex;align-items:center;justify-content:center;min-width:44px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:4px;cursor:pointer;flex:0 0 auto;user-select:none;transition:background .12s,color .12s,transform .12s}
+.switch{display:inline-flex;align-items:center;justify-content:center;min-width:44px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.02em;padding:3px 8px;border-radius:4px;cursor:pointer;flex:0 0 auto;user-select:none;transition:background .12s,color .12s,transform .12s}
 .sw-on.switch:hover{background:var(--on);color:var(--panel);border-color:var(--on)}
-.sw-off.switch:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sw-off.switch:hover{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .switch:active{transform:scale(.96)}
 .switch.busy{opacity:.4;cursor:wait}
 .lang-opt{padding:6px 12px;cursor:pointer;color:var(--dim);transition:background .12s,color .12s;font-size:12px}
 .lang-opt:hover{color:var(--text)}
-.lang-opt.active{background:var(--accent);color:#fff}
+.lang-opt.active{background:var(--accent);color:var(--bg)}
 .quiet-toggle .lang-opt.active{background:var(--off-tint);color:var(--text)}
 .tab-opt{padding:7px 14px;cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;transition:background .12s,color .12s}
 .tab-opt:not(:last-child){border-right:1px solid var(--border)}
 .tab-opt:hover{color:var(--text)}
-.tab-opt.active{background:var(--accent);color:#fff}
+.tab-opt.active{background:var(--accent);color:var(--bg)}
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
@@ -994,7 +999,7 @@ h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1
 span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .content{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:6px 0 10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;max-height:360px;overflow:auto;display:none}
 .content.open{display:block}
-.badge{background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.badge{background:var(--accent);color:var(--bg);padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .dim{color:var(--dim);font-size:13px}
 .skill-desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .share{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);margin-left:auto;
@@ -1008,19 +1013,19 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag.no{color:var(--dim);opacity:.45;text-decoration:line-through}
 .agenttag.partial{color:var(--dim);text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
 .loadline{font-size:13px;color:var(--text);background:var(--off-tint);border:1px solid var(--border);
-  border-radius:6px;padding:8px 11px;margin:2px 0 10px;cursor:help;line-height:1.6}
+  border-radius:6px;padding:8px 11px;margin:2px 0 10px;cursor:help;line-height:1.6;font-variant-numeric:tabular-nums}
 .loadline b{font-weight:700}
 .warn{margin-left:8px;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;
   background:var(--off-tint);color:var(--text);cursor:help;white-space:nowrap;vertical-align:middle}
-.comp{color:var(--dim);font-size:11px;white-space:nowrap;cursor:help;
+.comp{color:var(--dim);font-size:11px;white-space:nowrap;cursor:help;font-variant-numeric:tabular-nums;
   font-family:ui-monospace,"SF Mono",Menlo,monospace;border-bottom:1px dotted var(--border)}
 .comp:hover{color:var(--text);border-bottom-color:var(--dim)}
 .tooltag{border:1px solid var(--border);color:var(--dim);padding:1px 7px;border-radius:999px;font-size:11px;white-space:nowrap;margin-left:8px}
-.tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap}
+.tag{font-size:11px;color:var(--dim);font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:nowrap;font-variant-numeric:tabular-nums}
 .tag.danger{cursor:pointer}
 .tag.danger:hover{color:#f04452}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
-.card-action{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;white-space:nowrap}
+.card-action{font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;white-space:nowrap}
 .card-action:hover{opacity:.75}
 .btn{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:4px;
   padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -1907,19 +1912,50 @@ def _png_chunk(tag, data):
 
 def _solid_png(size, rgb):
     # "앱으로 설치" 버튼의 매니페스트 아이콘. PNG 하나로 충분해서 이미지 라이브러리를
-    # 넣지 않고 단색 사각형을 손으로 인코딩한다 -- 필터 바이트 0(그대로) + zlib.
-    row = bytes([0]) + bytes(rgb) * size
-    raw = row * size
+    # 넣지 않고 손으로 인코딩한다 -- 필터 바이트 0(그대로) + zlib. 픽셀 단위로 그린다.
+    return _raster_png(size, lambda x, y: rgb)
+
+
+def _raster_png(size, pixel):
+    """pixel(x, y) -> (r,g,b) 함수를 픽셀마다 불러 PNG로 인코딩한다."""
+    rows = bytearray()
+    for y in range(size):
+        rows.append(0)  # 필터 없음
+        for x in range(size):
+            rows.extend(pixel(x, y))
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # 8bit, RGB
-    idat = zlib.compress(raw, 9)
+    idat = zlib.compress(bytes(rows), 9)
     return sig + _png_chunk(b"IHDR", ihdr) + _png_chunk(b"IDAT", idat) + _png_chunk(b"IEND", b"")
 
 
-ICON_PNG = _solid_png(512, (49, 130, 246))  # --accent
+def _loadline_icon(size, bg, ring, fill):
+    """흘수선 마크: 원 하나를 수평선이 관통하고, 선 아래가 fill로 채워진다.
+    이미지 라이브러리 없이 원의 방정식만으로 그린다(스킬 로드 도구가 그림 라이브러리를
+    끌어들일 이유가 없다)."""
+    cx = cy = size / 2
+    radius = size * 0.24
+    ring_w = max(1, size * 0.052)
+    line_half = size * 0.345
+
+    def pixel(x, y):
+        dx, dy = x + 0.5 - cx, y + 0.5 - cy
+        r = (dx * dx + dy * dy) ** 0.5
+        on_ring = abs(r - radius) <= ring_w / 2
+        on_line = abs(dy) <= ring_w / 2 and abs(dx) <= line_half
+        if on_ring or on_line:
+            return ring
+        if r < radius and dy > ring_w / 2:
+            return fill
+        return bg
+
+    return _raster_png(size, pixel)
+
+
+ICON_PNG = _loadline_icon(512, bg=(20, 21, 15), ring=(236, 238, 228), fill=(232, 187, 78))
 MANIFEST_JSON = json.dumps({
     "name": "Agent HUD", "short_name": "Agent HUD", "start_url": "/",
-    "display": "standalone", "background_color": "#0d1117", "theme_color": "#161b22",
+    "display": "standalone", "background_color": "#14150f", "theme_color": "#1c1e17",
     "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
 }).encode()
 

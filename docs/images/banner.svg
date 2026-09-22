@@ -1,64 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480">
   <defs>
     <radialGradient id="glow" cx="50%" cy="35%" r="75%">
-      <stop offset="0%" stop-color="#1b2430"/>
-      <stop offset="100%" stop-color="#0d1117"/>
+      <stop offset="0%" stop-color="#1e1a16"/>
+      <stop offset="100%" stop-color="#14150f"/>
     </radialGradient>
-    <linearGradient id="scan" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0"/>
-      <stop offset="50%" stop-color="#58a6ff" stop-opacity=".55"/>
-      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
-    </linearGradient>
+    <clipPath id="hull"><circle cx="960" cy="140" r="70"/></clipPath>
   </defs>
 
   <rect width="1200" height="480" fill="url(#glow)"/>
 
-  <!-- faint radar rings -->
-  <g stroke="#233041" stroke-width="1" fill="none" opacity="0.7">
-    <circle cx="960" cy="120" r="60"/>
-    <circle cx="960" cy="120" r="110"/>
-    <circle cx="960" cy="120" r="160"/>
-  </g>
-  <line x1="800" y1="120" x2="1120" y2="120" stroke="#233041" stroke-width="1"/>
-  <line x1="960" y1="-40" x2="960" y2="280" stroke="#233041" stroke-width="1"/>
+  <!-- 흘수선 마크: 레이더 링 대신. 배 옆에 찍는 검사 표식, 탐지가 아니라 적재량. -->
+  <rect x="890" y="150" width="140" height="65" fill="#e8bb4e" clip-path="url(#hull)"/>
+  <circle cx="960" cy="140" r="70" fill="none" stroke="#eceee4" stroke-width="13"/>
+  <line x1="850" y1="150" x2="1070" y2="150" stroke="#eceee4" stroke-width="13" stroke-linecap="round"/>
 
   <!-- console frame -->
-  <rect x="120" y="176" width="560" height="240" rx="14" fill="#161b22" stroke="#30363d" stroke-width="2"/>
-  <rect x="120" y="176" width="560" height="36" rx="14" fill="#1c232c"/>
-  <circle cx="146" cy="194" r="5" fill="#f85149"/>
-  <circle cx="164" cy="194" r="5" fill="#d29922"/>
-  <circle cx="182" cy="194" r="5" fill="#3fb950"/>
-  <rect x="120" y="210" width="560" height="2" fill="#30363d"/>
+  <rect x="120" y="176" width="560" height="240" rx="14" fill="#1c1e17" stroke="#2c2e25" stroke-width="2"/>
+  <rect x="120" y="176" width="560" height="36" rx="14" fill="#211e19"/>
+  <circle cx="146" cy="194" r="5" fill="#836313"/>
+  <circle cx="164" cy="194" r="5" fill="#c98a1f"/>
+  <circle cx="182" cy="194" r="5" fill="#2f7a4f"/>
+  <rect x="120" y="210" width="560" height="2" fill="#2c2e25"/>
 
   <!-- headline stat: the actual product copy, not decoration -->
-  <rect x="140" y="228" width="520" height="34" rx="8" fill="#1c232c" stroke="#30363d"/>
+  <rect x="140" y="228" width="520" height="34" rx="8" fill="#211e19" stroke="#2c2e25"/>
   <text x="156" y="250" font-family="-apple-system,'SF Pro Text',Inter,sans-serif" font-size="14"
-        fill="#e6edf3">This project loads <tspan font-weight="700" fill="#58a6ff">6 skills</tspan> (about <tspan font-weight="700" fill="#58a6ff">600 tokens</tspan> every session)</text>
+        fill="#eceee4">This project loads <tspan font-weight="600" fill="#e8bb4e">6 skills</tspan> (about <tspan font-weight="600" fill="#e8bb4e">600 tokens</tspan> every session)</text>
 
   <!-- status rows -->
-  <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#e6edf3">
-    <circle cx="150" cy="288" r="5" fill="#3fb950"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#eceee4">
+    <circle cx="150" cy="288" r="5" fill="#2f7a4f"/>
     <text x="168" y="293">plugin-a@marketplace</text>
-    <rect x="560" y="279" width="90" height="18" rx="4" fill="none" stroke="#30363d"/>
-    <text x="575" y="292" font-size="11" fill="#8b949e">dev</text>
+    <rect x="560" y="279" width="90" height="18" rx="4" fill="none" stroke="#2c2e25"/>
+    <text x="575" y="292" font-size="11" fill="#8f9284">dev</text>
 
-    <circle cx="150" cy="326" r="5" fill="#3fb950"/>
+    <circle cx="150" cy="326" r="5" fill="#2f7a4f"/>
     <text x="168" y="331">plugin-b@marketplace</text>
-    <rect x="560" y="317" width="90" height="18" rx="4" fill="none" stroke="#30363d"/>
-    <text x="575" y="330" font-size="11" fill="#8b949e">dev</text>
+    <rect x="560" y="317" width="90" height="18" rx="4" fill="none" stroke="#2c2e25"/>
+    <text x="575" y="330" font-size="11" fill="#8f9284">dev</text>
 
-    <circle cx="150" cy="364" r="5" fill="#484f58"/>
-    <text x="168" y="369" fill="#8b949e">plugin-c@marketplace</text>
-    <rect x="560" y="355" width="110" height="18" rx="4" fill="none" stroke="#30363d"/>
-    <text x="575" y="368" font-size="11" fill="#8b949e">video</text>
+    <circle cx="150" cy="364" r="5" fill="#4a453d"/>
+    <text x="168" y="369" fill="#8f9284">plugin-c@marketplace</text>
+    <rect x="560" y="355" width="110" height="18" rx="4" fill="none" stroke="#2c2e25"/>
+    <text x="575" y="368" font-size="11" fill="#8f9284">video</text>
   </g>
 
-  <!-- scan line -->
-  <rect x="120" y="222" width="560" height="2" fill="url(#scan)"/>
-
-  <!-- title: system font, matches the product's own h1 (not monospace) -->
+  <!-- title: system font, matches the product's own h1 -->
   <g font-family="-apple-system,'SF Pro Text',Inter,sans-serif">
-    <text x="120" y="90" font-size="54" font-weight="800" letter-spacing="-1" fill="#e6edf3">Agent HUD</text>
-    <text x="120" y="124" font-size="17" fill="#8b949e" letter-spacing="1.5">LOCAL DASHBOARD FOR YOUR CODING AGENTS' SETUP</text>
+    <text x="120" y="90" font-size="54" font-weight="600" letter-spacing="-2" fill="#eceee4">Agent HUD</text>
+    <text x="120" y="124" font-size="17" fill="#8f9284" letter-spacing="1.5">LOCAL DASHBOARD FOR YOUR CODING AGENTS' SETUP</text>
   </g>
 </svg>
