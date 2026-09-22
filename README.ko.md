@@ -178,6 +178,12 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 ./install.sh
 ```
 
+Homebrew로 받아도 된다. 이쪽은 `agent-hud` 명령이 함께 깔린다.
+
+```bash
+brew install ganggangstone/tap/agent-hud
+```
+
 설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, 예제 파일로
 `modes.json`을 만들고, `launchd` 서비스로 등록한다. 등록 후에는 터미널이나 Claude Code
 세션을 닫아도 대시보드가 계속 실행되고, 프로세스가 종료되면 자동으로 다시 시작된다.
@@ -236,9 +242,9 @@ tail -f ~/.claude/tools/agent-hud/launchd.err.log             # 로그 보기
 ## 업데이트 확인
 
 대시보드는 12시간마다 GitHub Releases에서 새 버전 태그를 확인하고, 새 버전이 있으면 화면
-위쪽에 알림을 표시한다. 파일을 내려받거나 설치하지는 않는다. 업데이트하려면 저장소를
-클론한 폴더에서 `git pull`을 실행한 뒤 `./install.sh`를 다시 실행한다. 서비스는
-`~/.claude/tools/agent-hud/`에 복사된 파일을 실행하므로 `git pull`만으로는 바뀌지 않는다.
+위쪽에 알림을 표시한다. 파일을 내려받거나 설치하지는 않는다. 클론해서 설치했다면 그 폴더에서 `git pull`을 실행한 뒤 `./install.sh`를 다시 실행한다.
+서비스는 `~/.claude/tools/agent-hud/`에 복사된 파일을 실행하므로 `git pull`만으로는
+바뀌지 않는다. Homebrew로 설치했다면 `brew upgrade agent-hud`를 실행한다.
 
 ## 확장하기
 

@@ -185,6 +185,12 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 ./install.sh
 ```
 
+Homebrew works too, and gives you an `agent-hud` command as well.
+
+```bash
+brew install ganggangstone/tap/agent-hud
+```
+
 The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
 `modes.json` from the example file, and registers a `launchd` service. After that the
 dashboard keeps running when you close terminals or Claude Code sessions, and restarts
@@ -247,9 +253,9 @@ for it.
 
 Every 12 hours the dashboard checks GitHub Releases for a new version tag and shows a
 notice at the top of the page when one exists. It never downloads or installs anything.
-To update, run `git pull` in the folder you cloned, then run `./install.sh` again. The
+If you cloned it, run `git pull` in that folder and then `./install.sh` again — the
 service runs the copy in `~/.claude/tools/agent-hud/`, so `git pull` alone does not change
-it.
+it. If you installed with Homebrew, run `brew upgrade agent-hud`.
 
 ## Extend
 
