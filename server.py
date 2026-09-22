@@ -900,16 +900,18 @@ PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <link rel="manifest" href="/manifest.json">
 <style>
 /* 팔레트: GitHub Primer 토큰을 그대로 쓰고 있던 걸 우리 값으로 교체(2026-09).
-   변수 이름·개수는 그대로, 값만 바꿨다 -- getdesign.md의 Claude/OpenCode/Linear
-   DESIGN.md를 참고해 따뜻한 중성색 + 러스트(선박 방청 페인트) accent로. */
+   변수 이름·개수는 그대로, 값만 바꿨다 -- getdesign.md의 PostHog/OpenCode/Linear
+   DESIGN.md를 참고해 올리브 쪽으로 따뜻한 중성색 + 황토 accent 하나로.
+   중성색을 분홍 쪽(#faf9f5 계열)으로 두면 Claude 브랜드와 사촌이 된다. 이 도구는
+   서드파티 개인 프로젝트라 그렇게 보이면 안 된다. */
 :root{
-  --bg:#faf8f5;--panel:#ffffff;--border:#e9e3da;--text:#1c1a17;--dim:#79736a;
-  --accent:#c2410c;--on:#2f7a4f;--off:#6b645a;--on-tint:#e8f3ec;--off-tint:#f1ede7;--accent-tint:#fdeee4;
-  --shadow:0 1px 2px rgba(28,26,23,.04),0 1px 6px rgba(28,26,23,.03);
+  --bg:#eeefe9;--panel:#ffffff;--border:#d3d6ca;--text:#23251d;--dim:#6c6e63;
+  --accent:#836313;--on:#2f7a4f;--off:#62655a;--on-tint:#e6f2ea;--off-tint:#e7e9df;--accent-tint:#f6efd9;
+  --shadow:0 1px 2px rgba(35,37,29,.05),0 1px 6px rgba(35,37,29,.04);
 }
 :root[data-theme="dark"]{
-  --bg:#12100e;--panel:#1a1815;--border:#2b2723;--text:#f2efe9;--dim:#948c80;
-  --accent:#e8875c;--on:#6bbf8a;--off:#948c80;--on-tint:rgba(107,191,138,.13);--off-tint:rgba(148,140,128,.11);--accent-tint:rgba(232,135,92,.14);
+  --bg:#14150f;--panel:#1c1e17;--border:#2c2e25;--text:#eceee4;--dim:#8f9284;
+  --accent:#e8bb4e;--on:#6bbf8a;--off:#8f9284;--on-tint:rgba(107,191,138,.13);--off-tint:rgba(143,146,132,.11);--accent-tint:rgba(232,187,78,.14);
   --shadow:0 1px 2px rgba(0,0,0,.34),0 1px 6px rgba(0,0,0,.26);
 }
 *{box-sizing:border-box}
@@ -1950,10 +1952,10 @@ def _loadline_icon(size, bg, ring, fill):
     return _raster_png(size, pixel)
 
 
-ICON_PNG = _loadline_icon(512, bg=(18, 16, 14), ring=(242, 239, 233), fill=(232, 135, 92))
+ICON_PNG = _loadline_icon(512, bg=(20, 21, 15), ring=(236, 238, 228), fill=(232, 187, 78))
 MANIFEST_JSON = json.dumps({
     "name": "Agent HUD", "short_name": "Agent HUD", "start_url": "/",
-    "display": "standalone", "background_color": "#0d1117", "theme_color": "#161b22",
+    "display": "standalone", "background_color": "#14150f", "theme_color": "#1c1e17",
     "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
 }).encode()
 
