@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource
+import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -897,6 +897,7 @@ def build_state(project_dir=None):
 
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <title>Agent HUD</title>
+<link rel="manifest" href="/manifest.json">
 <style>
 :root{
   --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
@@ -1030,6 +1031,15 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 #period{background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:4px;
   padding:1px 4px;font-size:11px;font-family:inherit;cursor:pointer}
 #period:hover{color:var(--text)}
+#installWrap{position:relative}
+#installBtn{background:transparent;color:var(--dim);border:1px solid var(--border);
+  border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;letter-spacing:.03em;
+  font-family:inherit;cursor:pointer}
+#installBtn:hover{color:var(--text);border-color:var(--accent)}
+#installPop{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:10;width:230px;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);
+  padding:10px 12px;font-size:12px;line-height:1.6;color:var(--text)}
+#installPop.open{display:block}
 </style></head><body>
 <div class="page">
 <aside class="sidebar" id="sidebar"></aside>
@@ -1039,7 +1049,11 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
     <h1>Agent HUD</h1>
     <span id="h1sub"></span>
   </span>
-  <span style="display:flex;gap:8px">
+  <span style="display:flex;gap:8px;align-items:center">
+    <span id="installWrap">
+      <button id="installBtn"></button>
+      <div id="installPop"></div>
+    </span>
     <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
     </span>
@@ -1105,6 +1119,8 @@ const T = {
   sidebar_favorites: 'Favorites', sidebar_recent: 'Recent', sidebar_all: 'All',
   sidebar_no_match: 'No folder matches that search',
   pin_tip: 'Pin to favorites', unpin_tip: 'Remove from favorites',
+  install_app: 'Install app',
+  install_manual: 'This browser can’t install it automatically.<br><b>Chrome, Edge:</b> the install icon in the address bar.<br><b>Safari (macOS Sonoma+):</b> File → Add to Dock.',
   loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
   loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
   spec_issue: 'spec',
@@ -1182,6 +1198,8 @@ const T = {
   sidebar_favorites: '즐겨찾기', sidebar_recent: '최근 사용', sidebar_all: '전체',
   sidebar_no_match: '검색 결과가 없습니다',
   pin_tip: '즐겨찾기에 추가', unpin_tip: '즐겨찾기에서 제거',
+  install_app: '앱으로 설치',
+  install_manual: '이 브라우저는 자동 설치가 안 됩니다.<br><b>Chrome·Edge:</b> 주소창의 설치 아이콘.<br><b>Safari(macOS 소노마 이상):</b> 파일 → Dock에 추가.',
   loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
   loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
   spec_issue: '명세 위반',
@@ -1219,6 +1237,8 @@ function renderLangToggle(){
   document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
   document.getElementById('langKo').classList.toggle('active', lang === 'ko');
+  document.getElementById('installBtn').textContent = t().install_app;
+  closeInstallPop();
 }
 function setLang(l){
   lang = l;
@@ -1250,6 +1270,26 @@ function setTheme(th){
 document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
+// Chrome/Edge만 이 이벤트를 준다 -- Safari는 "Dock에 추가"를 코드로 띄우는 API 자체가 없다.
+// 버튼은 항상 보이고, 자동화가 되면(prompt 저장돼 있으면) 바로 설치 대화상자를 띄우고,
+// 안 되면 드롭다운으로 수동 안내를 보여준다.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; });
+window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; closeInstallPop(); });
+function closeInstallPop(){ document.getElementById('installPop').classList.remove('open'); }
+document.getElementById('installBtn').onclick = async (e) => {
+  e.stopPropagation();
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return;
+  }
+  const pop = document.getElementById('installPop');
+  pop.innerHTML = t().install_manual;
+  pop.classList.toggle('open');
+};
+document.addEventListener('click', (e) => { if(!e.target.closest('#installWrap')) closeInstallPop(); });
 const shortAgent = a => a.replace(' CLI','');
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
@@ -1858,6 +1898,29 @@ tick(); applyPeriod();
 </script></body></html>"""
 
 
+def _png_chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+
+
+def _solid_png(size, rgb):
+    # "앱으로 설치" 버튼의 매니페스트 아이콘. PNG 하나로 충분해서 이미지 라이브러리를
+    # 넣지 않고 단색 사각형을 손으로 인코딩한다 -- 필터 바이트 0(그대로) + zlib.
+    row = bytes([0]) + bytes(rgb) * size
+    raw = row * size
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # 8bit, RGB
+    idat = zlib.compress(raw, 9)
+    return sig + _png_chunk(b"IHDR", ihdr) + _png_chunk(b"IDAT", idat) + _png_chunk(b"IEND", b"")
+
+
+ICON_PNG = _solid_png(512, (49, 130, 246))  # --accent
+MANIFEST_JSON = json.dumps({
+    "name": "Agent HUD", "short_name": "Agent HUD", "start_url": "/",
+    "display": "standalone", "background_color": "#0d1117", "theme_color": "#161b22",
+    "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
+}).encode()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -1884,6 +1947,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": err}, 403)
             else:
                 self._send_json({"ok": True, "text": text})
+        elif self.path == "/manifest.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/manifest+json")
+            self.send_header("Content-Length", str(len(MANIFEST_JSON)))
+            self.end_headers()
+            self.wfile.write(MANIFEST_JSON)
+        elif self.path == "/icon.png":
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(ICON_PNG)))
+            self.end_headers()
+            self.wfile.write(ICON_PNG)
         else:
             body = PAGE.encode()
             self.send_response(200)
