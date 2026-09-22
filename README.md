@@ -20,6 +20,7 @@
 - [Install (macOS)](#install-macos)
 - [Behavior across projects and sessions](#behavior-across-projects-and-sessions)
 - [Managing the service](#managing-the-service)
+- [Open it as an app](#open-it-as-an-app)
 - [Update checks](#update-checks)
 - [Extend](#extend)
 - [Feedback](#feedback)
@@ -65,11 +66,10 @@ one at a time. It opens on the Groups tab the first time, then on the last tab y
   on and every other plugin off. Other projects' settings are not changed.
 - **Plugins & skills**: the skills installed on this computer, listed by plugin, with
   skills that belong to no plugin in a separate section. Each skill has a badge for
-  Claude Code, Codex, Cursor, Copilot and Gemini CLI. A badge is shown in plain text
-  when that agent can read the skill in the selected project, and struck through when
-  it can't. This tab also turns plugins on and off (ON/OFF switch) and blocks individual
-  plugin skills (ALLOWED/BLOCKED switch). Both features exist only in Claude Code;
-  hovering the ALLOWED/BLOCKED switch says it applies to Claude Code only.
+  Claude Code, Codex, Cursor, Copilot, Gemini CLI and Antigravity. A badge is shown in
+  plain text when that agent can read the skill in the selected project, and struck
+  through when it can't. This tab also turns Claude Code plugins on and off (ON/OFF
+  switch).
 - **Agent instructions**: finds 30 kinds of instruction files in the project folder,
   including `CLAUDE.md`, `AGENTS.md`, `.clinerules` and `.cursor/rules/`, and shows their
   size and modified time. Each agent has its own instruction file, so the modified times
@@ -89,17 +89,17 @@ Each concept belongs to a different tool.
 | [Instruction file](#instruction-file-per-agent) | Per agent: file names differ by tool |
 | [Plugin](#plugin-claude-code) | Claude Code |
 | [Marketplace](#marketplace-claude-code) | Claude Code |
-| [Permission override](#permission-override-claude-code) | Claude Code |
 | [Group](#group-agent-hud) | Agent HUD |
 
 ### Skill [Shared]
 
 A folder containing a `SKILL.md` file and any supporting files. It follows the
-[Agent Skills](https://agentskills.io) standard, so Claude Code, Codex, Cursor, Copilot
-and Gemini CLI read the same folder without conversion. Each agent looks for skills in a
-different folder: Claude Code reads only `.claude/skills/`, Codex and Gemini CLI read
-`.agents/skills/`, and Cursor and Copilot read both. Agent HUD creates symbolic links in
-both folders so all five agents can read one skill.
+[Agent Skills](https://agentskills.io) standard, so Claude Code, Codex, Cursor, Copilot,
+Gemini CLI and Antigravity read the same folder without conversion. Each agent looks for
+skills in a different folder: in a project, Claude Code reads only `.claude/skills/`,
+Codex, Gemini CLI and Antigravity read `.agents/skills/`, and Cursor and Copilot read
+both. Antigravity's global skills live in `~/.gemini/config/skills/`. Agent HUD creates
+symbolic links in both project folders so all six agents can read one skill.
 
 A skill inside a plugin is read only by Claude Code, with that plugin turned on. The
 checkbox on the Plugins & skills tab links it into the other agents' skill folders too.
@@ -121,19 +121,17 @@ settings file. Clicking the ON/OFF switch next to a plugin in Agent HUD writes t
 selected project's `.claude/settings.local.json`. Other projects are not affected, and
 the change takes effect from the next session.
 
+A single plugin skill cannot be kept out of the context on its own; turning the plugin
+off is the only way. A `permissions.deny` entry such as `"Skill(plugin:skill)"` stops the
+skill from being invoked, but the skill's name and description still load every session
+(measured, see [docs/ADR.md](docs/ADR.md) section 10), so it saves no tokens. Agent HUD
+therefore has no per-skill block switch.
+
 ### Marketplace [Claude Code]
 
 The source plugins are downloaded from: a git repository or a local path, registered
 with `claude plugin marketplace add`. Agent HUD shows a plugin's source when you hover its name,
 but does not add or remove marketplaces. You decide which sources to trust, with the `claude` CLI.
-
-### Permission override [Claude Code]
-
-An entry such as `"Skill(plugin:skill)"` added to `permissions.deny` in a settings file.
-It blocks one skill without turning off the whole plugin. Clicking the ALLOWED/BLOCKED
-switch next to a skill in Agent HUD adds or removes this entry in the selected project's
-`.claude/settings.local.json`. That file is not committed to git, so the team repository
-does not change. Unlike plugin settings, it takes effect immediately.
 
 ### Group [Agent HUD]
 
@@ -196,7 +194,7 @@ script does not write the file itself, so it can't overwrite hooks you already h
 the printed setting in yourself.
 
 Only Claude Code sessions register a project automatically. For a project you work on
-only with Gemini CLI, Codex or Cursor, add it with "+ add a folder" in the dashboard.
+only with Gemini CLI, Antigravity, Codex or Cursor, add it with "+ add a folder" in the dashboard.
 After that, the skill badges and group apply work for those agents the same way.
 
 This install method uses `launchd`, so it works on macOS only. `server.py` itself has no
@@ -210,6 +208,11 @@ starts, the hook checks whether a server is running. If one is, the hook only re
 the current project path; if not, it starts a new server. Opening or closing a terminal
 in the same project does not restart the server or change its port. Starting a new server
 opens the dashboard in a browser tab.
+
+Older versions wrote skill-block entries in the form `Skill(plugin@marketplace:skill)`,
+which Claude Code ignores. When the server starts or a project is registered, Agent HUD
+removes only entries in that form from the project's `.claude/settings.local.json` and
+`.claude/settings.json`, and logs what it removed. Other rules are left as they are.
 
 The Plugins & skills and Agent instructions tabs have a project dropdown under the title;
 the Groups tab applies to the project selected there. "+ add a folder" adds a project
@@ -230,13 +233,10 @@ commands also do nothing while it is set. A server that is already running keeps
 
 ## Open it as an app
 
-The dashboard is a browser tab by default. To get a window without browser
-chrome and its own icon:
-
-- **Chrome or Edge:** open the dashboard, then use the browser's "Install as
-  app" (Chrome: the install icon in the address bar, or menu → Cast, save and
-  share → Install page as app) — works the same on macOS and Windows.
-- **Safari (macOS Sonoma+):** File → Add to Dock.
+To get a window without browser chrome and its own icon, click **Install
+app** in the header. On Chrome or Edge that installs it in one step (macOS
+and Windows alike). Browsers without that API — Safari included — show
+instead where to find their own manual step (Safari: File → Add to Dock).
 
 This uses the browser's own app-mode; Agent HUD doesn't need a native wrapper
 for it.
