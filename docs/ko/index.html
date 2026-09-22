@@ -15,6 +15,12 @@
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/ko/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Agent HUD">
+<meta name="twitter:description" content="설치된 스킬과 플러그인을 한곳에서 볼 수 있습니다. 이 프로젝트에 필요 없는 건 OFF 합니다.">
+<meta name="twitter:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
+<meta property="og:site_name" content="Agent HUD">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:locale:alternate" content="en_US">
 <style>
 :root{
   --bg:#eeefe9;--panel:#ffffff;--border:#d3d6ca;--text:#23251d;--dim:#6c6e63;
@@ -165,6 +171,23 @@ footer a:hover{color:var(--text)}
 .dgm .halo{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round}
 .dgm .end{text-anchor:end}
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Agent HUD",
+  "description": "여기저기 흩어진 스킬과 플러그인을 한곳에서 볼 수 있는 로컬 대시보드입니다. 프로젝트마다 쓰지 않는 스킬과 플러그인을 꺼둘 수 있습니다.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS",
+  "url": "https://ganggangstone.github.io/agent-hud/ko/",
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 </head>
 <body>
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker></defs></svg>
@@ -364,7 +387,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <p class="say col-n">흩어져 있는 지침 파일도 찾아줍니다.</p>
   <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span> 같은 지침 파일 30종을 찾아 크기와 수정 시각을 보여줍니다. 색인이고, 내용 대조는 사람이 합니다.</p>
   <figure style="margin-top:clamp(26px,4vw,44px);max-width:660px;margin-left:auto">
-    <div class="shot"><img src="../images/instructions-ko.png" alt="에이전트 지침 탭" width="1469" height="812"></div>
+    <div class="shot"><img src="../images/instructions-ko.png" loading="lazy" decoding="async" alt="에이전트 지침 탭" width="1469" height="812"></div>
   </figure>
 </section>
 
