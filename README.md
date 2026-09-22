@@ -65,11 +65,13 @@ one at a time. It opens on the Groups tab the first time, then on the last tab y
   links the group's skills into that project's skill folders, turns the group's plugins
   on and every other plugin off. Other projects' settings are not changed.
 - **Plugins & skills**: the skills installed on this computer, listed by plugin, with
-  skills that belong to no plugin in a separate section. Each skill has a badge for
-  Claude Code, Codex, Cursor, Copilot, Gemini CLI and Antigravity. A badge is shown in
-  plain text when that agent can read the skill in the selected project, and struck
-  through when it can't. This tab also turns Claude Code plugins on and off (ON/OFF
-  switch).
+  skills that belong to no plugin in a separate section. A plugin row carries a badge
+  for each of Claude Code, Codex, Cursor, Copilot, Gemini CLI and Antigravity that can
+  read its skills in the selected project; the agents that can't are listed in the
+  checkbox tooltip instead of taking up a badge on every row. A skill inside the plugin
+  repeats the badges only when it differs from its plugin, and then it shows all of
+  them, struck through where that agent can't read it. This tab also turns Claude Code
+  plugins on and off (ON/OFF switch).
 - **Agent instructions**: finds 30 kinds of instruction files in the project folder,
   including `CLAUDE.md`, `AGENTS.md`, `.clinerules` and `.cursor/rules/`, and shows their
   size and modified time. Each agent has its own instruction file, so the modified times
