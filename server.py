@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource
+import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -53,6 +53,8 @@ def register_project(path):
             json.dump(projects, f)
     except Exception:
         pass
+    if os.path.isdir(path):
+        remove_stale_skill_denies(path)
 
 
 def known_projects():
@@ -401,11 +403,12 @@ def _instruction_rows(project_dir):
 # 출처(2026-09 공식 문서): code.claude.com/docs/en/skills,
 # learn.chatgpt.com/docs/build-skills, cursor.com/docs/context/skills,
 # code.visualstudio.com/docs/copilot/customization/agent-skills, geminicli.com/docs/cli/skills
-SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI"]
+# Antigravity(agy)는 CLI에 들어 있는 문서와 2026-09 센티널 실측으로 확인했다(ADR 10).
+SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]
 
 SKILL_ROOTS_PROJECT = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor"]),
     (".github/skills", ["Copilot"]),
@@ -419,6 +422,7 @@ SKILL_ROOTS_HOME = [
     (".codex/skills", ["Cursor"]),
     (".copilot/skills", ["Copilot"]),
     (".gemini/skills", ["Gemini CLI"]),
+    (".gemini/config/skills", ["Antigravity"]),  # agy는 ~/.agents/skills를 읽지 않는다
 ]
 
 
@@ -552,15 +556,14 @@ def _loaded_count(rows):
 
     스킬은 본문이 아니라 **이름과 설명이 세션 시작 때 전부** 컨텍스트에 올라간다
     (agentskills.io 명세의 progressive disclosure). 그래서 안 쓰는 스킬도 비용이다.
-    꺼진 플러그인의 스킬과 이 프로젝트에서 차단한 스킬은 빠진다.
+    꺼진 플러그인의 스킬은 빠진다. permissions.deny로 차단한 스킬은 목록에 남으므로
+    빼지 않는다(센티널 실측, ADR 10).
     """
     n = 0
     for row in rows:
         if row["enabled"] is False:          # 꺼진 플러그인
             continue
         for sk in row["skills"]:
-            if sk.get("blocked"):
-                continue
             if "Claude Code" in (sk.get("agents") or []):
                 n += 1
     return n
@@ -597,14 +600,10 @@ def collect_skills(ctx):
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
     modes = read_json(MODES_FILE)
-    denied = skill_denies(project_dir)
 
-    def decorate(skill, fallback_agents, blocked=False):
+    def decorate(skill, fallback_agents):
         hit = index.get(skill["id"])
         agents = hit["agents"] if hit else list(fallback_agents)
-        if blocked:
-            # 차단은 이 프로젝트의 Claude Code에만 건다. 다른 에이전트는 그대로 본다.
-            agents = [a for a in agents if a != "Claude Code"]
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
@@ -623,8 +622,7 @@ def collect_skills(ctx):
         for sk in skills:
             # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
             # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
-            sk["blocked"] = f"Skill({name}:{sk['id']})" in denied
-            decorate(sk, ["Claude Code"], sk["blocked"])
+            decorate(sk, ["Claude Code"])
         rows.append({
             "name": name,
             "section_state": _section_state(skills),
@@ -833,55 +831,48 @@ def assign_set(name, project_dir):
 
 SHARED_SETTINGS = os.path.join(".claude", "settings.json")
 
-
-def skill_denies(project_dir):
-    """이 프로젝트에서 차단된 항목. 예전 버전이 공유 settings.json에 쓴 차단도 함께 읽는다."""
-    out = set()
-    for rel in (SHARED_SETTINGS, LOCAL_SETTINGS):
-        out.update(read_json(os.path.join(project_dir, rel)).get("permissions", {}).get("deny", []))
-    return out
+# 예전 버전은 스킬 차단을 Skill(플러그인@마켓플레이스:스킬)로 썼다. Claude Code는 스킬 이름에 @를 쓰지 않아
+# 이 항목은 목록에서도 빠지지 않고 호출도 막지 못했다(센티널 실측, ADR 10). 그 형식만 골라 지운다.
+_STALE_SKILL_DENY = re.compile(r"^Skill\([^()@:]+@[^()@:]+:[^()]+\)$")
 
 
-def _edit_deny(path, entry, add):
-    """path의 permissions.deny에 entry를 넣거나 뺀다. 바뀐 게 없으면 파일을 쓰지 않는다."""
-    settings = read_json(path, {})
-    perms = settings.setdefault("permissions", {})
-    deny = perms.setdefault("deny", [])
-    if (entry in deny) == add:
-        return True, ""
-    deny.append(entry) if add else deny.remove(entry)
-    if not deny:
-        perms.pop("deny", None)
-    if not perms:
-        settings.pop("permissions", None)
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        return False, str(e)
-    return True, ""
+def remove_stale_skill_denies(project_dir):
+    """이 프로젝트 설정에서 효과 없던 스킬 차단 항목을 지우고, 지운 항목을 돌려준다.
+    지울 게 없는 파일은 다시 쓰지 않는다."""
+    removed = []
+    for rel in (LOCAL_SETTINGS, SHARED_SETTINGS):
+        path = os.path.join(project_dir, rel)
+        if not os.path.isfile(path):
+            continue
+        settings = read_json(path, {})
+        if not isinstance(settings, dict):
+            continue
+        perms = settings.get("permissions")
+        deny = perms.get("deny") if isinstance(perms, dict) else None
+        if not isinstance(deny, list):
+            continue
+        stale = [e for e in deny if isinstance(e, str) and _STALE_SKILL_DENY.match(e)]
+        if not stale:
+            continue
+        perms["deny"] = [e for e in deny if e not in stale]
+        if not perms["deny"]:
+            perms.pop("deny")
+        if not perms:
+            settings.pop("permissions")
+        try:
+            with open(path, "w") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"agent-hud: {path} 정리 실패: {e}", file=sys.stderr)
+            continue
+        removed += stale
+        print(f"agent-hud: {path}에서 효과 없는 스킬 차단 {len(stale)}개 삭제: {', '.join(stale)}", file=sys.stderr)
+    return removed
 
 
-def modify_skill_permission(action, plugin, skill, project_dir):
-    project_dir = project_dir or PROJECT_DIR
-    if plugin not in known_plugin_names():
-        return False, "unknown plugin"
-    if not skill:
-        return False, "skill id required"
-    if action not in ("block", "unblock"):
-        return False, "unknown action"
-    entry = f"Skill({plugin}:{skill})"
-    local = os.path.join(project_dir, LOCAL_SETTINGS)
-    if action == "block":
-        # 커밋되지 않는 개인 파일에만 쓴다(ADR 3). 공유 settings.json은 만들지 않는다.
-        return _edit_deny(local, entry, True)
-    # 허용은 두 파일 모두에서 지운다. 공유 파일에 남은 옛 차단을 두면 허용해도 계속 막힌다.
-    for path in (local, os.path.join(project_dir, SHARED_SETTINGS)):
-        ok, err = _edit_deny(path, entry, False)
-        if not ok:
-            return False, err
-    return True, ""
+def cleanup_known_projects():
+    for project_dir in known_projects():
+        remove_stale_skill_denies(project_dir)
 
 
 _last_cpu = [time.monotonic(), sum(os.times()[:2])]
@@ -906,19 +897,50 @@ def build_state(project_dir=None):
 
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <title>Agent HUD</title>
+<link rel="manifest" href="/manifest.json">
 <style>
 :root{
   --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
-  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
   --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
 }
 :root[data-theme="dark"]{
   --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
-  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0 auto;padding:28px;max-width:976px;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+.page{display:flex;align-items:flex-start;max-width:1180px;margin:0 auto}
+.main{flex:1;min-width:0;padding:28px 28px 28px 18px}
+.sidebar{flex:0 0 220px;padding:28px 12px 28px 28px;position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.sb-list{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sb-search{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:7px 9px;background:var(--panel)}
+.sb-search svg{flex-shrink:0;color:var(--dim)}
+.sb-search input{border:0;background:transparent;outline:0;font:inherit;font-size:12.5px;color:var(--text);width:100%}
+.sb-search input::placeholder{color:var(--dim)}
+.sb-group{display:flex;flex-direction:column;gap:2px}
+.sb-label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);padding:4px 8px 2px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);position:relative}
+.sb-item:hover{background:var(--off-tint)}
+.sb-item.active{background:var(--accent-tint);color:var(--accent);font-weight:600}
+.sb-item.active::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--accent)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--on);flex-shrink:0}
+.sb-dot.idle{background:var(--dim);opacity:.5}
+.sb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-parent{color:var(--dim);font-size:11px;font-weight:400;flex-shrink:0}
+.sb-pin{margin-left:auto;background:none;border:0;padding:2px;color:var(--dim);cursor:pointer;opacity:0;flex-shrink:0;line-height:0}
+.sb-item:hover .sb-pin{opacity:1}
+.sb-item.active .sb-pin{opacity:1;color:var(--accent)}
+.sb-item.pinned .sb-pin{opacity:1;color:var(--accent)}
+.sb-empty{font-size:12px;color:var(--dim);padding:6px 8px}
+.sb-add{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;padding:0 8px}
+.sb-add:hover{opacity:.75}
+@media (max-width:640px){
+  .page{flex-direction:column}
+  .sidebar{position:static;width:100%;padding:16px;max-height:none;border-bottom:1px solid var(--border)}
+  .main{padding:16px}
+}
 h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--text)}
 #h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
@@ -1009,13 +1031,29 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 #period{background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:4px;
   padding:1px 4px;font-size:11px;font-family:inherit;cursor:pointer}
 #period:hover{color:var(--text)}
+#installWrap{position:relative}
+#installBtn{background:transparent;color:var(--dim);border:1px solid var(--border);
+  border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;letter-spacing:.03em;
+  font-family:inherit;cursor:pointer}
+#installBtn:hover{color:var(--text);border-color:var(--accent)}
+#installPop{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:10;width:230px;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);
+  padding:10px 12px;font-size:12px;line-height:1.6;color:var(--text)}
+#installPop.open{display:block}
 </style></head><body>
+<div class="page">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="main">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
   <span>
     <h1>Agent HUD</h1>
     <span id="h1sub"></span>
   </span>
-  <span style="display:flex;gap:8px">
+  <span style="display:flex;gap:8px;align-items:center">
+    <span id="installWrap">
+      <button id="installBtn"></button>
+      <div id="installPop"></div>
+    </span>
     <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
     </span>
@@ -1030,6 +1068,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <div class="grid" id="app"></div>
 <div style="max-width:920px;margin-top:16px"><a id="fbLink" class="card-action" href="#" target="_blank" rel="noopener"></a></div>
 <div id="ts"><span id="tsText"></span><select id="period" title=""></select></div>
+</main>
+</div>
 <script>
 const T = {
   en: {
@@ -1075,6 +1115,12 @@ const T = {
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
   no_project_yet: 'no folders yet',
+  sidebar_search_ph: 'Search folders…',
+  sidebar_favorites: 'Favorites', sidebar_recent: 'Recent', sidebar_all: 'All',
+  sidebar_no_match: 'No folder matches that search',
+  pin_tip: 'Pin to favorites', unpin_tip: 'Remove from favorites',
+  install_app: 'Install app',
+  install_manual: 'This browser can’t install it automatically.<br><b>Chrome, Edge:</b> the install icon in the address bar.<br><b>Safari (macOS Sonoma+):</b> File → Add to Dock.',
   loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
   loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
   spec_issue: 'spec',
@@ -1090,15 +1136,12 @@ const T = {
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
     no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
-    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ', skill_update_failed: 'Could not change that skill: ',
+    toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
     plugin_on_tip: 'On in this project. Click to turn it off (next session)',
     plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
-    blocked: 'BLOCKED', allowed: 'ALLOWED',
-    blocked_tip: 'Blocked for Claude Code in this project. Other agents are unaffected. Click to allow',
-    allowed_tip: 'Click to block this skill for Claude Code in this project. Other agents are unaffected',
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
     updated: 'updated ', every_n: n => `every ${n}s`, paused: 'paused',
@@ -1151,6 +1194,12 @@ const T = {
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
   no_project_yet: '아직 폴더가 없습니다',
+  sidebar_search_ph: '폴더 검색…',
+  sidebar_favorites: '즐겨찾기', sidebar_recent: '최근 사용', sidebar_all: '전체',
+  sidebar_no_match: '검색 결과가 없습니다',
+  pin_tip: '즐겨찾기에 추가', unpin_tip: '즐겨찾기에서 제거',
+  install_app: '앱으로 설치',
+  install_manual: '이 브라우저는 자동 설치가 안 됩니다.<br><b>Chrome·Edge:</b> 주소창의 설치 아이콘.<br><b>Safari(macOS 소노마 이상):</b> 파일 → Dock에 추가.',
   loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
   loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
   spec_issue: '명세 위반',
@@ -1166,15 +1215,12 @@ const T = {
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
     no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
-    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ', skill_update_failed: '스킬을 바꾸지 못했습니다: ',
+    toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
     plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
-    blocked: '차단', allowed: '허용',
-    blocked_tip: '이 프로젝트의 Claude Code에서만 막아둔 스킬입니다. 다른 에이전트는 그대로 씁니다. 누르면 풉니다',
-    allowed_tip: '누르면 이 프로젝트의 Claude Code에서만 막습니다. 다른 에이전트는 그대로 씁니다',
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
     updated: '갱신 ', every_n: n => `${n}초마다`, paused: '멈춤',
@@ -1191,6 +1237,8 @@ function renderLangToggle(){
   document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
   document.getElementById('langKo').classList.toggle('active', lang === 'ko');
+  document.getElementById('installBtn').textContent = t().install_app;
+  closeInstallPop();
 }
 function setLang(l){
   lang = l;
@@ -1222,6 +1270,26 @@ function setTheme(th){
 document.getElementById('themeLight').onclick = () => setTheme('light');
 document.getElementById('themeDark').onclick = () => setTheme('dark');
 renderTheme();
+// Chrome/Edge만 이 이벤트를 준다 -- Safari는 "Dock에 추가"를 코드로 띄우는 API 자체가 없다.
+// 버튼은 항상 보이고, 자동화가 되면(prompt 저장돼 있으면) 바로 설치 대화상자를 띄우고,
+// 안 되면 드롭다운으로 수동 안내를 보여준다.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; });
+window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; closeInstallPop(); });
+function closeInstallPop(){ document.getElementById('installPop').classList.remove('open'); }
+document.getElementById('installBtn').onclick = async (e) => {
+  e.stopPropagation();
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return;
+  }
+  const pop = document.getElementById('installPop');
+  pop.innerHTML = t().install_manual;
+  pop.classList.toggle('open');
+};
+document.addEventListener('click', (e) => { if(!e.target.closest('#installWrap')) closeInstallPop(); });
 const shortAgent = a => a.replace(' CLI','');
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
@@ -1250,6 +1318,129 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
+// 사이드바 상태: 지금 프로젝트 선택(agent-hud-project)과 같은 자리(localStorage)에 둔다.
+// 서버 쪽 파일을 늘리지 않아도 되고, 기기별로 다른 즐겨찾기를 갖는 게 오히려 자연스럽다.
+function readJSON(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch(e){ return fallback; } }
+let favorites = readJSON('agent-hud-favorites', []);
+let recents = readJSON('agent-hud-recents', {});
+function saveFavorites(){ localStorage.setItem('agent-hud-favorites', JSON.stringify(favorites)); }
+function toggleFavorite(path){
+  favorites = favorites.includes(path) ? favorites.filter(p => p !== path) : [...favorites, path];
+  saveFavorites(); renderSidebar(lastPanels);
+}
+function chooseProject(path){
+  selectedProject = path; localStorage.setItem('agent-hud-project', path);
+  recents[path] = Date.now();
+  // 화면엔 최근 5개만 보이므로(renderSidebarList) 저장도 5개로 자른다 -- 안 그러면
+  // 연 적 있는 프로젝트 전부가 지워지지 않고 계속 쌓인다.
+  recents = Object.fromEntries(Object.entries(recents).sort((a, b) => b[1] - a[1]).slice(0, 5));
+  localStorage.setItem('agent-hud-recents', JSON.stringify(recents));
+  rerender();
+}
+function baseName(p){ return (p||'').split('/').filter(Boolean).pop() || p; }
+function parentName(p){ const parts = (p||'').split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : ''; }
+let sidebarQuery = '';
+let lastPanels = null;
+// 프로젝트 선택기. 사이드바 하나가 모든 탭을 대표한다 -- 예전엔 탭마다 드롭다운을 복제해 갖고 있었다.
+// 검색창(input)은 언어가 안 바뀌는 한 한 번만 만들고 다시는 지우지 않는다.
+// 예전엔 keystroke마다, 그리고 1초 폴링 tick마다 사이드바 전체(input 포함)를 지우고 새로 만들었는데,
+// 그러면 한글 입력 중 조합 상태를 쥔 DOM 노드가 통째로 사라져서 조합이 깨졌다(agy로도 같은 진단 확인).
+// 목록(.sb-list)만 다시 그리고, input 노드 자체는 절대 건드리지 않는다.
+let sidebarShellLang = null;
+function renderSidebar(p){
+  lastPanels = p;
+  const side = document.getElementById('sidebar');
+  if(sidebarShellLang !== lang){
+    side.innerHTML = '';
+    const search = document.createElement('div'); search.className = 'sb-search';
+    search.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
+    const input = document.createElement('input');
+    input.id = 'sbSearchInput';
+    input.placeholder = t().sidebar_search_ph; input.value = sidebarQuery;
+    input.oninput = () => { sidebarQuery = input.value; renderSidebarList(); };
+    search.appendChild(input);
+    side.appendChild(search);
+    const listWrap = document.createElement('div'); listWrap.className = 'sb-list';
+    side.appendChild(listWrap);
+    sidebarShellLang = lang;
+  }
+  renderSidebarList();
+}
+function renderSidebarList(){
+  const p = lastPanels;
+  const listWrap = document.getElementById('sidebar').querySelector('.sb-list');
+  listWrap.innerHTML = '';
+  const list = (p && p.known_projects) || [];
+  const q = sidebarQuery.trim().toLowerCase();
+  const matches = pr => !q || pr.toLowerCase().includes(q);
+  // 이름이 같은 폴더가 둘 이상이면(예: 여러 워크스페이스의 build/) 상위 폴더명을 옆에 붙인다.
+  const nameCounts = {};
+  for(const pr of list) nameCounts[baseName(pr)] = (nameCounts[baseName(pr)] || 0) + 1;
+
+  function group(labelKey, paths){
+    const shown = paths.filter(matches);
+    if(!shown.length) return;
+    const g = document.createElement('div'); g.className = 'sb-group';
+    const label = document.createElement('div'); label.className = 'sb-label'; label.textContent = t()[labelKey];
+    g.appendChild(label);
+    for(const path of shown){
+      const it = document.createElement('div');
+      it.className = 'sb-item' + (path === p.project_dir ? ' active' : '') + (favorites.includes(path) ? ' pinned' : '');
+      it.title = path;
+      const dot = document.createElement('span'); dot.className = 'sb-dot' + (path === p.project_dir ? '' : ' idle');
+      const name = document.createElement('span'); name.className = 'sb-name'; name.textContent = baseName(path);
+      it.appendChild(dot); it.appendChild(name);
+      if(nameCounts[baseName(path)] > 1){
+        const parent = document.createElement('span'); parent.className = 'sb-parent'; parent.textContent = parentName(path);
+        it.appendChild(parent);
+      }
+      const pin = document.createElement('button'); pin.className = 'sb-pin';
+      pin.title = favorites.includes(path) ? t().unpin_tip : t().pin_tip;
+      pin.innerHTML = favorites.includes(path)
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>';
+      pin.onclick = (e) => { e.stopPropagation(); toggleFavorite(path); };
+      it.appendChild(pin);
+      it.onclick = () => chooseProject(path);
+      g.appendChild(it);
+    }
+    listWrap.appendChild(g);
+  }
+
+  const pinned = list.filter(pr => favorites.includes(pr));
+  const recent = list.filter(pr => !favorites.includes(pr) && recents[pr])
+    .sort((a, b) => (recents[b]||0) - (recents[a]||0)).slice(0, 5);
+  const rest = list.filter(pr => !favorites.includes(pr) && !recent.includes(pr));
+
+  group('sidebar_favorites', pinned);
+  group('sidebar_recent', recent);
+  group('sidebar_all', rest);
+
+  if(!list.length){
+    const empty = document.createElement('div'); empty.className = 'sb-empty'; empty.textContent = t().no_project_yet;
+    listWrap.appendChild(empty);
+  } else if(q && !pinned.some(matches) && !recent.some(matches) && !rest.some(matches)){
+    const empty = document.createElement('div'); empty.className = 'sb-empty'; empty.textContent = t().sidebar_no_match;
+    listWrap.appendChild(empty);
+  }
+
+  const add = document.createElement('div'); add.className = 'sb-add'; add.textContent = t().add_project;
+  add.title = t().add_project_tip;
+  add.onclick = async () => {
+    const path = (prompt(t().add_project_prompt) || '').trim();
+    if(!path) return;
+    polling = false;
+    try{
+      const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
+      const d = await r.json();
+      if(!d.ok){ alert(t().add_project_failed + (d.error || t().error)); }
+      else chooseProject(path);
+    } catch(e){ alert(t().add_project_failed + e); }
+    polling = true;
+    await tick();
+  };
+  listWrap.appendChild(add);
+}
 // ?open=<플러그인> 으로 펼친 채 열 수 있다 (?tab= 과 같은 이유)
 const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get('open')||'')
   .split(',').filter(Boolean).map(k => [k, true]));
@@ -1312,18 +1503,6 @@ async function assignSet(name, btn){
   polling = true;
   await tick();
 }
-async function toggleSkill(plugin, skill, block, dotEl){
-  polling = false; dotEl.classList.add('busy');
-  try{
-    const r = await fetch('/api/skill', {method:'POST', body: JSON.stringify({
-      action: block ? 'block' : 'unblock', plugin, skill, project: currentProjectDir
-    })});
-    const d = await r.json();
-    if(!d.ok) alert(t().skill_update_failed + (d.error || t().error));
-  } catch(e){ alert(t().skill_update_failed + e); }
-  polling = true;
-  await tick();
-}
 // 피드백은 GitHub Issues로 받는다. 이 도구를 설치할 수 있는 사람은 전부 GitHub 계정이
 // 있으므로(설치가 git clone + 셸 스크립트 + settings.json 편집이다), 별도 수신 서버를
 // 두는 것보다 이슈 폼 하나가 낫다. 버전은 링크가 미리 채워 보낸다.
@@ -1331,42 +1510,6 @@ function renderFeedback(upd){
   const a = document.getElementById('fbLink');
   a.textContent = t().feedback_open;
   a.href = `https://github.com/${upd.repo}/issues/new?template=feedback.yml&version=${encodeURIComponent(upd.version)}`;
-}
-// 프로젝트 선택기. 두 탭이 같은 코드를 복사해 갖고 있었다.
-// 목록이 비어도 보여준다 -- 폴더를 직접 더할 수 있어야 시작이 되기 때문이다.
-function projectPicker(p){
-  const box = document.createElement('div');
-  box.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:10px';
-  const sel = document.createElement('select');
-  sel.style.cssText = 'background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;flex:1;min-width:0';
-  const list = p.known_projects || [];
-  if(!list.length){
-    const o = document.createElement('option'); o.textContent = t().no_project_yet; sel.appendChild(o);
-    sel.disabled = true;
-  }
-  for(const pr of list){
-    const o = document.createElement('option'); o.value = pr; o.textContent = pr;
-    if(pr === p.project_dir) o.selected = true;
-    sel.appendChild(o);
-  }
-  sel.onchange = () => { selectedProject = sel.value; localStorage.setItem('agent-hud-project', sel.value); rerender(); };
-  const add = document.createElement('span'); add.className = 'card-action';
-  add.textContent = t().add_project; add.title = t().add_project_tip;
-  add.onclick = async () => {
-    const path = (prompt(t().add_project_prompt) || '').trim();
-    if(!path) return;
-    polling = false;
-    try{
-      const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
-      const d = await r.json();
-      if(!d.ok){ alert(t().add_project_failed + (d.error || t().error)); }
-      else { selectedProject = path; localStorage.setItem('agent-hud-project', path); }
-    } catch(e){ alert(t().add_project_failed + e); }
-    polling = true;
-    await tick();
-  };
-  box.appendChild(sel); box.appendChild(add);
-  return box;
 }
 async function tick(){
   if(!polling) return;
@@ -1380,6 +1523,7 @@ async function tick(){
     updEl.style.display = 'none';
   }
   if(upd) renderFeedback(upd);
+  renderSidebar(d.panels.find(p => p.known_projects) || {known_projects: [], project_dir: selectedProject});
   const app = document.getElementById('app'); app.innerHTML='';
   for(const p of d.panels){
     if(p.project_dir) currentProjectDir = p.project_dir;
@@ -1481,7 +1625,6 @@ async function tick(){
 
     } else if(p.files){
       c.appendChild(h);
-      c.appendChild(projectPicker(p));
       for(const f of p.files){
         const el = document.createElement('div'); el.className = 'row' + (f.exists ? ' clickable' : '');
         const left = document.createElement('span');
@@ -1529,7 +1672,6 @@ async function tick(){
       c.appendChild(an);
     } else {
       c.appendChild(h);
-      c.appendChild(projectPicker(p));
       if(typeof p.loaded === 'number'){
         // 스킬은 이름과 설명이 세션 시작 때 전부 올라간다. 안 쓰는 것도 자리를 차지하므로,
         // 주장하지 말고 지금 이 프로젝트의 숫자를 그대로 보여준다.
@@ -1645,12 +1787,6 @@ async function tick(){
           if(hasSkills){
             for(const s of row.skills){
               const srow = document.createElement('div'); srow.className = 'row sub skill-row';
-              const ssw = document.createElement('span');
-              ssw.className = 'switch ' + (s.blocked ? 'sw-off' : 'sw-on');
-              ssw.textContent = s.blocked ? t().blocked : t().allowed;
-              ssw.title = s.blocked ? t().blocked_tip : t().allowed_tip;
-              if(isPlugin){ ssw.onclick = () => toggleSkill(row.name, s.id, !s.blocked, ssw); }
-              else { ssw.className = 'switch sw-on'; ssw.textContent = t().allowed; }
 
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
@@ -1681,7 +1817,7 @@ async function tick(){
                   badges.appendChild(tag);
                 }
               }
-              srow.appendChild(ssw); srow.appendChild(stext); srow.appendChild(badges);
+              srow.appendChild(stext); srow.appendChild(badges);
               if(s.linkable){
                 // 섹션과 같은 말이면 글자를 반복하지 않는다. 뱃지와 같은 규칙.
                 const miss = (s.missing||[]).map(shortAgent);
@@ -1762,6 +1898,29 @@ tick(); applyPeriod();
 </script></body></html>"""
 
 
+def _png_chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+
+
+def _solid_png(size, rgb):
+    # "앱으로 설치" 버튼의 매니페스트 아이콘. PNG 하나로 충분해서 이미지 라이브러리를
+    # 넣지 않고 단색 사각형을 손으로 인코딩한다 -- 필터 바이트 0(그대로) + zlib.
+    row = bytes([0]) + bytes(rgb) * size
+    raw = row * size
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # 8bit, RGB
+    idat = zlib.compress(raw, 9)
+    return sig + _png_chunk(b"IHDR", ihdr) + _png_chunk(b"IDAT", idat) + _png_chunk(b"IEND", b"")
+
+
+ICON_PNG = _solid_png(512, (49, 130, 246))  # --accent
+MANIFEST_JSON = json.dumps({
+    "name": "Agent HUD", "short_name": "Agent HUD", "start_url": "/",
+    "display": "standalone", "background_color": "#0d1117", "theme_color": "#161b22",
+    "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
+}).encode()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -1788,6 +1947,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": err}, 403)
             else:
                 self._send_json({"ok": True, "text": text})
+        elif self.path == "/manifest.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/manifest+json")
+            self.send_header("Content-Length", str(len(MANIFEST_JSON)))
+            self.end_headers()
+            self.wfile.write(MANIFEST_JSON)
+        elif self.path == "/icon.png":
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(ICON_PNG)))
+            self.end_headers()
+            self.wfile.write(ICON_PNG)
         else:
             body = PAGE.encode()
             self.send_response(200)
@@ -1846,17 +2017,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not ok:
                     errs.append(f"{n}: {err}")
             self._send_json({"ok": not errs, "error": "; ".join(errs[:3])})
-        elif self.path == "/api/skill":
-            length = int(self.headers.get("Content-Length", 0))
-            try:
-                payload = json.loads(self.rfile.read(length) or b"{}")
-            except Exception:
-                return self._send_json({"ok": False, "error": "bad request"}, 400)
-            ok, err = modify_skill_permission(
-                payload.get("action", ""), payload.get("plugin", ""),
-                payload.get("skill", ""), payload.get("project", ""),
-            )
-            self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/register":
             length = int(self.headers.get("Content-Length", 0))
             try:
@@ -1961,6 +2121,7 @@ def main():
         return
 
     register_project(PROJECT_DIR)
+    cleanup_known_projects()
     port = base_port
     for _ in range(10):
         if not port_alive(port):

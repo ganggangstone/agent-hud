@@ -37,9 +37,11 @@ No framework, no dependencies — each file runs on its own and asserts.
   links the user made by hand alone.
 - **`tests/test_plugin_scope.py`** — plugin state is per project. The user-wide
   settings file must come out byte-identical.
-- **`tests/test_skill_deny_scope.py`** — blocking a skill writes only to the
-  uncommitted `settings.local.json`. Allowing it also clears a block an older
-  version left in the shared `settings.json`, without touching other rules.
+- **`tests/test_stale_deny_cleanup.py`** — removes the no-op `Skill(plugin@marketplace:skill)`
+  deny entries older versions wrote, from both project settings files, keeping every
+  other rule and key and leaving files with nothing to remove untouched.
+- **`tests/test_skill_roots_agy.py`** — Antigravity (agy) is in the agent list and reads
+  `~/.gemini/config/skills` and project `.agents/skills`, not `~/.agents/skills`.
 - **`tests/test_cli.py`** — the `groups` and `apply` subcommands, run as a
   subprocess against a throwaway home.
 - **`tests/test_data_dir.py`** — data files sit next to `server.py` by default
@@ -52,6 +54,9 @@ No framework, no dependencies — each file runs on its own and asserts.
 - **`tests/test_update_hint.py`** — the update notice tells people to rerun
   `install.sh` (or `brew upgrade`), since the service runs an installed copy
   that `git pull` alone does not change.
+- **`tests/test_install_app.py`** — `/manifest.json` and `/icon.png` are valid
+  and the page actually links the manifest. Whether Chrome offers the install
+  prompt for real can only be checked in a browser.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.
@@ -118,7 +123,7 @@ the browser as JSON and rendered by the branch that matches its shape.
 
 ## Scope
 
-Plugins and per-skill blocking are Claude Code concepts; this dashboard reads
-Claude Code's copies of them. Groups are Agent HUD's own. Skills and instruction
+Plugins are a Claude Code concept; this dashboard reads Claude Code's copies of
+them. Groups are Agent HUD's own. Skills and instruction
 files are read for every supported agent. Don't invent equivalents for tools that have none — say
 which agent a control applies to instead.
