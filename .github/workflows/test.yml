@@ -1,0 +1,30 @@
+name: 검사
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # tests/test_page_js.py와 test_landing.py가 인라인 스크립트를 node --check로 본다
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 전체 검사
+        run: |
+          fail=0
+          for t in tests/test_*.py; do
+            echo "── $t"
+            python3 "$t" || fail=1
+          done
+          exit $fail
