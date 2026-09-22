@@ -1051,7 +1051,15 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <main class="main">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
   <span>
-    <h1>Agent HUD</h1>
+    <span style="display:flex;align-items:center;gap:8px">
+      <svg width="22" height="22" viewBox="0 0 96 96" aria-hidden="true" style="flex-shrink:0">
+        <defs><clipPath id="hullMark"><circle cx="48" cy="48" r="23"/></clipPath></defs>
+        <rect x="25" y="52" width="46" height="22" fill="var(--accent)" clip-path="url(#hullMark)"/>
+        <circle cx="48" cy="48" r="23" fill="none" stroke="currentColor" stroke-width="6"/>
+        <line x1="15" y1="52" x2="81" y2="52" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+      <h1>Agent HUD</h1>
+    </span>
     <span id="h1sub"></span>
   </span>
   <span style="display:flex;gap:8px;align-items:center">
