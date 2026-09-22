@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent HUD — 설치된 스킬과 플러그인을 한곳에서</title>
-<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 끕니다. 로컬 대시보드입니다.">
+<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 OFF 합니다. 로컬 대시보드입니다.">
 <link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:title" content="Agent HUD">
-<meta property="og:description" content="설치된 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 끕니다.">
+<meta property="og:description" content="설치된 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 OFF 합니다.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/ko/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
@@ -97,11 +97,6 @@ pre{margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px
   overflow-x:auto;color:var(--text)}
 pre .s{color:var(--on)}
 
-/* 색 블록 하나로 끝을 닫는다. 3열 카드 대신 이어지는 글 */
-.band{background:var(--off-tint);margin-top:clamp(74px,10vw,132px);padding:clamp(52px,7vw,88px) 0}
-.band .say{margin-top:0}
-.band p{margin:18px 0 0}
-
 footer{padding:30px 0 56px;font-size:12.5px;color:var(--dim)}
 footer a{color:var(--dim);text-decoration:none;margin-left:16px}
 footer a:hover{color:var(--text)}
@@ -165,7 +160,7 @@ footer a:hover{color:var(--text)}
     <line x1="15" y1="52" x2="81" y2="52" stroke="var(--text)" stroke-width="5" stroke-linecap="round"/>
   </svg>
   <h1 class="wm">Agent HUD</h1>
-  <p class="say">설치된 스킬과 플러그인을<br>한곳에서 봅니다.<br><span class="soft">이 프로젝트에 필요 없는 건 끕니다.</span></p>
+  <p class="say">설치된 스킬과 플러그인을<br>한곳에서 봅니다.<br><span class="soft">이 프로젝트에 필요 없는 건 OFF 합니다.</span></p>
   <p class="sub">로컬 대시보드입니다. macOS, MIT, 계정이 필요 없습니다.</p>
   <div class="cmd">git clone https://github.com/ganggangstone/agent-hud.git
 cd agent-hud &amp;&amp; ./install.sh
@@ -342,12 +337,9 @@ cd agent-hud &amp;&amp; ./install.sh
   </figure>
 </section>
 
-<section class="band">
-  <div class="w">
-    <p class="say col-n">전부 이 컴퓨터 안에서 일어납니다.</p>
-    <p class="col-m small">이 컴퓨터의 설정 파일만 읽고 씁니다. 올라가는 데이터가 없고 만들 계정도 없습니다. 밖으로 나가는 요청은 12시간마다 하는 GitHub Releases 조회 하나뿐이고, 새 버전이 있는지만 알려줍니다. 쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이며, 지침 파일은 목록만 보여줍니다.</p>
-  </div>
-</section>
+<div class="w" style="margin-top:clamp(74px,10vw,132px)">
+  <p class="fine">파이썬 파일 하나, 표준 라이브러리만 쓰고 전부 이 컴퓨터 안에서 돕니다. 올라가는 데이터가 없고 만들 계정도 없습니다. 밖으로 나가는 요청은 12시간마다 하는 GitHub Releases 조회 하나뿐이고, 새 버전이 있는지만 알려줍니다. 쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이며, 지침 파일은 목록만 보여줍니다.</p>
+</div>
 
 <footer class="w">
   MIT License
