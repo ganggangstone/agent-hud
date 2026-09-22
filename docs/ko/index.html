@@ -231,6 +231,7 @@ cd agent-hud &amp;&amp; ./install.sh
 
 <section class="w tell">
   <p class="say col-m">코딩 에이전트는 세션을 시작할 때<br>설치된 스킬의 이름과 설명을 전부 읽습니다.<br><span class="soft">쓰지 않는 스킬도 마찬가지입니다.</span></p>
+  <p class="small dim col-m" style="margin-top:14px">앱을 만드는 중인데 글쓰기 스킬 열두 개가 같이 올라가 있는 식입니다.</p>
   <p class="num"><b>스킬 60개</b> <span>·</span> <b>18,938자</b> <span>·</span> <span>세션마다</span> <b>5,000~9,000토큰</b></p>
   <figure class="dgm" style="margin:clamp(34px,5vw,56px) 0 0">
 <svg viewBox="0 0 840 250" role="img" aria-label="다이어그램: 설치된 스킬 60개를 사각형 60개로 그리고, 흘수선 아래에 이 프로젝트가 실제로 로드하는 6개를 둡니다.">
@@ -302,7 +303,8 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="8" y="230">예시</text>
 </svg>
   </figure>
-  <p class="small dim col-m" style="margin-top:26px">컴퓨터 한 대에서 직접 재본 예시 값입니다. <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 스킬 하나에 약 100토큰씩 잡습니다. 스킬 개수와 설명 길이에 따라 값은 달라집니다. 내 프로젝트의 실제 값은 대시보드가 세어서 보여줍니다.</p>
+  <p class="col-m" style="margin-top:26px">이 프로젝트에서 한 번도 안 쓸 쉰네 개 몫까지, 세션을 열 때마다 다시 냅니다.</p>
+  <p class="small dim col-m" style="margin-top:14px">컴퓨터 한 대에서 직접 재본 예시 값입니다. 스킬 하나의 이름과 설명은 <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준 기준 100토큰 안팎인데, 설명이 길고 짧은 편차가 커서 60개면 5,000~9,000토큰 사이가 됩니다. 내 프로젝트의 실제 값은 대시보드가 세어서 보여줍니다.</p>
 </section>
 
 <section class="w tell">
@@ -331,7 +333,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">그룹은 함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 고른 프로젝트만 바뀌고 다른 프로젝트는 그대로입니다. 플러그인은 다음 세션부터 반영됩니다. 그룹은 그룹 탭에서 만들어도 되고 <span class="mono">modes.json</span>을 직접 고쳐도 됩니다.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">플러그인은 스킬·커맨드·훅을 묶어 한 번에 설치하는 꾸러미이고, 그룹은 그중 함께 쓰는 것들을 다시 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 쓰는 곳은 고른 프로젝트 폴더 안뿐이고, 전역 설정 파일은 건드리지 않습니다. 플러그인은 다음 세션부터 반영됩니다. 그룹은 그룹 탭에서 만들어도 되고 <span class="mono">modes.json</span>을 직접 고쳐도 됩니다.</p>
   
 </section>
 
@@ -389,6 +391,8 @@ cd agent-hud &amp;&amp; ./install.sh
     <p class="small dim">설치 스크립트가 등록하는 <span class="mono">launchd</span> 서비스가 macOS 전용입니다. <span class="mono">server.py</span> 자체에는 OS를 타는 코드가 없어서, Linux에서는 <span class="mono">systemd --user</span> 유닛이 이 파일을 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
     <p class="q">내 컴퓨터에서 무엇이 바뀌나요?</p>
     <p class="small dim">그룹을 적용한 프로젝트 안의 플러그인 켜짐·꺼짐 상태와, 스킬 폴더로 연결되는 링크입니다. 지침 파일은 목록만 보여줄 뿐 고치지 않습니다.</p>
+    <p class="q">되돌리거나 지우려면요?</p>
+    <p class="small dim">그룹을 해제하면 걸어둔 스킬 링크가 지워집니다(대시보드에서, 또는 <span class="mono">agent-hud apply --off</span>). 플러그인 켜짐·꺼짐 값은 그 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 남으니, 지우고 싶으면 그 파일에서 <span class="mono">enabledPlugins</span>를 빼면 됩니다. 도구 자체는 <span class="mono">launchctl bootout</span>으로 멈추고, <span class="mono">~/.claude/tools/agent-hud/</span> 폴더와 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>를 지우면 흔적이 없습니다.</p>
     <p class="q">다른 에이전트도 따로 설정해야 하나요?</p>
     <p class="small dim">Claude Code는 프로젝트를 알아서 등록합니다. Cursor·Codex·Gemini CLI·Antigravity로만 쓰는 프로젝트는 대시보드에서 &#8220;+ 폴더 추가&#8221;로 넣으면 되고, 그 뒤로는 스킬 배지와 그룹 적용이 똑같이 동작합니다.</p>
   </div>

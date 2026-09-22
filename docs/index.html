@@ -229,6 +229,7 @@ cd agent-hud &amp;&amp; ./install.sh
 
 <section class="w tell">
   <p class="say col-m">A coding agent reads every installed skill's name and description at the start of a session.<br><span class="soft">The ones you never use, too.</span></p>
+  <p class="small dim col-m" style="margin-top:14px">You are building an app, and twelve writing skills rode along with it.</p>
   <p class="num"><b>60 skills</b> <span>·</span> <b>18,938 characters</b> <span>·</span> <b>5,000–9,000 tokens</b> <span>every session</span></p>
   <figure class="dgm" style="margin:clamp(34px,5vw,56px) 0 0">
 <svg viewBox="0 0 840 250" role="img" aria-label="Diagram: a grid of 60 squares for the installed skills, with a load line and the six squares below it that this project actually loads.">
@@ -300,7 +301,8 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="8" y="230">example</text>
 </svg>
   </figure>
-  <p class="small dim col-m" style="margin-top:26px">These are example numbers, measured on one machine — about 100 tokens per skill, going by the <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> standard. Yours will differ with how many skills you have and how long their descriptions run. The dashboard counts your own project for you.</p>
+  <p class="col-m" style="margin-top:26px">Fifty-four of them this project never touches, paid again every time you open a session.</p>
+  <p class="small dim col-m" style="margin-top:14px">These are example numbers, measured on one machine . A skill&#8217;s name and description run about 100 tokens by the <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> standard, but descriptions vary enough that 60 of them land somewhere between 5,000 and 9,000. The dashboard counts your own project for you.</p>
 </section>
 
 <section class="w tell">
@@ -329,7 +331,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 2 links</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A group is just the plugins and skills you use together. Apply one and this project gets exactly those — everything else is switched off. Only the project you picked changes; your other projects stay as they are. Plugin changes take effect the next time you start a session. Build a group in the Groups tab, or edit <span class="mono">modes.json</span> yourself.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A plugin is a bundle of skills, commands and hooks you install in one go; a group is the ones you use together, bundled again. Apply one and this project gets exactly those — everything else is switched off. It writes inside the project folder you picked and never touches your global settings. Plugin changes take effect the next time you start a session. Build a group in the Groups tab, or edit <span class="mono">modes.json</span> yourself.</p>
   
 </section>
 
@@ -387,6 +389,8 @@ cd agent-hud &amp;&amp; ./install.sh
     <p class="small dim">The installer registers a <span class="mono">launchd</span> service, and that part is macOS-only. <span class="mono">server.py</span> itself has no OS-specific code, so on Linux you can point a <span class="mono">systemd --user</span> unit at it instead. Windows is not supported yet (<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
     <p class="q">What does it change on my computer?</p>
     <p class="small dim">Which plugins are on or off, and links pointing at your skill folders, inside the project you applied a group to. Instruction files are only ever listed — it never edits them.</p>
+    <p class="q">How do I undo it, or remove it?</p>
+    <p class="small dim">Unassign the group and the skill links it made are removed (from the dashboard, or <span class="mono">agent-hud apply --off</span>). The plugin on/off values stay in that project&#8217;s <span class="mono">.claude/settings.local.json</span>, so drop <span class="mono">enabledPlugins</span> there if you want them gone. The tool itself stops with <span class="mono">launchctl bootout</span>; delete <span class="mono">~/.claude/tools/agent-hud/</span> and <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span> and nothing is left.</p>
     <p class="q">Do my other agents need setting up?</p>
     <p class="small dim">Claude Code registers a project on its own. For one you use only with Cursor, Codex, Gemini CLI or Antigravity, add it with <span class="mono">+ add a folder</span> in the dashboard; skill badges and group apply then work the same way.</p>
   </div>
