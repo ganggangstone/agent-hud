@@ -81,6 +81,10 @@ a{color:var(--accent)}
 .copy.ok{color:var(--accent);border-color:var(--accent)}
 .copy svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round}
+/* 아이콘 교체는 class로 한다. 인라인 SVG에는 hidden 속성이 듣지 않아 둘 다 보인다 */
+.copy .i-ok{display:none}
+.copy.ok .i-copy{display:none}
+.copy.ok .i-ok{display:block}
 /* 지원 플랫폼은 설치 안내 문단에 묻히면 안 된다 */
 .plat{margin:16px 0 0}
 .badge{display:inline-block;background:var(--accent-tint);color:var(--accent);
@@ -124,6 +128,9 @@ footer a:hover{color:var(--text)}
   .mk{margin-bottom:14px}
   .say{margin-top:18px}
   .cmd{margin-top:24px}
+  /* 좁은 화면에서는 명령 한 줄이 화면보다 길어서 블록의 "오른쪽 위"가 화면 밖에 있다.
+     거기 붙여두면 버튼이 안 보인다. 흐름 안으로 되돌려 아래 한 줄로 깐다 */
+  .copy{position:static;display:flex;width:100%;justify-content:center;margin-top:10px}
 }
 
 /* 다이어그램: 장식이 아니라 구조를 그린다. 인라인 SVG뿐이고 색은 :root 변수를 그대로 쓴다 */
@@ -181,8 +188,8 @@ footer a:hover{color:var(--text)}
 cd agent-hud &amp;&amp; ./install.sh
 <b>또는  brew install ganggangstone/tap/agent-hud</b></div>
     <button class="copy" type="button" id="cp">
-      <svg id="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
-      <svg id="io" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M20 6 9 17l-5-5"/></svg>
+      <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+      <svg class="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
       <span id="cpl">복사</span>
     </button>
   </div>
@@ -395,13 +402,9 @@ else cp.onclick = function(){
   if(alt) alt.remove();
   navigator.clipboard.writeText(c.textContent.trim()).then(function(){
     document.getElementById('cpl').textContent = '복사됨';
-    document.getElementById('ic').hidden = true;
-    document.getElementById('io').hidden = false;
     cp.classList.add('ok');
     setTimeout(function(){
       document.getElementById('cpl').textContent = '복사';
-      document.getElementById('ic').hidden = false;
-      document.getElementById('io').hidden = true;
       cp.classList.remove('ok');
     }, 1600);
   });
