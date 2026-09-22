@@ -20,6 +20,7 @@
 - [Install (macOS)](#install-macos)
 - [Behavior across projects and sessions](#behavior-across-projects-and-sessions)
 - [Managing the service](#managing-the-service)
+- [Open it as an app](#open-it-as-an-app)
 - [Update checks](#update-checks)
 - [Extend](#extend)
 - [Feedback](#feedback)
@@ -232,13 +233,10 @@ commands also do nothing while it is set. A server that is already running keeps
 
 ## Open it as an app
 
-The dashboard is a browser tab by default. To get a window without browser
-chrome and its own icon:
-
-- **Chrome or Edge:** open the dashboard, then use the browser's "Install as
-  app" (Chrome: the install icon in the address bar, or menu → Cast, save and
-  share → Install page as app) — works the same on macOS and Windows.
-- **Safari (macOS Sonoma+):** File → Add to Dock.
+To get a window without browser chrome and its own icon, click **Install
+app** in the header. On Chrome or Edge that installs it in one step (macOS
+and Windows alike). Browsers without that API — Safari included — show
+instead where to find their own manual step (Safari: File → Add to Dock).
 
 This uses the browser's own app-mode; Agent HUD doesn't need a native wrapper
 for it.

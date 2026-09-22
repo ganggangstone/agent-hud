@@ -54,6 +54,9 @@ No framework, no dependencies — each file runs on its own and asserts.
 - **`tests/test_update_hint.py`** — the update notice tells people to rerun
   `install.sh` (or `brew upgrade`), since the service runs an installed copy
   that `git pull` alone does not change.
+- **`tests/test_install_app.py`** — `/manifest.json` and `/icon.png` are valid
+  and the page actually links the manifest. Whether Chrome offers the install
+  prompt for real can only be checked in a browser.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.
