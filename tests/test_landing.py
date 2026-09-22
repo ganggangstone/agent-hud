@@ -1,7 +1,7 @@
 """랜딩 페이지(docs/index.html, docs/ko/index.html)가 최소한 깨지진 않는지 본다.
    실제 디자인 판단은 사람이 본다 -- 여기서는 기계적으로 잡히는 것만.
    python3 tests/test_landing.py"""
-import os, re, subprocess, sys
+import json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGES = [
@@ -12,12 +12,25 @@ PAGES = [
 
 def check_js(path, html):
     """인라인 <script>가 문법적으로 깨졌으면 여기서 잡는다 -- 제품 쪽에서
-    실제로 이 검사가 없어서 화면이 헤더만 그리고 멈춘 사고가 났었다."""
-    scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, re.S)
+    실제로 이 검사가 없어서 화면이 헤더만 그리고 멈춘 사고가 났었다.
+    JSON-LD는 자바스크립트가 아니므로 node가 아니라 JSON으로 읽는다 --
+    한 덩어리로 묶어 node에 넘기면 멀쩡한 구조화 데이터가 문법 오류로 잡힌다."""
+    scripts = re.findall(r"<script(\s[^>]*)?>(.*?)</script>", html, re.S)
     assert scripts, f"{path}: <script> 블록이 없다"
-    for i, code in enumerate(scripts):
+    ld_seen = False
+    for i, (attrs, code) in enumerate(scripts):
+        if "application/ld+json" in (attrs or ""):
+            ld_seen = True
+            try:
+                data = json.loads(code)
+            except json.JSONDecodeError as e:
+                raise AssertionError(f"{path} JSON-LD: {e}")
+            assert data.get("@context") == "https://schema.org", f"{path}: JSON-LD @context가 없다"
+            assert data.get("@type"), f"{path}: JSON-LD @type이 없다"
+            continue
         out = subprocess.run(["node", "--check"], input=code, capture_output=True, text=True)
         assert out.returncode == 0, f"{path} script #{i}: {out.stderr}"
+    assert ld_seen, f"{path}: JSON-LD 구조화 데이터가 빠졌다"
 
 
 def check_images(path, html, base_dir):

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ganggangstone.github.io/agent-hud/sitemap.xml

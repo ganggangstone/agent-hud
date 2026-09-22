@@ -15,6 +15,12 @@
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills.png">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Agent HUD">
+<meta name="twitter:description" content="Every skill and plugin you have installed, in one place. Turn off what this project does not need.">
+<meta name="twitter:image" content="https://ganggangstone.github.io/agent-hud/images/skills.png">
+<meta property="og:site_name" content="Agent HUD">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ko_KR">
 <style>
 :root{
   --bg:#eeefe9;--panel:#ffffff;--border:#d3d6ca;--text:#23251d;--dim:#6c6e63;
@@ -162,6 +168,23 @@ footer a:hover{color:var(--text)}
 .dgm .halo{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round}
 .dgm .end{text-anchor:end}
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Agent HUD",
+  "description": "A local dashboard for the skills and plugins installed across your machine. See them in one place, and switch off the ones a project does not need.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS",
+  "url": "https://ganggangstone.github.io/agent-hud/",
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 </head>
 <body>
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker></defs></svg>
@@ -361,7 +384,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <p class="say col-n">It also finds the instruction files you scattered around.</p>
   <p class="small dim col-n" style="margin-top:16px">30 kinds of <span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span> and the rest, with size and modified time. It indexes them; it does not compare them.</p>
   <figure style="margin-top:clamp(26px,4vw,44px);max-width:660px;margin-left:auto">
-    <div class="shot"><img src="images/instructions.png" alt="The Agent instructions tab" width="1469" height="812"></div>
+    <div class="shot"><img src="images/instructions.png" loading="lazy" decoding="async" alt="The Agent instructions tab" width="1469" height="812"></div>
   </figure>
 </section>
 
