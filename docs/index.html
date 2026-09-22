@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent HUD — see how many skills a project loads</title>
+<meta name="description" content="A local dashboard that shows how many skills the project you have open loads, and lets you save the plugins and skills you use together as a group and apply a different group per project.">
+<link rel="canonical" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
+<meta property="og:title" content="Agent HUD">
+<meta property="og:description" content="See how many skills this project loads. Group the plugins and skills you use together, and apply a different group to each project.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ganggangstone.github.io/agent-hud/">
+<meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+/* 색 변수 출처: server.py :root (docs/landing-page-plan.md 3절) — 사본 갈라지면 여기부터 맞춘다 */
+:root{
+  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+    --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);margin:0;
+  font:14px/1.6 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+a{color:var(--accent)}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+/* 폭: 본문 텍스트는 좁게, 스크린샷은 넓게 */
+.wide{max-width:1040px;margin:0 auto;padding:0 24px}
+.col{max-width:620px}
+
+header{border-bottom:1px solid var(--border)}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;flex-wrap:wrap}
+.brand{font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700}
+.pill a,.pill button{padding:5px 10px;color:var(--dim);text-decoration:none;background:transparent;border:0;font:inherit;cursor:pointer;line-height:1.4}
+.pill a.active,.pill button.active{background:var(--accent);color:#fff}
+.pill a:hover,.pill button:hover{color:var(--text)}
+.pill a.active:hover,.pill button.active:hover{color:#fff}
+.ghost{font-size:12px;font-weight:600;color:var(--dim);text-decoration:none}
+.ghost:hover{color:var(--text)}
+
+/* 히어로: 텍스트는 좁게, 그 아래 스크린샷은 화면폭을 쓴다 */
+.hero{padding:72px 0 0}
+.eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim);margin:0 0 14px}
+h1{font-size:40px;font-weight:800;letter-spacing:-.025em;line-height:1.12;margin:0}
+h1 .soft{color:var(--dim)}
+.lead{font-size:17px;line-height:1.55;color:var(--text);opacity:.82;margin:16px 0 0;max-width:560px}
+.cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:26px}
+.btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;
+  font-size:13px;padding:9px 16px;border-radius:8px}
+.cta .mono{font-size:12px;color:var(--dim)}
+.frame{border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  overflow:hidden;background:var(--panel);line-height:0}
+.frame img{display:block;width:103%;max-width:none;margin:0 0 -2.8%}
+.frame.short,.frame.shorter{-webkit-mask-image:linear-gradient(#000 82%,transparent);mask-image:linear-gradient(#000 82%,transparent)}
+.frame.short{max-height:440px}
+.frame.shorter{max-height:340px}
+.hero-shot{margin:44px 0 0}
+.shotnote{font-size:11.5px;color:var(--dim);margin:10px 0 0;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+section{padding:76px 0}
+.rule{border-top:1px solid var(--border)}
+h2{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.25;margin:0 0 14px}
+h3{font-size:13px;font-weight:700;margin:0 0 6px}
+p{margin:0 0 14px}
+p:last-child{margin-bottom:0}
+.dim{color:var(--dim)}
+.small{font-size:12.5px;line-height:1.7}
+
+/* 문제 제기: 인용이 주인공 */
+blockquote{margin:0 0 28px;padding:0 0 0 20px;border-left:3px solid var(--accent);
+  font-size:20px;line-height:1.5;font-weight:600;letter-spacing:-.01em;max-width:680px}
+blockquote cite{display:block;margin-top:10px;font-size:12px;font-weight:400;font-style:normal;color:var(--dim)}
+
+/* 숫자: 타일 3개 대신 한 장의 측정 기록 */
+.ledger{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:6px 22px 8px;max-width:620px}
+.lrow{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  padding:16px 0;border-bottom:1px solid var(--border)}
+.lrow:last-child{border-bottom:0}
+.lrow .k{font-size:13px;color:var(--dim);line-height:1.5}
+.lrow .v{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:19px;font-weight:700;
+  letter-spacing:-.02em;white-space:nowrap}
+.lrow.key .v{font-size:26px;color:var(--accent)}
+.lrow.key .k{color:var(--text);font-weight:600}
+.src{font-size:12px;color:var(--dim);margin-top:14px;max-width:620px;line-height:1.7}
+
+/* 그룹: 코드가 주인공 */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px;align-items:start}
+pre{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:16px 18px;margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  font-size:12.5px;line-height:1.85;overflow-x:auto}
+pre .c{color:var(--dim)}
+pre .s{color:var(--on)}
+.steps{margin:18px 0 0;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:0 0 12px 26px;font-size:13.5px;line-height:1.6}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:18px;height:18px;border-radius:50%;
+  background:var(--accent-tint);color:var(--accent);font-size:10.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace}
+
+/* 탭 둘: 스크린샷이 주인공. 전폭으로 쌓고 캡션은 옆으로 뺀다 */
+.shots{display:flex;flex-direction:column;gap:44px;margin-top:8px}
+.shots figure{margin:0}
+.shots figcaption{margin-top:14px;font-size:13px;line-height:1.7;color:var(--dim);
+  display:grid;grid-template-columns:180px minmax(0,1fr);gap:20px;align-items:baseline}
+.shots b{color:var(--text);font-weight:700;font-size:14px;letter-spacing:-.01em}
+
+/* 지원 에이전트 */
+.badges{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px;border:1px solid var(--border);
+  border-radius:999px;padding:4px 12px;color:var(--dim);opacity:.5}
+.b.yes{color:var(--text);opacity:1}
+.label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 10px}
+
+/* 설치 */
+.install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
+.spec{margin:0;font-size:12.5px}
+.spec div{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--border)}
+.spec div:last-child{border-bottom:0}
+.spec dt{color:var(--dim)}
+.spec dd{margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;text-align:right}
+.alt{font-size:12.5px;color:var(--dim);margin-top:12px}
+
+/* 정직함 */
+.honest{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:24px 26px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.honest h3{font-size:12px;color:var(--accent);letter-spacing:.02em}
+.honest p{font-size:12.5px;line-height:1.65;color:var(--dim);margin:0}
+
+footer{border-top:1px solid var(--border)}
+.ftr{display:flex;gap:18px;flex-wrap:wrap;align-items:center;padding:26px 0 44px;font-size:12px;color:var(--dim)}
+.ftr a{color:var(--dim);text-decoration:none}
+.ftr a:hover{color:var(--text)}
+
+@media (max-width:760px){
+  .split,.install,.honest{grid-template-columns:minmax(0,1fr);gap:28px}
+  .shots figcaption{grid-template-columns:1fr;gap:4px}
+  h1{font-size:30px}
+  h2{font-size:21px}
+  .hero{padding-top:44px}
+  section{padding:52px 0}
+  .wide{padding:0 18px}
+  blockquote{font-size:17px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wide hdr">
+    <a class="brand" href="./">Agent HUD</a>
+    <div class="hdr-right">
+      <span class="pill">
+        <a href="./" class="active">EN</a><a href="./ko/">한국어</a>
+      </span>
+      <span class="pill">
+        <button id="themeLight" type="button">Light</button><button id="themeDark" type="button">Dark</button>
+      </span>
+      <a class="ghost" href="https://github.com/ganggangstone/agent-hud">GitHub ↗</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<div class="wide hero">
+  <p class="eyebrow">local dashboard · macos · mit</p>
+  <h1>See how many skills<br>this project loads.<br><span class="soft">Then load fewer.</span></h1>
+  <p class="lead">Save the plugins and skills you use together as a group, and apply a different group to each project. The dashboard runs on your own machine and needs no account.</p>
+  <div class="cta">
+    <a class="btn" href="#install">Install</a>
+    <span class="mono">git clone · ./install.sh · 127.0.0.1:7717</span>
+  </div>
+  <div class="hero-shot frame">
+    <img src="images/skills.png" alt="The Plugins &amp; skills tab, with the load count and token estimate on the line above the plugin list" width="1469" height="812">
+  </div>
+  <p class="shotnote">Plugins &amp; skills tab. The count at the top is for the project selected in the sidebar.</p>
+</div>
+
+<section class="wide">
+  <blockquote>
+    Different projects use different skills and plugins. Loading all of them costs tokens and slows things down, and switching them by hand every time is a chore.
+    <cite>why this was built</cite>
+  </blockquote>
+  <div class="col">
+    <p>A coding agent puts the name and description of every installed skill into the model's input when a session starts. It needs that list to pick a skill mid-conversation. A skill's body is only read when the skill is used, but the names and descriptions all go in, including the ones that session never touches.</p>
+    <p class="dim">And the usual way to turn a plugin off writes to the user-wide settings file. Turn it off for this project and it is off in every project, so you turn it back on the next time you switch.</p>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="col">
+    <h2>What that came to on one machine</h2>
+    <p class="small dim">Three plugins were installed. Nothing unusual, no deliberate hoarding.</p>
+  </div>
+  <div class="ledger">
+    <div class="lrow"><span class="k">Skills installed</span><span class="v">60</span></div>
+    <div class="lrow"><span class="k">Characters in their names and descriptions</span><span class="v">18,938</span></div>
+    <div class="lrow key"><span class="k">Tokens spent on that, every session</span><span class="v">5,000–9,000</span></div>
+  </div>
+  <p class="src">The <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills specification</a> puts one skill's metadata at about 100 tokens. Your own figure depends on how long your installed skills' descriptions run, which is why the dashboard shows the count for the project you have open rather than a number from someone else's machine.</p>
+</section>
+
+<section class="wide rule">
+  <div class="split">
+    <div>
+      <h2>A group is the unit that was missing</h2>
+      <p>Name the plugins and skills you use together. Applying a group links its skills into that project's skill folders, turns the group's plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>.</p>
+      <p class="small dim">Other projects are left alone, and the setting survives the session, so the next one starts the way you left it. Plugin changes take effect from the next session.</p>
+      <ol class="steps">
+        <li>Create a group, add plugins and skills.</li>
+        <li>Pick the project in the sidebar.</li>
+        <li>Apply. Or run <span class="mono">agent-hud apply dev</span> from the folder.</li>
+      </ol>
+    </div>
+    <div>
+      <p class="label">modes.json</p>
+<pre>{
+  <span class="s">"dev"</span>: {
+    <span class="s">"plugins"</span>: [<span class="s">"mattpocock-skills@mattpocock"</span>],
+    <span class="s">"skills"</span>: [<span class="s">"diagnosing-bugs"</span>]
+  },
+  <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
+}</pre>
+      <p class="small dim" style="margin-top:12px">Edit it in the Groups tab or in the file. The dashboard picks up file edits on its next refresh.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="col">
+    <h2>Two more tabs</h2>
+  </div>
+  <div class="shots">
+    <figure>
+      <span class="frame short" style="display:block"><img src="images/groups.png" alt="Groups tab" width="1469" height="812"></span>
+      <figcaption><b>Groups</b><span>Every group, and which project each one is applied to.</span></figcaption>
+    </figure>
+    <figure>
+      <span class="frame shorter" style="display:block"><img src="images/instructions.png" alt="Agent instructions tab" width="1469" height="812"></span>
+      <figcaption><b>Agent instructions</b><span>30 kinds of instruction file found across the project tree, with size and modified time. It indexes them, it does not compare them. The comparing is yours.</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="split">
+    <div>
+      <h2>One skill folder, six agents</h2>
+      <p>The skill format is an open standard, so a folder moves as it is. Each agent reads a different path, so the dashboard symlinks one skill into all of them and shows a badge per agent for the project you have open.</p>
+      <p class="small dim">This is a side benefit, not the reason the tool exists. Instruction files stay per agent, and the dashboard only lists them.</p>
+    </div>
+    <div>
+      <p class="label">Currently supported agents</p>
+      <div class="badges">
+        <span class="b yes">Claude Code</span><span class="b yes">Codex</span><span class="b yes">Copilot</span>
+        <span class="b yes">Gemini CLI</span><span class="b yes">Antigravity</span><span class="b">Cursor</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule" id="install">
+  <div class="install">
+    <div>
+      <h2>Install</h2>
+<pre>git clone https://github.com/ganggangstone/agent-hud.git
+cd agent-hud &amp;&amp; ./install.sh</pre>
+      <p class="alt">or <span class="mono">brew install ganggangstone/tap/agent-hud</span></p>
+      <p class="small dim" style="margin-top:16px">A browser opens at <span class="mono">127.0.0.1:7717</span> and a <span class="mono">launchd</span> service keeps it running. macOS only for that part; on Linux point a <span class="mono">systemd --user</span> unit at <span class="mono">server.py</span>. Windows is not supported yet (<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+    </div>
+    <div>
+      <p class="label">What it needs</p>
+      <dl class="spec">
+        <div><dt>Dependencies</dt><dd>none</dd></div>
+        <div><dt>Runtime</dt><dd>python3 stdlib</dd></div>
+        <div><dt>Listens on</dt><dd>127.0.0.1</dd></div>
+        <div><dt>Account</dt><dd>not needed</dd></div>
+        <div><dt>License</dt><dd>MIT</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="honest">
+    <div>
+      <h3>Local only</h3>
+      <p>It reads and writes settings files on this computer. Nothing is uploaded, and there is no account to make.</p>
+    </div>
+    <div>
+      <h3>One outbound request</h3>
+      <p>A GitHub Releases lookup every 12 hours, to tell you a newer version exists. It never downloads or installs anything.</p>
+    </div>
+    <div>
+      <h3>Read-mostly</h3>
+      <p>It writes plugin state and skill symlinks. Instruction files are listed and never edited.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wide ftr">
+    <span>MIT License</span>
+    <a href="https://github.com/ganggangstone/agent-hud">Repository</a>
+    <a href="https://github.com/ganggangstone/agent-hud/issues">Issues</a>
+    <a href="https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md">Design decisions</a>
+  </div>
+</footer>
+
+<script>
+var theme = localStorage.getItem('agent-hud-theme') || 'dark';
+function render(){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+}
+function set(v){ theme = v; localStorage.setItem('agent-hud-theme', v); render(); }
+document.getElementById('themeLight').onclick = function(){ set('light'); };
+document.getElementById('themeDark').onclick = function(){ set('dark'); };
+render();
+</script>
+</body>
+</html>
