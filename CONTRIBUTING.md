@@ -26,6 +26,16 @@ for t in tests/test_*.py; do python3 "$t" || echo "FAIL $t"; done
 
 No framework, no dependencies — each file runs on its own and asserts.
 
+GitHub Actions runs the same loop on every push and pull request
+(`.github/workflows/test.yml`), so a pull request tells you whether the checks pass
+without you running them. `node` is the only thing beyond Python that the checks need,
+for the `--check` passes over inline `<script>` blocks.
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`: it refuses to publish when
+the tag and `VERSION` in `server.py` disagree, runs the checks, and creates the release.
+The dashboard's update notice reads `releases/latest`, so a tag without a release does
+nothing for users.
+
 - **`tests/test_page_js.py`** runs `node --check` over every `<script>` block in the
   page. The UI is one Python string, so a stray quote makes the server answer
   200, render the header, and draw nothing else. Nothing else catches that.

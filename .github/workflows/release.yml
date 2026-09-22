@@ -105,14 +105,16 @@ jobs:
           sha=$(sha256sum /tmp/src.tar.gz | cut -d' ' -f1)
           echo "sha256 $sha"
           f=tap/Formula/agent-hud.rb
-          python3 - "$f" "$tarball" "$sha" "${tag#v}" <<'PY'
+          # 수식에 version 필드는 없다. Homebrew가 url의 태그에서 버전을 읽는다
+          python3 - "$f" "$tarball" "$sha" <<'PY'
           import re, sys
-          path, url, sha, ver = sys.argv[1:5]
+          path, url, sha = sys.argv[1:4]
           s = open(path).read()
-          s = re.sub(r'url "[^"]+"', f'url "{url}"', s, count=1)
-          s = re.sub(r'sha256 "[^"]+"', f'sha256 "{sha}"', s, count=1)
-          s = re.sub(r'version "[^"]+"', f'version "{ver}"', s, count=1)
-          open(path, "w").write(s)
+          s2 = re.sub(r'url "[^"]+"', f'url "{url}"', s, count=1)
+          s2 = re.sub(r'sha256 "[^"]+"', f'sha256 "{sha}"', s2, count=1)
+          if s2 == s:
+              sys.exit("수식에서 url/sha256을 못 찾았습니다")
+          open(path, "w").write(s2)
           PY
           cd tap
           git config user.name  "github-actions[bot]"

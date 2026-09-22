@@ -262,6 +262,11 @@ Report bugs and suggestions in [Issues](../../issues). The "send feedback ↗" l
 bottom of the dashboard opens an issue form with the version already filled in. English
 and Korean are both fine.
 
+## Releases
+
+Pushing a `v*` tag builds the release from GitHub Actions, so the update notice in the
+dashboard has something to point at. Checks run on every push and pull request.
+
 ## Why it's built this way
 
 Decisions made by comparing alternatives (a single file with no dependencies, how plugin
