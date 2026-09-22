@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <!-- 헤더의 흘수선 마크와 같은 도형. 파비콘은 페이지 CSS 변수를 못 읽으므로 색을 직접 적는다 -->
+  <defs><clipPath id="hull"><circle cx="48" cy="48" r="26"/></clipPath></defs>
+  <rect width="96" height="96" rx="20" fill="#14150f"/>
+  <rect x="22" y="52" width="52" height="24" fill="#e8bb4e" clip-path="url(#hull)"/>
+  <circle cx="48" cy="48" r="26" fill="none" stroke="#eceee4" stroke-width="6"/>
+  <line x1="12" y1="52" x2="84" y2="52" stroke="#eceee4" stroke-width="6" stroke-linecap="round"/>
+</svg>
