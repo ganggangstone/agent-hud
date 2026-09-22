@@ -91,7 +91,6 @@ p:last-child{margin-bottom:0}
 /* 문제 제기: 인용이 주인공 */
 blockquote{margin:0 0 28px;padding:0 0 0 20px;border-left:3px solid var(--accent);
   font-size:20px;line-height:1.5;font-weight:600;letter-spacing:-.01em;max-width:680px}
-blockquote cite{display:block;margin-top:10px;font-size:12px;font-weight:400;font-style:normal;color:var(--dim)}
 
 /* 숫자: 타일 3개 대신 한 장의 측정 기록 */
 .ledger{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
@@ -170,13 +169,6 @@ pre .s{color:var(--on)}
 .figrow p{font-size:13.5px;line-height:1.7;margin:0 0 10px}
 .figrow p:last-child{margin-bottom:0}
 
-/* 큰 인용 한 줄. 섹션이 전부 "제목 위, 본문 아래"로 반복되던 것을 끊는다 */
-.pull{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.3;
-  margin:0 0 22px;max-width:780px;text-wrap:pretty}
-.pull .q{color:var(--accent)}
-.eyeh{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
-  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 14px}
-.eyeh:lang(ko){letter-spacing:.06em;text-transform:none;font-size:11px}
 
 /* 설치 */
 .install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
@@ -205,7 +197,6 @@ footer{border-top:1px solid var(--border)}
   .dgm .t{font-size:19px}
   .dgm .t.s{font-size:18px}
   .dgm .m,.dgm .ma{font-size:16px}
-  .pull{font-size:21px}
   h1{font-size:30px}
   h2{font-size:21px}
   .hero{padding-top:44px}
@@ -252,7 +243,6 @@ footer{border-top:1px solid var(--border)}
 <section class="wide">
   <blockquote>
     Different projects use different skills and plugins. Loading all of them costs tokens and slows things down, and switching them by hand every time is a chore.
-    <cite>why this was built</cite>
   </blockquote>
   <div class="col">
     <p>A coding agent loads the name and description of every installed skill when a session starts. The body is only read when the skill is used; the names and descriptions all go in, including the ones that session never touches.</p>
@@ -261,8 +251,7 @@ footer{border-top:1px solid var(--border)}
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">Measured</p>
-  <p class="pull"><span class="q">&ldquo;</span>Every installed skill loads, used or not.<span class="q">&rdquo;</span></p>
+  <h2>Every installed skill loads, used or not</h2>
   <p class="small dim" style="max-width:620px">Three plugins, on one machine. Nothing unusual.</p>
   <figure class="dgm" style="margin-top:34px">
 <svg viewBox="0 0 840 250" role="img" aria-label="Diagram: a grid of 60 squares for the installed skills, with a load line and the six squares below it that this project actually loads.">
@@ -343,8 +332,7 @@ footer{border-top:1px solid var(--border)}
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">Groups</p>
-  <p class="pull"><span class="q">&ldquo;</span>A group is what you switch on and off.<span class="q">&rdquo;</span></p>
+  <h2>Groups</h2>
   <figure class="dgm" style="margin:0 0 14px">
 <svg viewBox="0 0 840 330" role="img" aria-label="Diagram: modes.json holds the groups; applying one writes into a single project's settings and skill folders, leaving the other project unchanged.">
   <rect class="box" x="310" y="6" width="220" height="62" rx="8"/>
@@ -371,7 +359,7 @@ footer{border-top:1px solid var(--border)}
   </figure>
   <div class="split">
     <div>
-      <p>Applying a group links its skills into that project's skill folders, turns the group's plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>. Other projects are not touched.</p>
+      <p>A group is what you switch on and off. Applying one links its skills into that project's skill folders, turns the group's plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>. Other projects are not touched.</p>
       <p class="small dim">It survives the session. Plugin changes take effect from the next one.</p>
       <ol class="steps">
         <li>Create a group, add plugins and skills.</li>
@@ -395,7 +383,7 @@ footer{border-top:1px solid var(--border)}
 
 <section class="wide rule">
   <div class="col">
-    <h2>Two more tabs</h2>
+    <h2>The rest of the dashboard</h2>
   </div>
   <div class="shots">
     <figure>
@@ -410,8 +398,7 @@ footer{border-top:1px solid var(--border)}
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">Skills</p>
-  <p class="pull"><span class="q">&ldquo;</span>One skill folder, and six agents read it.<span class="q">&rdquo;</span></p>
+  <h2>One skill folder, six agents</h2>
   <figure class="dgm" style="margin-top:26px">
 <svg viewBox="0 0 840 340" role="img" aria-label="Diagram: one skill folder is symlinked into .claude/skills and .agents/skills, and those two folders are read by six agents.">
   <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>

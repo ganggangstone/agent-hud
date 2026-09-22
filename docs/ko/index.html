@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent HUD — 설치된 스킬과 플러그인을 한곳에서</title>
-<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 본다. 이 프로젝트에 필요 없는 건 끈다. 로컬 대시보드.">
+<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 끕니다. 로컬 대시보드입니다.">
 <link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:title" content="Agent HUD">
-<meta property="og:description" content="설치된 스킬과 플러그인을 한곳에서 본다. 이 프로젝트에 필요 없는 건 끈다.">
+<meta property="og:description" content="설치된 스킬과 플러그인을 한곳에서 봅니다. 이 프로젝트에 필요 없는 건 끕니다.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/ko/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
@@ -91,7 +91,6 @@ p:last-child{margin-bottom:0}
 /* 문제 제기: 인용이 주인공 */
 blockquote{margin:0 0 28px;padding:0 0 0 20px;border-left:3px solid var(--accent);
   font-size:20px;line-height:1.5;font-weight:600;letter-spacing:-.01em;max-width:680px}
-blockquote cite{display:block;margin-top:10px;font-size:12px;font-weight:400;font-style:normal;color:var(--dim)}
 
 /* 숫자: 타일 3개 대신 한 장의 측정 기록 */
 .ledger{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
@@ -170,13 +169,6 @@ pre .s{color:var(--on)}
 .figrow p{font-size:13.5px;line-height:1.7;margin:0 0 10px}
 .figrow p:last-child{margin-bottom:0}
 
-/* 큰 인용 한 줄. 섹션이 전부 "제목 위, 본문 아래"로 반복되던 것을 끊는다 */
-.pull{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.3;
-  margin:0 0 22px;max-width:780px;text-wrap:pretty}
-.pull .q{color:var(--accent)}
-.eyeh{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
-  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 14px}
-.eyeh:lang(ko){letter-spacing:.06em;text-transform:none;font-size:11px}
 
 /* 설치 */
 .install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
@@ -205,7 +197,6 @@ footer{border-top:1px solid var(--border)}
   .dgm .t{font-size:19px}
   .dgm .t.s{font-size:18px}
   .dgm .m,.dgm .ma{font-size:16px}
-  .pull{font-size:21px}
   h1{font-size:30px}
   h2{font-size:21px}
   .hero{padding-top:44px}
@@ -243,35 +234,33 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 
 <div class="wide hero">
   <p class="eyebrow">로컬 대시보드 · macOS · MIT</p>
-  <h1>설치된 스킬과 플러그인을<br>한곳에서 본다.<br><span class="soft">이 프로젝트에 필요 없는 건 끈다.</span></h1>
-  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.</p>
+  <h1>설치된 스킬과 플러그인을<br>한곳에서 봅니다.<br><span class="soft">이 프로젝트에 필요 없는 건 끕니다.</span></h1>
+  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용합니다.</p>
   <div class="cta">
     <a class="btn" href="#install">설치하기</a>
     <span class="mono">git clone · ./install.sh · 127.0.0.1:7717</span>
   </div>
   <div class="hero-shot frame">
-    <img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 로드 개수와 토큰 추정치가 있다" width="1469" height="812">
+    <img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 로드 개수와 토큰 추정치가 있습니다" width="1469" height="812">
   </div>
-  <p class="shotnote">플러그인 &amp; 스킬 탭. 숫자는 사이드바에서 고른 프로젝트 기준이다.</p>
+  <p class="shotnote">플러그인 &amp; 스킬 탭. 숫자는 사이드바에서 고른 프로젝트 기준입니다.</p>
 </div>
 
 <section class="wide">
   <blockquote>
-    프로젝트마다 쓰이는 스킬과 플러그인이 다른데 다 로드하면 비용과 성능 이슈가 있고, 매번 온오프하고 하기 불편해서 만든 거지.
-    <cite>만든 이유</cite>
+    프로젝트마다 쓰는 스킬과 플러그인이 다른데, 다 로드하면 비용과 성능에 부담이 되고 매번 켜고 끄기도 번거롭습니다.
   </blockquote>
   <div class="col">
-    <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣는다. 본문은 실제로 쓸 때만 읽지만, 이름과 설명은 그 세션에서 한 번도 안 쓰는 스킬까지 전부 들어간다.</p>
-    <p class="dim">플러그인을 끄는 기본 명령은 사용자 전역 설정 파일에 기록한다. 여기서 끄면 모든 프로젝트에서 꺼진다.</p>
+    <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣습니다. 본문은 실제로 쓸 때만 읽지만, 이름과 설명은 그 세션에서 한 번도 안 쓰는 스킬까지 전부 들어갑니다.</p>
+    <p class="dim">플러그인을 끄는 기본 명령은 사용자 전역 설정 파일에 기록합니다. 여기서 끄면 모든 프로젝트에서 꺼집니다.</p>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">실측</p>
-  <p class="pull"><span class="q">&ldquo;</span>쓰든 안 쓰든 설치된 스킬은 전부 올라간다.<span class="q">&rdquo;</span></p>
-  <p class="small dim" style="max-width:620px">한 대의 컴퓨터, 플러그인 3개. 특별히 많이 깔아둔 상태가 아니다.</p>
+  <h2>쓰든 안 쓰든 설치된 스킬은 전부 올라갑니다</h2>
+  <p class="small dim" style="max-width:620px">한 대의 컴퓨터, 플러그인 3개. 특별히 많이 깔아둔 상태는 아닙니다.</p>
   <figure class="dgm" style="margin-top:34px">
-<svg viewBox="0 0 840 250" role="img" aria-label="다이어그램: 설치된 스킬 60개를 사각형 60개로 그리고, 흘수선 아래에 이 프로젝트가 실제로 로드하는 6개를 둔다.">
+<svg viewBox="0 0 840 250" role="img" aria-label="다이어그램: 설치된 스킬 60개를 사각형 60개로 그리고, 흘수선 아래에 이 프로젝트가 실제로 로드하는 6개를 둡니다.">
   <circle class="ring" cx="70" cy="170" r="30"/>
   <path class="fill" d="M40 170 A 30 30 0 0 0 100 170 Z"/>
     <rect class="cell" x="170" y="26" width="56" height="22" rx="3"/>
@@ -345,14 +334,13 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
     <div class="lrow"><span class="k">그 스킬들의 이름과 설명을 합친 글자 수</span><span class="v">18,938자</span></div>
     <div class="lrow key"><span class="k">세션마다 거기 쓰이는 토큰</span><span class="v">5,000~9,000</span></div>
   </div>
-  <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 본다. 실제 값은 설명 길이에 따라 다르므로, 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여준다.</p>
+  <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 봅니다. 실제 값은 설명 길이에 따라 다르므로, 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여줍니다.</p>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">그룹</p>
-  <p class="pull"><span class="q">&ldquo;</span>켜고 끄는 단위가 그룹이다.<span class="q">&rdquo;</span></p>
+  <h2>그룹</h2>
   <figure class="dgm" style="margin:0 0 14px">
-<svg viewBox="0 0 840 330" role="img" aria-label="다이어그램: modes.json이 그룹을 갖고 있고, 적용하면 프로젝트 하나의 설정과 스킬 폴더에만 쓰며 다른 프로젝트는 그대로 둔다.">
+<svg viewBox="0 0 840 330" role="img" aria-label="다이어그램: modes.json이 그룹을 갖고 있고, 적용하면 프로젝트 하나의 설정과 스킬 폴더에만 쓰며 다른 프로젝트는 그대로 둡니다.">
   <rect class="box" x="310" y="6" width="220" height="62" rx="8"/>
   <text class="t" x="330" y="32">modes.json</text>
   <text class="m" x="330" y="54">dev · video</text>
@@ -377,12 +365,12 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   </figure>
   <div class="split">
     <div>
-      <p>적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼진다. 그 내용은 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적히고, 다른 프로젝트는 바뀌지 않는다.</p>
-      <p class="small dim">세션이 끝나도 남는다. 플러그인 변경은 다음 세션부터 반영된다.</p>
+      <p>켜고 끄는 단위가 그룹입니다. 적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼집니다. 그 내용은 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적히고, 다른 프로젝트는 바뀌지 않습니다.</p>
+      <p class="small dim">세션이 끝나도 남습니다. 플러그인 변경은 다음 세션부터 반영됩니다.</p>
       <ol class="steps">
-        <li>그룹을 만들고 플러그인과 스킬을 담는다.</li>
-        <li>사이드바에서 프로젝트를 고른다.</li>
-        <li>적용한다. 폴더에서 <span class="mono">agent-hud apply dev</span>로도 된다.</li>
+        <li>그룹을 만들고 플러그인과 스킬을 담습니다.</li>
+        <li>사이드바에서 프로젝트를 고릅니다.</li>
+        <li>적용합니다. 폴더에서 <span class="mono">agent-hud apply dev</span>로도 됩니다.</li>
       </ol>
     </div>
     <div>
@@ -394,32 +382,31 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   },
   <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
 }</pre>
-      <p class="small dim" style="margin-top:12px">그룹 탭에서 고쳐도 되고 파일을 직접 고쳐도 된다.</p>
+      <p class="small dim" style="margin-top:12px">그룹 탭에서 고쳐도 되고 파일을 직접 고쳐도 됩니다.</p>
     </div>
   </div>
 </section>
 
 <section class="wide rule">
   <div class="col">
-    <h2>남은 탭 두 개</h2>
+    <h2>대시보드의 나머지 화면</h2>
   </div>
   <div class="shots">
     <figure>
       <span class="frame short" style="display:block"><img src="../images/groups-ko.png" alt="그룹 탭" width="1469" height="812"></span>
-      <figcaption><b>그룹</b><span>만들어둔 그룹과 각 그룹이 어느 프로젝트에 적용돼 있는지.</span></figcaption>
+      <figcaption><b>그룹</b><span>만들어둔 그룹과 각 그룹이 어느 프로젝트에 적용돼 있는지 보여줍니다.</span></figcaption>
     </figure>
     <figure>
       <span class="frame shorter" style="display:block"><img src="../images/instructions-ko.png" alt="에이전트 지침 탭" width="1469" height="812"></span>
-      <figcaption><b>에이전트 지침</b><span>지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. 색인이고, 내용 대조는 사람이 한다.</span></figcaption>
+      <figcaption><b>에이전트 지침</b><span>지침 파일 30종을 찾아 크기와 수정 시각을 보여줍니다. 색인이고, 내용 대조는 사람이 합니다.</span></figcaption>
     </figure>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">스킬</p>
-  <p class="pull"><span class="q">&ldquo;</span>스킬 폴더 하나를 에이전트 여섯이 읽는다.<span class="q">&rdquo;</span></p>
+  <h2>스킬 폴더 하나, 에이전트 여섯 개</h2>
   <figure class="dgm" style="margin-top:26px">
-<svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나가 .claude/skills와 .agents/skills에 심볼릭 링크로 걸리고, 그 두 폴더를 에이전트 여섯 개가 읽는다.">
+<svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나가 .claude/skills와 .agents/skills에 심볼릭 링크로 걸리고, 그 두 폴더를 에이전트 여섯 개가 읽습니다.">
   <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>
   <text class="t" x="28" y="164">diagnosing-bugs/</text>
   <text class="m" x="28" y="188">SKILL.md</text>
@@ -455,8 +442,8 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   <div class="figrow">
     <span class="fk">심볼릭 링크</span>
     <div>
-      <p>스킬 형식은 공개 표준이다. 에이전트마다 읽는 경로가 달라서, 대시보드가 스킬 하나를 두 폴더에 심볼릭 링크로 건다.</p>
-      <p class="dim">덤이고, 만든 이유는 위쪽에 있다.</p>
+      <p>스킬 형식은 공개 표준입니다. 에이전트마다 읽는 경로가 달라서, 대시보드가 스킬 하나를 두 폴더에 심볼릭 링크로 겁니다.</p>
+      <p class="dim">덤이고, 만든 이유는 위쪽에 있습니다.</p>
     </div>
   </div>
 </section>
@@ -468,7 +455,7 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 <pre>git clone https://github.com/ganggangstone/agent-hud.git
 cd agent-hud &amp;&amp; ./install.sh</pre>
       <p class="alt">또는 <span class="mono">brew install ganggangstone/tap/agent-hud</span></p>
-      <p class="small dim" style="margin-top:16px">브라우저가 <span class="mono">127.0.0.1:7717</span>에 열리고 <span class="mono">launchd</span> 서비스가 계속 띄워둔다. 이 부분은 macOS 전용이고, Linux는 <span class="mono">systemd --user</span> 유닛이 <span class="mono">server.py</span>를 실행하게 하면 된다. Windows는 아직 지원하지 않는다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+      <p class="small dim" style="margin-top:16px">브라우저가 <span class="mono">127.0.0.1:7717</span>에 열리고 <span class="mono">launchd</span> 서비스가 계속 띄워둡니다. 이 부분은 macOS 전용이고, Linux는 <span class="mono">systemd --user</span> 유닛이 <span class="mono">server.py</span>를 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
     </div>
     <div>
       <p class="label">필요한 것</p>
@@ -487,15 +474,15 @@ cd agent-hud &amp;&amp; ./install.sh</pre>
   <div class="honest">
     <div>
       <h3>로컬 전용</h3>
-      <p>이 컴퓨터의 설정 파일만 읽고 쓴다. 올라가는 데이터가 없고 만들 계정도 없다. 내 컴퓨터에서 돈다.</p>
+      <p>이 컴퓨터의 설정 파일만 읽고 씁니다. 올라가는 데이터가 없고 만들 계정도 없습니다. 내 컴퓨터에서 돕니다.</p>
     </div>
     <div>
       <h3>밖으로 나가는 요청 하나</h3>
-      <p>12시간마다 GitHub Releases를 조회해 새 버전이 있는지만 알려준다. 내려받는 것은 없다.</p>
+      <p>12시간마다 GitHub Releases를 조회해 새 버전이 있는지만 알려줍니다. 내려받는 것은 없습니다.</p>
     </div>
     <div>
       <h3>읽는 쪽이 기본</h3>
-      <p>쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이다. 지침 파일은 고치지 않는다.</p>
+      <p>쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐입니다. 지침 파일은 고치지 않습니다.</p>
     </div>
   </div>
 </section>
