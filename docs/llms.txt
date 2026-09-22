@@ -1,0 +1,32 @@
+# Agent HUD
+
+A local dashboard for the skills and plugins scattered across a coding agent
+setup. Free, macOS only for now, MIT license, no account.
+
+## What it does
+
+Coding agents such as Claude Code, Codex and Cursor load the name and
+description of every installed skill into the model's context at the start
+of a session, whether that session uses the skill or not. Agent HUD shows
+how many skills a selected project loads, and lets you save the plugins and
+skills you use together as a group and apply a different group per project.
+It reads and writes settings files on the machine it runs on and needs no
+account; the only request that leaves the computer is a GitHub Releases
+check every 12 hours for update notices.
+
+## Links
+
+- Homepage (English): https://ganggangstone.github.io/agent-hud/
+- Homepage (Korean): https://ganggangstone.github.io/agent-hud/ko/
+- Repository: https://github.com/ganggangstone/agent-hud
+- Install: `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh` (or `brew install ganggangstone/tap/agent-hud`)
+- Design decisions: https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md
+
+## Summary
+
+- Price: free
+- Platform: macOS (Linux via running `server.py` directly; Windows not supported yet)
+- License: MIT
+- Dependencies: none — a single Python file, standard library only
+- Account: not required
+- Network use: one GitHub Releases check every 12 hours, nothing else
