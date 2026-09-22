@@ -1078,6 +1078,7 @@ const T = {
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
   skills_note: 'Everything on this tab applies to the selected project only.',
   badge_on_tip: a => `${a} can use this skill`,
+  badge_off_tip: a => `${a} cannot see this skill here`,
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
   loose_skills: 'Skills not from a plugin',
@@ -1094,7 +1095,7 @@ const T = {
     on: 'ON', off: 'OFF',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
-    new_group: '+ create a new group', new_group_tip: 'Plugins you switch on together. For example one set for coding, one for video work',
+    new_group: '+ create a new group', new_group_tip: 'Plugins and skills you switch on together. For example one set for coding, one for video work',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
     groups_legend: 'The plugins and skills you use together. Applying one sets up that project and leaves the others alone.',
@@ -1109,7 +1110,7 @@ const T = {
   share_short: 'apply to others',
   share_done: 'applied everywhere',
   share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
-  partly: 'Some skills only',
+  partly: a => `${a} can use only some of these skills`,
   inherited_note: 'Nothing set for this project yet, using defaults',
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
@@ -1152,11 +1153,12 @@ const T = {
     feedback_open: 'send feedback ↗',
   },
   ko: {
-    banner: '플러그인은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
+    banner: '플러그인 변경은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
   skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다.',
   badge_on_tip: a => `${a}가 이 스킬을 씁니다`,
+  badge_off_tip: a => `${a}는 여기서 이 스킬을 못 봅니다`,
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
   loose_skills: '플러그인 밖의 스킬',
@@ -1182,13 +1184,13 @@ const T = {
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
     monitors: '모니터', bin: '실행파일', settings: '기본설정'},
   comp_count: (label, n) => `${label} ${n}개`,
-  comp_portable_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 체크박스는 스킬만 옮깁니다`,
-  comp_stays_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
+  comp_portable_tip: n => `이 플러그인에 들어 있는 것: ${n}. 체크박스는 스킬만 옮깁니다`,
+  comp_stays_tip: n => `이 플러그인에 들어 있는 것: ${n}. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
   share_to: names => names.join('·') + '에도 적용하기',
-  share_short: '다른 에이전트에도',
+  share_short: '다른 에이전트에도 적용',
   share_done: '전부 적용됨',
   share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
-  partly: '일부 스킬만',
+  partly: a => `${a}가 쓰는 것은 이 중 일부 스킬입니다`,
   inherited_note: '아직 이 프로젝트에 정한 것이 없어 기본값을 씁니다',
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',
@@ -1208,7 +1210,7 @@ const T = {
     no_frontmatter: () => 'YAML frontmatter가 없습니다',
     name_missing: () => 'name이 없습니다',
     name_format: i => `name "${i.name}" — 소문자·숫자·하이픈 하나씩만, 64자 이내`,
-    name_mismatch: i => `name "${i.name}"이 폴더 이름 "${i.folder}"과 다릅니다`,
+    name_mismatch: i => `name "${i.name}", 폴더 이름 "${i.folder}" — 서로 다릅니다`,
     desc_missing: () => 'description이 없습니다',
     desc_long: i => `description이 ${i.len}자입니다 (상한 1024)`,
   },
@@ -1766,7 +1768,7 @@ async function tick(){
           const tag = document.createElement('span');
           tag.className = 'agenttag ' + (v === 'all' ? 'yes' : 'partial');
           tag.textContent = shortAgent(a);
-          tag.title = v === 'some' ? t().partly : t().badge_on_tip(a);
+          tag.title = v === 'some' ? t().partly(a) : t().badge_on_tip(a);
           badges.appendChild(tag);
         }
         meta.appendChild(badges);
@@ -1806,17 +1808,18 @@ async function tick(){
               stext.appendChild(sname); stext.appendChild(sdesc);
 
               // 섹션과 같으면 아무것도 안 그린다. 같은 사실을 줄마다 되풀이하지 않는다.
-              // 여기도 꺼진 에이전트는 뱃지로 안 그린다(위 플러그인 줄과 같은 규칙).
+              // 다르면 켜진 것과 꺼진 것을 다 그린다. 여기서 꺼진 것을 빼면 "아무 데서도
+              // 안 보이는 스킬"이 뱃지 0개가 되어 "섹션과 같음"과 화면에서 구별되지 않는다.
               const badges = document.createElement('span');
               const secUniform = isPlugin && (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
               const sec = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all').join('|');
               if(!secUniform || (s.agents||[]).join('|') !== sec){
                 for(const a of (p.agents||[])){
-                  if(!(s.agents||[]).includes(a)) continue;
+                  const on = (s.agents||[]).includes(a);
                   const tag = document.createElement('span');
-                  tag.className = 'agenttag yes';
+                  tag.className = 'agenttag ' + (on ? 'yes' : 'no');
                   tag.textContent = shortAgent(a);
-                  tag.title = t().badge_on_tip(a);
+                  tag.title = on ? t().badge_on_tip(a) : t().badge_off_tip(a);
                   badges.appendChild(tag);
                 }
               }
