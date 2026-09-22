@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent HUD — 이 프로젝트가 스킬을 몇 개나 로드하는지</title>
+<meta name="description" content="프로젝트마다 스킬 로드 개수를 보여주고, 함께 쓰는 플러그인·스킬을 그룹으로 묶어 프로젝트마다 다르게 적용하는 로컬 대시보드.">
+<link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
+<style>
+/* 색 변수 출처: server.py :root (docs/landing-page-plan.md 3절) — 사본 갈라지면 여기부터 맞춘다 */
+:root{
+  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+    --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;
+  font:14px/1.7 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;-webkit-font-smoothing:antialiased;
+  word-break:keep-all}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border)}
+.brand{font-size:17px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700}
+.pill a, .pill button{padding:4px 9px;color:var(--dim);text-decoration:none;background:transparent;border:0;font:inherit;cursor:pointer}
+.pill a.active{background:var(--accent);color:#fff}
+.pill button:hover{color:var(--text)}
+main{padding:40px 0 20px}
+section{padding:36px 0;border-top:1px solid var(--border)}
+section:first-of-type{border-top:0;padding-top:8px}
+h1{font-size:32px;font-weight:800;letter-spacing:-.01em;line-height:1.35;margin:0 0 12px}
+h2{font-size:19px;font-weight:800;margin:0 0 10px}
+.eyebrow{font-size:11px;color:var(--dim);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 6px}
+.lead{font-size:16px;color:var(--dim);max-width:640px}
+p{max-width:640px}
+.shot{width:100%;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);overflow:hidden;margin:20px 0 0}
+.shot img{display:block;width:100%}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;box-shadow:var(--shadow)}
+.tile b{display:block;font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.01em}
+.tile span{font-size:12px;color:var(--dim)}
+.src{font-size:11px;color:var(--dim);margin-top:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.grid3 figure{margin:0}
+.grid3 img{width:100%;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+.grid3 figcaption{font-size:12px;color:var(--dim);margin-top:6px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;border:1px solid var(--border);
+  border-radius:999px;padding:3px 10px;color:var(--dim)}
+.b.on{color:var(--on);border-color:var(--on)}
+pre{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.8;color:var(--text);overflow-x:auto;max-width:640px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+table{border-collapse:collapse;font-size:13px;margin-top:8px}
+td{padding:5px 14px 5px 0;border-bottom:1px solid var(--border)}
+td:first-child{color:var(--dim)}
+.honest{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px 20px;box-shadow:var(--shadow)}
+footer{border-top:1px solid var(--border);padding:24px 0 40px;font-size:12px;color:var(--dim);display:flex;gap:16px;flex-wrap:wrap}
+@media (max-width:640px){
+  .tiles,.grid3{grid-template-columns:1fr}
+  h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="brand" href="#">Agent HUD</a>
+  <div class="hdr-right">
+    <span class="pill">
+      <a href="https://ganggangstone.github.io/agent-hud/">EN</a><a href="https://ganggangstone.github.io/agent-hud/ko/" class="active">한국어</a>
+    </span>
+    <span class="pill" id="themeToggle">
+      <button id="themeLight">라이트</button><button id="themeDark">다크</button>
+    </span>
+    <a href="https://github.com/ganggangstone/agent-hud" style="font-size:12px;color:var(--dim)">GitHub</a>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <p class="eyebrow">로컬 대시보드</p>
+  <h1>이 프로젝트가 스킬 몇 개를 로드하는지 보여준다.</h1>
+  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.</p>
+  <div class="shot"><img src="../images/skills-ko.png" alt="플러그인 & 스킬 탭. 맨 위에 로드 개수와 토큰 추정치가 있다"></div>
+</section>
+
+<section>
+  <h2>쓰든 안 쓰든, 설치한 스킬은 전부 로드된다</h2>
+  <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣는다. 본문은 그 스킬을 쓸 때만 읽지만, 이름과 설명은 그 세션에서 쓰지 않는 스킬까지 전부 들어간다.</p>
+  <p>플러그인을 끄는 기본 명령은 사용자 전역 설정에 기록한다. 한 프로젝트에서 끄면 다른 프로젝트에서도 꺼진다.</p>
+</section>
+
+<section>
+  <h2>추정이 아니라 실측이다</h2>
+  <div class="tiles">
+    <div class="tile"><b>60</b><span>이 도구를 만든 컴퓨터에 설치돼 있던 스킬 수</span></div>
+    <div class="tile"><b>18,938</b><span>그 스킬들의 이름·설명을 합친 글자 수</span></div>
+    <div class="tile"><b>5,000~9,000</b><span>세션마다 거기에 쓰이는 토큰</span></div>
+  </div>
+  <p class="src">스킬 하나당 metadata는 <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a> 기준 약 100토큰이다. 실제 값은 설치된 스킬들의 설명 길이에 따라 다르다.</p>
+</section>
+
+<section>
+  <h2>탭 세 개</h2>
+  <div class="grid3">
+    <figure><img src="../images/groups-ko.png" alt="그룹 탭"><figcaption>그룹 — 함께 쓰는 플러그인·스킬을 묶는다</figcaption></figure>
+    <figure><img src="../images/skills-ko.png" alt="플러그인 & 스킬 탭"><figcaption>플러그인 & 스킬 — 스킬마다 에이전트별 뱃지</figcaption></figure>
+    <figure><img src="../images/instructions-ko.png" alt="에이전트 지침 탭"><figcaption>에이전트 지침 — CLAUDE.md/AGENTS.md 색인</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>그룹</h2>
+  <p>적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 플러그인 값이 그 프로젝트의 설정 파일에 적힌다. 다른 프로젝트의 설정은 바뀌지 않는다. 플러그인 변경은 다음 세션부터 반영된다.</p>
+  <pre>agent-hud apply backend
+agent-hud groups</pre>
+</section>
+
+<section>
+  <h2>다른 에이전트</h2>
+  <p>스킬 형식은 공개 표준이라 폴더째 옮겨진다. 체크박스 하나로 같은 스킬을 여섯 에이전트의 스킬 폴더에 링크한다. Cursor는 아직 실측 확인을 못 했다.</p>
+  <div class="badges">
+    <span class="b on">Claude Code</span><span class="b on">Codex</span><span class="b">Cursor</span>
+    <span class="b on">Copilot</span><span class="b on">Gemini CLI</span><span class="b on">Antigravity</span>
+  </div>
+</section>
+
+<section>
+  <h2>에이전트 지침</h2>
+  <p>프로젝트 트리에서 지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. 내용을 비교하지는 않는다. 색인이고, 대조는 사람이 한다.</p>
+</section>
+
+<section>
+  <h2>설치</h2>
+  <table>
+    <tr><td>의존성</td><td>없음 (표준 라이브러리)</td></tr>
+    <tr><td>네트워크</td><td>127.0.0.1 전용</td></tr>
+    <tr><td>계정</td><td>필요 없음</td></tr>
+    <tr><td>라이선스</td><td>MIT</td></tr>
+  </table>
+  <pre>git clone https://github.com/ganggangstone/agent-hud.git
+cd agent-hud &amp;&amp; ./install.sh</pre>
+  <p style="font-size:12.5px;color:var(--dim)">또는 <span class="mono">brew install ganggangstone/tap/agent-hud</span></p>
+  <p>브라우저가 열리고 <span class="mono">127.0.0.1:7717</span>에 뜬다. macOS 전용 — Linux는 <span class="mono">systemd --user</span> 유닛으로 돌리면 되고, Windows는 아직 지원하지 않는다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+</section>
+
+<section>
+  <div class="honest">
+    <p style="margin:0">계정이 필요 없다. 이 컴퓨터의 설정 파일만 읽고 쓴다. 컴퓨터 밖으로 나가는 요청은 새 버전 확인용 GitHub Releases 조회 하나다.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span>MIT License</span>
+  <a href="https://github.com/ganggangstone/agent-hud">저장소</a>
+  <a href="https://github.com/ganggangstone/agent-hud/issues">이슈</a>
+  <a href="https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md">설계 근거</a>
+</footer>
+</div>
+
+<script>
+var theme = localStorage.getItem('agent-hud-theme') || 'dark';
+function render(){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+}
+document.getElementById('themeLight').onclick = function(){ theme = 'light'; localStorage.setItem('agent-hud-theme', theme); render(); };
+document.getElementById('themeDark').onclick = function(){ theme = 'dark'; localStorage.setItem('agent-hud-theme', theme); render(); };
+render();
+</script>
+</body>
+</html>
