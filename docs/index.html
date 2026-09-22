@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent HUD — see how many skills a project loads</title>
-<meta name="description" content="A local dashboard that shows how many skills the project you have open loads, and lets you save the plugins and skills you use together as a group and apply a different group per project.">
+<title>Agent HUD — every skill and plugin you have installed, in one place</title>
+<meta name="description" content="A local dashboard for the skills and plugins scattered across your machine. See them in one place, and turn off the ones this project does not need.">
 <link rel="canonical" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:title" content="Agent HUD">
-<meta property="og:description" content="See how many skills this project loads. Group the plugins and skills you use together, and apply a different group to each project.">
+<meta property="og:description" content="Every skill and plugin you have installed, in one place. Turn off what this project does not need.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills.png">
@@ -91,7 +91,6 @@ p:last-child{margin-bottom:0}
 /* 문제 제기: 인용이 주인공 */
 blockquote{margin:0 0 28px;padding:0 0 0 20px;border-left:3px solid var(--accent);
   font-size:20px;line-height:1.5;font-weight:600;letter-spacing:-.01em;max-width:680px}
-blockquote cite{display:block;margin-top:10px;font-size:12px;font-weight:400;font-style:normal;color:var(--dim)}
 
 /* 숫자: 타일 3개 대신 한 장의 측정 기록 */
 .ledger{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
@@ -170,13 +169,6 @@ pre .s{color:var(--on)}
 .figrow p{font-size:13.5px;line-height:1.7;margin:0 0 10px}
 .figrow p:last-child{margin-bottom:0}
 
-/* 큰 인용 한 줄. 섹션이 전부 "제목 위, 본문 아래"로 반복되던 것을 끊는다 */
-.pull{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.3;
-  margin:0 0 22px;max-width:780px;text-wrap:pretty}
-.pull .q{color:var(--accent)}
-.eyeh{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
-  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 14px}
-.eyeh:lang(ko){letter-spacing:.06em;text-transform:none;font-size:11px}
 
 /* 설치 */
 .install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
@@ -205,7 +197,6 @@ footer{border-top:1px solid var(--border)}
   .dgm .t{font-size:19px}
   .dgm .t.s{font-size:18px}
   .dgm .m,.dgm .ma{font-size:16px}
-  .pull{font-size:21px}
   h1{font-size:30px}
   h2{font-size:21px}
   .hero{padding-top:44px}
@@ -237,8 +228,8 @@ footer{border-top:1px solid var(--border)}
 
 <div class="wide hero">
   <p class="eyebrow">local dashboard · macos · mit</p>
-  <h1>See how many skills<br>this project loads.<br><span class="soft">Then load fewer.</span></h1>
-  <p class="lead">Save the plugins and skills you use together as a group, and apply a different group to each project. The dashboard runs on your own machine and needs no account.</p>
+  <h1>Every skill and plugin<br>you have installed, in one place.<br><span class="soft">Off for the projects that don't need them.</span></h1>
+  <p class="lead">Group the plugins and skills you use together, and apply a different group to each project.</p>
   <div class="cta">
     <a class="btn" href="#install">Install</a>
     <span class="mono">git clone · ./install.sh · 127.0.0.1:7717</span>
@@ -246,24 +237,22 @@ footer{border-top:1px solid var(--border)}
   <div class="hero-shot frame">
     <img src="images/skills.png" alt="The Plugins &amp; skills tab, with the load count and token estimate on the line above the plugin list" width="1469" height="812">
   </div>
-  <p class="shotnote">Plugins &amp; skills tab. The count at the top is for the project selected in the sidebar.</p>
+  <p class="shotnote">Plugins &amp; skills tab. The count is for the project selected in the sidebar.</p>
 </div>
 
 <section class="wide">
   <blockquote>
     Different projects use different skills and plugins. Loading all of them costs tokens and slows things down, and switching them by hand every time is a chore.
-    <cite>why this was built</cite>
   </blockquote>
   <div class="col">
-    <p>A coding agent puts the name and description of every installed skill into the model's input when a session starts. It needs that list to pick a skill mid-conversation. A skill's body is only read when the skill is used, but the names and descriptions all go in, including the ones that session never touches.</p>
-    <p class="dim">And the usual way to turn a plugin off writes to the user-wide settings file. Turn it off for this project and it is off in every project, so you turn it back on the next time you switch.</p>
+    <p>A coding agent loads the name and description of every installed skill when a session starts. The body is only read when the skill is used; the names and descriptions all go in, including the ones that session never touches.</p>
+    <p class="dim">And the usual way to turn a plugin off writes to the user-wide settings file: off here means off everywhere.</p>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">What that came to on one machine</p>
-  <p class="pull"><span class="q">&ldquo;</span>Nothing unusual, no deliberate hoarding.<span class="q">&rdquo;</span></p>
-  <p class="small dim" style="max-width:620px">Three plugins were installed.</p>
+  <h2>Every installed skill loads, used or not</h2>
+  <p class="small dim" style="max-width:620px">Three plugins, on one machine. Nothing unusual.</p>
   <figure class="dgm" style="margin-top:34px">
 <svg viewBox="0 0 840 250" role="img" aria-label="Diagram: a grid of 60 squares for the installed skills, with a load line and the six squares below it that this project actually loads.">
   <circle class="ring" cx="70" cy="170" r="30"/>
@@ -334,16 +323,16 @@ footer{border-top:1px solid var(--border)}
   <text class="m" x="8" y="230">example</text>
 </svg>
   </figure>
-  <div class="figrow">
-    <span class="fk">load line</span>
-    <p>Everything above the line is installed and idle. Everything below it is riding in the context this session.</p>
+  <div class="ledger" style="margin-top:34px">
+    <div class="lrow"><span class="k">Skills installed</span><span class="v">60</span></div>
+    <div class="lrow"><span class="k">Characters in their names and descriptions</span><span class="v">18,938</span></div>
+    <div class="lrow key"><span class="k">Tokens spent on that, every session</span><span class="v">5,000–9,000</span></div>
   </div>
-  <p class="src">The <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills specification</a> puts one skill's metadata at about 100 tokens. Your own figure depends on how long your installed skills' descriptions run, which is why the dashboard shows the count for the project you have open rather than a number from someone else's machine.</p>
+  <p class="src">The <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills specification</a> puts one skill's metadata at about 100 tokens. Your own number depends on how long your skills' descriptions run, so the dashboard counts the project you have open rather than someone else's machine.</p>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">A group is the unit that was missing</p>
-  <p class="pull"><span class="q">&ldquo;</span>Other projects are left alone.<span class="q">&rdquo;</span></p>
+  <h2>Groups</h2>
   <figure class="dgm" style="margin:0 0 14px">
 <svg viewBox="0 0 840 330" role="img" aria-label="Diagram: modes.json holds the groups; applying one writes into a single project's settings and skill folders, leaving the other project unchanged.">
   <rect class="box" x="310" y="6" width="220" height="62" rx="8"/>
@@ -368,11 +357,10 @@ footer{border-top:1px solid var(--border)}
   <text class="m" x="466" y="288">.agents/skills/ → 2 links</text>
 </svg>
   </figure>
-  <div class="figrow" style="margin-bottom:38px"><span class="fk">scope</span><p>Applying a group writes inside one project. The other keeps what it had.</p></div>
   <div class="split">
     <div>
-      <p>Name the plugins and skills you use together. Applying a group links its skills into that project's skill folders, turns the group's plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>.</p>
-      <p class="small dim">The setting survives the session, so the next one starts the way you left it. Plugin changes take effect from the next session.</p>
+      <p>A group is what you switch on and off. Applying one links its skills into that project's skill folders, turns the group's plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>. Other projects are not touched.</p>
+      <p class="small dim">It survives the session. Plugin changes take effect from the next one.</p>
       <ol class="steps">
         <li>Create a group, add plugins and skills.</li>
         <li>Pick the project in the sidebar.</li>
@@ -388,14 +376,14 @@ footer{border-top:1px solid var(--border)}
   },
   <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
 }</pre>
-      <p class="small dim" style="margin-top:12px">Edit it in the Groups tab or in the file. The dashboard picks up file edits on its next refresh.</p>
+      <p class="small dim" style="margin-top:12px">Edit it in the Groups tab or in the file.</p>
     </div>
   </div>
 </section>
 
 <section class="wide rule">
   <div class="col">
-    <h2>Two more tabs</h2>
+    <h2>The rest of the dashboard</h2>
   </div>
   <div class="shots">
     <figure>
@@ -404,14 +392,13 @@ footer{border-top:1px solid var(--border)}
     </figure>
     <figure>
       <span class="frame shorter" style="display:block"><img src="images/instructions.png" alt="Agent instructions tab" width="1469" height="812"></span>
-      <figcaption><b>Agent instructions</b><span>30 kinds of instruction file found across the project tree, with size and modified time. It indexes them, it does not compare them. The comparing is yours.</span></figcaption>
+      <figcaption><b>Agent instructions</b><span>30 kinds of instruction file, with size and modified time. It indexes them; it does not compare them.</span></figcaption>
     </figure>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">One folder, two links, six agents</p>
-  <p class="pull"><span class="q">&ldquo;</span>A folder moves as it is.<span class="q">&rdquo;</span></p>
+  <h2>One skill folder, six agents</h2>
   <figure class="dgm" style="margin-top:26px">
 <svg viewBox="0 0 840 340" role="img" aria-label="Diagram: one skill folder is symlinked into .claude/skills and .agents/skills, and those two folders are read by six agents.">
   <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>
@@ -449,8 +436,8 @@ footer{border-top:1px solid var(--border)}
   <div class="figrow">
     <span class="fk">symlink</span>
     <div>
-      <p>The skill format is an open standard. Each agent reads a different path, so the dashboard symlinks one skill into both project skill folders. Two links cover six agents. Cursor and Copilot read both folders.</p>
-      <p class="dim">This is a side benefit, not the reason the tool exists. Instruction files stay per agent, and the dashboard only lists them.</p>
+      <p>The skill format is an open standard. Agents read different paths, so the dashboard symlinks one skill into both.</p>
+      <p class="dim">A side benefit, not the reason the tool exists.</p>
     </div>
   </div>
 </section>
@@ -481,15 +468,15 @@ cd agent-hud &amp;&amp; ./install.sh</pre>
   <div class="honest">
     <div>
       <h3>Local only</h3>
-      <p>It reads and writes settings files on this computer. Nothing is uploaded, and there is no account to make.</p>
+      <p>It reads and writes settings files on this computer. Nothing is uploaded, and there is no account to make. It runs on your own machine.</p>
     </div>
     <div>
       <h3>One outbound request</h3>
-      <p>A GitHub Releases lookup every 12 hours, to tell you a newer version exists. It never downloads or installs anything.</p>
+      <p>A GitHub Releases lookup every 12 hours, to tell you a newer version exists. It downloads nothing.</p>
     </div>
     <div>
       <h3>Read-mostly</h3>
-      <p>It writes plugin state and skill symlinks. Instruction files are listed and never edited.</p>
+      <p>It writes plugin state and skill symlinks. Instruction files are never edited.</p>
     </div>
   </div>
 </section>
