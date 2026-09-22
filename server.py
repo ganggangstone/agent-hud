@@ -1077,7 +1077,6 @@ const T = {
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
   skills_note: 'Everything on this tab applies to the selected project only.',
-  badge_off_tip: a => `${a} cannot see this skill`,
   badge_on_tip: a => `${a} can use this skill`,
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
@@ -1107,6 +1106,7 @@ const T = {
   comp_portable_tip: n => `This plugin ships ${n}. The checkbox moves skills only`,
   comp_stays_tip: n => `This plugin ships ${n}. They work wherever the plugin is on; the checkbox moves skills only`,
   share_to: names => 'apply to ' + names.join(', '),
+  share_short: 'apply to others',
   share_done: 'applied everywhere',
   share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
   partly: 'Some skills only',
@@ -1156,7 +1156,6 @@ const T = {
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
   skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다.',
-  badge_off_tip: a => `${a}는 이 스킬을 못 봅니다`,
   badge_on_tip: a => `${a}가 이 스킬을 씁니다`,
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
@@ -1186,6 +1185,7 @@ const T = {
   comp_portable_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 체크박스는 스킬만 옮깁니다`,
   comp_stays_tip: n => `이 플러그인에 ${n}이(가) 들어 있습니다. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
   share_to: names => names.join('·') + '에도 적용하기',
+  share_short: '다른 에이전트에도',
   share_done: '전부 적용됨',
   share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
   partly: '일부 스킬만',
@@ -1758,12 +1758,15 @@ async function tick(){
         }
         const st = row.section_state || {};
         // 플러그인 밖 스킬은 출처도 대상도 제각각이라 한 줄로 요약할 수 없다.
+        // 꺼진(no) 에이전트는 뱃지로 안 그린다 -- 누가 보는지만 보여주고, 빠진 곳은
+        // 아래 체크박스 툴팁으로 옮긴다. 줄마다 뱃지 6개가 늘어서던 것을 줄인다.
         for(const a of (isPlugin ? (p.agents||[]) : [])){
-          const tag = document.createElement('span');
           const v = st[a] || 'none';
-          tag.className = 'agenttag ' + (v === 'all' ? 'yes' : v === 'some' ? 'partial' : 'no');
+          if(v === 'none') continue;
+          const tag = document.createElement('span');
+          tag.className = 'agenttag ' + (v === 'all' ? 'yes' : 'partial');
           tag.textContent = shortAgent(a);
-          tag.title = v === 'some' ? t().partly : v === 'all' ? t().badge_on_tip(a) : t().badge_off_tip(a);
+          tag.title = v === 'some' ? t().partly : t().badge_on_tip(a);
           badges.appendChild(tag);
         }
         meta.appendChild(badges);
@@ -1776,9 +1779,8 @@ async function tick(){
           cb.checked = (row.skills||[]).every(x => x.shared);
           cb.onclick = e => { e.stopPropagation(); linkSkill(ids, cb.checked, share); };
           share.appendChild(cb);
-          share.appendChild(document.createTextNode(
-            secMiss.length ? t().share_to(secMiss.map(shortAgent)) : t().share_done));
-          share.title = t().share_all_tip;
+          share.appendChild(document.createTextNode(secMiss.length ? t().share_short : t().share_done));
+          share.title = secMiss.length ? t().share_to(secMiss.map(shortAgent)) : t().share_all_tip;
           meta.appendChild(share);
         }
         wrap.appendChild(meta);
@@ -1804,16 +1806,17 @@ async function tick(){
               stext.appendChild(sname); stext.appendChild(sdesc);
 
               // 섹션과 같으면 아무것도 안 그린다. 같은 사실을 줄마다 되풀이하지 않는다.
+              // 여기도 꺼진 에이전트는 뱃지로 안 그린다(위 플러그인 줄과 같은 규칙).
               const badges = document.createElement('span');
               const secUniform = isPlugin && (p.agents||[]).every(a => (row.section_state||{})[a] !== 'some');
               const sec = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all').join('|');
               if(!secUniform || (s.agents||[]).join('|') !== sec){
                 for(const a of (p.agents||[])){
+                  if(!(s.agents||[]).includes(a)) continue;
                   const tag = document.createElement('span');
-                  const on = (s.agents||[]).includes(a);
-                  tag.className = 'agenttag ' + (on ? 'yes' : 'no');
+                  tag.className = 'agenttag yes';
                   tag.textContent = shortAgent(a);
-                  tag.title = on ? t().badge_on_tip(a) : t().badge_off_tip(a);
+                  tag.title = t().badge_on_tip(a);
                   badges.appendChild(tag);
                 }
               }
@@ -1830,7 +1833,7 @@ async function tick(){
                 cb.onclick = e => { e.stopPropagation(); linkSkill(s.id, cb.checked, share); };
                 share.appendChild(cb);
                 if(!sameAsSection){
-                  share.appendChild(document.createTextNode(miss.length ? t().share_to(miss) : t().share_done));
+                  share.appendChild(document.createTextNode(miss.length ? t().share_short : t().share_done));
                 }
                 share.title = miss.length ? t().share_to(miss) : t().share_done;
                 srow.appendChild(share);

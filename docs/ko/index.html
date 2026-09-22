@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent HUD — 이 프로젝트가 스킬 몇 개를 로드하는지</title>
+<meta name="description" content="열어둔 프로젝트가 스킬 몇 개를 로드하는지 보여주는 로컬 대시보드. 함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.">
+<link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
+<meta property="og:title" content="Agent HUD">
+<meta property="og:description" content="이 프로젝트가 스킬 몇 개를 로드하는지 보여준다. 함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ganggangstone.github.io/agent-hud/ko/">
+<meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+/* 색 변수 출처: server.py :root (docs/landing-page-plan.md 3절) — 사본 갈라지면 여기부터 맞춘다 */
+:root{
+  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+    --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);margin:0;
+  font:14px/1.6 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+a{color:var(--accent)}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+/* 폭: 본문 텍스트는 좁게, 스크린샷은 넓게 */
+.wide{max-width:1040px;margin:0 auto;padding:0 24px}
+.col{max-width:620px}
+
+header{border-bottom:1px solid var(--border)}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;flex-wrap:wrap}
+.brand{font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700}
+.pill a,.pill button{padding:5px 10px;color:var(--dim);text-decoration:none;background:transparent;border:0;font:inherit;cursor:pointer;line-height:1.4}
+.pill a.active,.pill button.active{background:var(--accent);color:#fff}
+.pill a:hover,.pill button:hover{color:var(--text)}
+.pill a.active:hover,.pill button.active:hover{color:#fff}
+.ghost{font-size:12px;font-weight:600;color:var(--dim);text-decoration:none}
+.ghost:hover{color:var(--text)}
+
+/* 히어로: 텍스트는 좁게, 그 아래 스크린샷은 화면폭을 쓴다 */
+.hero{padding:72px 0 0}
+.eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim);margin:0 0 14px}
+h1{font-size:40px;font-weight:800;letter-spacing:-.025em;line-height:1.12;margin:0}
+h1 .soft{color:var(--dim)}
+.lead{font-size:17px;line-height:1.55;color:var(--text);opacity:.82;margin:16px 0 0;max-width:560px}
+.cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:26px}
+.btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;
+  font-size:13px;padding:9px 16px;border-radius:8px}
+.cta .mono{font-size:12px;color:var(--dim)}
+.frame{border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  overflow:hidden;background:var(--panel);line-height:0}
+.frame img{display:block;width:103%;max-width:none;margin:0 0 -2.8%}
+.frame.short,.frame.shorter{-webkit-mask-image:linear-gradient(#000 82%,transparent);mask-image:linear-gradient(#000 82%,transparent)}
+.frame.short{max-height:440px}
+.frame.shorter{max-height:340px}
+.hero-shot{margin:44px 0 0}
+.shotnote{font-size:11.5px;color:var(--dim);margin:10px 0 0;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+section{padding:76px 0}
+.rule{border-top:1px solid var(--border)}
+h2{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.25;margin:0 0 14px}
+h3{font-size:13px;font-weight:700;margin:0 0 6px}
+p{margin:0 0 14px}
+p:last-child{margin-bottom:0}
+.dim{color:var(--dim)}
+.small{font-size:12.5px;line-height:1.7}
+
+/* 문제 제기: 인용이 주인공 */
+blockquote{margin:0 0 28px;padding:0 0 0 20px;border-left:3px solid var(--accent);
+  font-size:20px;line-height:1.5;font-weight:600;letter-spacing:-.01em;max-width:680px}
+blockquote cite{display:block;margin-top:10px;font-size:12px;font-weight:400;font-style:normal;color:var(--dim)}
+
+/* 숫자: 타일 3개 대신 한 장의 측정 기록 */
+.ledger{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:6px 22px 8px;max-width:620px}
+.lrow{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  padding:16px 0;border-bottom:1px solid var(--border)}
+.lrow:last-child{border-bottom:0}
+.lrow .k{font-size:13px;color:var(--dim);line-height:1.5}
+.lrow .v{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:19px;font-weight:700;
+  letter-spacing:-.02em;white-space:nowrap}
+.lrow.key .v{font-size:26px;color:var(--accent)}
+.lrow.key .k{color:var(--text);font-weight:600}
+.src{font-size:12px;color:var(--dim);margin-top:14px;max-width:620px;line-height:1.7}
+
+/* 그룹: 코드가 주인공 */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px;align-items:start}
+pre{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:16px 18px;margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  font-size:12.5px;line-height:1.85;overflow-x:auto}
+pre .c{color:var(--dim)}
+pre .s{color:var(--on)}
+.steps{margin:18px 0 0;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:0 0 12px 26px;font-size:13.5px;line-height:1.6}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:18px;height:18px;border-radius:50%;
+  background:var(--accent-tint);color:var(--accent);font-size:10.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace}
+
+/* 탭 둘: 스크린샷이 주인공. 전폭으로 쌓고 캡션은 옆으로 뺀다 */
+.shots{display:flex;flex-direction:column;gap:44px;margin-top:8px}
+.shots figure{margin:0}
+.shots figcaption{margin-top:14px;font-size:13px;line-height:1.7;color:var(--dim);
+  display:grid;grid-template-columns:180px minmax(0,1fr);gap:20px;align-items:baseline}
+.shots b{color:var(--text);font-weight:700;font-size:14px;letter-spacing:-.01em}
+
+/* 지원 에이전트 */
+.badges{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px;border:1px solid var(--border);
+  border-radius:999px;padding:4px 12px;color:var(--dim);opacity:.5}
+.b.yes{color:var(--text);opacity:1}
+.label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 10px}
+
+/* 설치 */
+.install{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:44px;align-items:start}
+.spec{margin:0;font-size:12.5px}
+.spec div{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--border)}
+.spec div:last-child{border-bottom:0}
+.spec dt{color:var(--dim)}
+.spec dd{margin:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;text-align:right}
+.alt{font-size:12.5px;color:var(--dim);margin-top:12px}
+
+/* 정직함 */
+.honest{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+  padding:24px 26px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.honest h3{font-size:12px;color:var(--accent);letter-spacing:.02em}
+.honest p{font-size:12.5px;line-height:1.65;color:var(--dim);margin:0}
+
+footer{border-top:1px solid var(--border)}
+.ftr{display:flex;gap:18px;flex-wrap:wrap;align-items:center;padding:26px 0 44px;font-size:12px;color:var(--dim)}
+.ftr a{color:var(--dim);text-decoration:none}
+.ftr a:hover{color:var(--text)}
+
+@media (max-width:760px){
+  .split,.install,.honest{grid-template-columns:minmax(0,1fr);gap:28px}
+  .shots figcaption{grid-template-columns:1fr;gap:4px}
+  h1{font-size:30px}
+  h2{font-size:21px}
+  .hero{padding-top:44px}
+  section{padding:52px 0}
+  .wide{padding:0 18px}
+  blockquote{font-size:17px}
+}
+
+/* 한국어: 제품의 #h1sub:lang(ko)와 같은 처리 — 자간·대문자·모노 해제 */
+.eyebrow,.label{letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px;font-weight:600}
+.lrow .v{letter-spacing:0}
+/* 한국어는 어절 단위로 줄바꿈해서 단어 중간에서 끊기지 않게 */
+h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:break-word}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wide hdr">
+    <a class="brand" href="./">Agent HUD</a>
+    <div class="hdr-right">
+      <span class="pill">
+        <a href="../">EN</a><a href="./" class="active">한국어</a>
+      </span>
+      <span class="pill">
+        <button id="themeLight" type="button">라이트</button><button id="themeDark" type="button">다크</button>
+      </span>
+      <a class="ghost" href="https://github.com/ganggangstone/agent-hud">GitHub ↗</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<div class="wide hero">
+  <p class="eyebrow">로컬 대시보드 · macOS · MIT</p>
+  <h1>이 프로젝트가 스킬 몇 개를<br>로드하는지 보여준다.<br><span class="soft">그다음 줄인다.</span></h1>
+  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다. 계정 없이 내 컴퓨터에서 돈다.</p>
+  <div class="cta">
+    <a class="btn" href="#install">설치하기</a>
+    <span class="mono">git clone · ./install.sh · 127.0.0.1:7717</span>
+  </div>
+  <div class="hero-shot frame">
+    <img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 로드 개수와 토큰 추정치가 있다" width="1469" height="812">
+  </div>
+  <p class="shotnote">플러그인 &amp; 스킬 탭. 맨 위 숫자는 사이드바에서 고른 프로젝트 기준이다.</p>
+</div>
+
+<section class="wide">
+  <blockquote>
+    프로젝트마다 쓰이는 스킬과 플러그인이 다른데 다 로드하면 비용과 성능 이슈가 있고, 매번 온오프하고 하기 불편해서 만든 거지.
+    <cite>만든 이유</cite>
+  </blockquote>
+  <div class="col">
+    <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣는다. 대화 중에 어떤 스킬을 쓸지 고르려면 그 목록이 필요하기 때문이다. 본문은 그 스킬을 실제로 쓸 때만 읽지만, 이름과 설명은 그 세션에서 한 번도 안 쓰는 스킬까지 전부 들어간다.</p>
+    <p class="dim">플러그인을 끄는 기본 명령은 사용자 전역 설정 파일에 기록한다. 이 프로젝트에서 껐는데 모든 프로젝트에서 꺼지니, 프로젝트를 옮길 때마다 다시 켜게 된다.</p>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="col">
+    <h2>한 대의 컴퓨터에서 재보니</h2>
+    <p class="small dim">플러그인 3개가 설치돼 있었다. 특별히 많이 깔아둔 상태가 아니다.</p>
+  </div>
+  <div class="ledger">
+    <div class="lrow"><span class="k">설치된 스킬</span><span class="v">60개</span></div>
+    <div class="lrow"><span class="k">그 스킬들의 이름과 설명을 합친 글자 수</span><span class="v">18,938자</span></div>
+    <div class="lrow key"><span class="k">세션마다 거기 쓰이는 토큰</span><span class="v">5,000~9,000</span></div>
+  </div>
+  <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 본다. 실제 값은 설치된 스킬들의 설명이 얼마나 긴지에 따라 달라진다. 그래서 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여준다.</p>
+</section>
+
+<section class="wide rule">
+  <div class="split">
+    <div>
+      <h2>없던 단위가 그룹이다</h2>
+      <p>함께 쓰는 플러그인과 스킬에 이름을 붙여둔다. 적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼지며, 그 내용이 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적힌다.</p>
+      <p class="small dim">다른 프로젝트의 설정은 바뀌지 않는다. 세션이 끝나도 남아 있어서 다음 세션도 같은 상태로 시작한다. 플러그인 변경은 다음 세션부터 반영된다.</p>
+      <ol class="steps">
+        <li>그룹을 만들고 플러그인과 스킬을 담는다.</li>
+        <li>사이드바에서 프로젝트를 고른다.</li>
+        <li>적용한다. 폴더에서 <span class="mono">agent-hud apply dev</span>로도 된다.</li>
+      </ol>
+    </div>
+    <div>
+      <p class="label">modes.json</p>
+<pre>{
+  <span class="s">"dev"</span>: {
+    <span class="s">"plugins"</span>: [<span class="s">"mattpocock-skills@mattpocock"</span>],
+    <span class="s">"skills"</span>: [<span class="s">"diagnosing-bugs"</span>]
+  },
+  <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
+}</pre>
+      <p class="small dim" style="margin-top:12px">그룹 탭에서 고쳐도 되고 파일을 직접 고쳐도 된다. 파일을 고치면 다음 갱신 때 반영된다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="col">
+    <h2>남은 탭 둘</h2>
+  </div>
+  <div class="shots">
+    <figure>
+      <span class="frame short" style="display:block"><img src="../images/groups-ko.png" alt="그룹 탭" width="1469" height="812"></span>
+      <figcaption><b>그룹</b><span>만들어둔 그룹과 각 그룹이 어느 프로젝트에 적용돼 있는지.</span></figcaption>
+    </figure>
+    <figure>
+      <span class="frame shorter" style="display:block"><img src="../images/instructions-ko.png" alt="에이전트 지침 탭" width="1469" height="812"></span>
+      <figcaption><b>에이전트 지침</b><span>프로젝트 트리에서 지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. 색인이고, 내용 대조는 사람이 한다.</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="split">
+    <div>
+      <h2>스킬 폴더 하나로 에이전트 여섯</h2>
+      <p>스킬 형식은 공개 표준이라 폴더째 옮겨진다. 에이전트마다 읽는 경로가 다르므로 대시보드가 심볼릭 링크를 걸고, 열어둔 프로젝트 기준으로 스킬마다 에이전트별 뱃지를 보여준다.</p>
+      <p class="small dim">이 기능은 덤이고, 만든 이유는 위쪽에 있다. 지침 파일은 에이전트마다 따로 두고 대시보드는 목록만 보여준다.</p>
+    </div>
+    <div>
+      <p class="label">현재 지원 에이전트</p>
+      <div class="badges">
+        <span class="b yes">Claude Code</span><span class="b yes">Codex</span><span class="b yes">Copilot</span>
+        <span class="b yes">Gemini CLI</span><span class="b yes">Antigravity</span><span class="b">Cursor</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule" id="install">
+  <div class="install">
+    <div>
+      <h2>설치</h2>
+<pre>git clone https://github.com/ganggangstone/agent-hud.git
+cd agent-hud &amp;&amp; ./install.sh</pre>
+      <p class="alt">또는 <span class="mono">brew install ganggangstone/tap/agent-hud</span></p>
+      <p class="small dim" style="margin-top:16px">브라우저가 <span class="mono">127.0.0.1:7717</span>에 열리고 <span class="mono">launchd</span> 서비스가 계속 띄워둔다. 이 부분은 macOS 전용이고, Linux는 <span class="mono">systemd --user</span> 유닛이 <span class="mono">server.py</span>를 실행하게 하면 된다. Windows는 아직 지원하지 않는다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+    </div>
+    <div>
+      <p class="label">필요한 것</p>
+      <dl class="spec">
+        <div><dt>의존성</dt><dd>없음</dd></div>
+        <div><dt>실행</dt><dd>python3 stdlib</dd></div>
+        <div><dt>대기 주소</dt><dd>127.0.0.1</dd></div>
+        <div><dt>계정</dt><dd>필요 없음</dd></div>
+        <div><dt>라이선스</dt><dd>MIT</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="wide rule">
+  <div class="honest">
+    <div>
+      <h3>로컬 전용</h3>
+      <p>이 컴퓨터의 설정 파일만 읽고 쓴다. 올라가는 데이터가 없고 만들 계정도 없다.</p>
+    </div>
+    <div>
+      <h3>밖으로 나가는 요청 하나</h3>
+      <p>12시간마다 GitHub Releases를 조회해 새 버전이 있는지만 알려준다. 무언가를 내려받거나 설치하지 않는다.</p>
+    </div>
+    <div>
+      <h3>읽는 쪽이 기본</h3>
+      <p>쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이다. 지침 파일은 목록만 보여주고 고치지 않는다.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wide ftr">
+    <span>MIT License</span>
+    <a href="https://github.com/ganggangstone/agent-hud">저장소</a>
+    <a href="https://github.com/ganggangstone/agent-hud/issues">이슈</a>
+    <a href="https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md">설계 근거</a>
+  </div>
+</footer>
+
+<script>
+var theme = localStorage.getItem('agent-hud-theme') || 'dark';
+function render(){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+}
+function set(v){ theme = v; localStorage.setItem('agent-hud-theme', v); render(); }
+document.getElementById('themeLight').onclick = function(){ set('light'); };
+document.getElementById('themeDark').onclick = function(){ set('dark'); };
+render();
+</script>
+</body>
+</html>
