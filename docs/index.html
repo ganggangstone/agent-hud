@@ -158,11 +158,11 @@ footer a:hover{color:var(--text)}
   </svg>
   <h1 class="wm">Agent HUD</h1>
   <p class="say">Every skill and plugin you<br>have installed, in one place.<br><span class="soft">Off for the projects that don't need them.</span></p>
-  <p class="sub">A local dashboard. macOS, MIT, no account.</p>
+  <p class="sub">A dashboard that runs on your own computer. No sign-up, no account.</p>
   <div class="cmd">git clone https://github.com/ganggangstone/agent-hud.git
 cd agent-hud &amp;&amp; ./install.sh
 <b>or  brew install ganggangstone/tap/agent-hud</b></div>
-  <p class="fine">It opens at <span class="mono">127.0.0.1:7717</span> and a <span class="mono">launchd</span> service keeps it running. macOS only for that part; on Linux, point a <span class="mono">systemd --user</span> unit at <span class="mono">server.py</span>. Windows is not supported yet (<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+  <p class="fine">It opens in your browser at <span class="mono">127.0.0.1:7717</span> and stays running in the background. macOS for now. On Linux you can run <span class="mono">server.py</span> yourself, and Windows is not supported yet (<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
 </header>
 
 <div class="w">
@@ -245,7 +245,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="8" y="230">example</text>
 </svg>
   </figure>
-  <p class="small dim col-m" style="margin-top:26px">Measured on one machine with three plugins installed. The <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills specification</a> puts one skill's metadata at about 100 tokens, and your own number depends on how long your descriptions run, so the dashboard counts the project you have open rather than someone else's machine.</p>
+  <p class="small dim col-m" style="margin-top:26px">These are example numbers, from one machine with three plugins installed — about 100 tokens per skill, going by the <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> standard. Yours will be different, depending on how many skills you have and how long their descriptions are, so the dashboard counts your own project for you.</p>
 </section>
 
 <section class="w tell">
@@ -274,7 +274,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 2 links</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A group is the plugins and skills you use together. Applying one links its skills into that project's skill folders, turns its plugins on and the rest off, and writes it into that project's <span class="mono">.claude/settings.local.json</span>. Other projects are not touched, and plugin changes take effect from the next session.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A group is just the plugins and skills you use together. Apply one and this project gets exactly those — everything else is switched off. Only the project you picked changes; your other projects stay as they are. Plugin changes take effect the next time you start a session.</p>
   <div class="col-m push" style="margin-top:26px;border-top:1px solid var(--border);padding-top:22px">
     <pre>{
   <span class="s">"dev"</span>: {
