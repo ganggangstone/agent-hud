@@ -228,6 +228,19 @@ If the environment variable `CLAUDE_HUD_DISABLE=1` is set before a session's hoo
 that session neither starts a server nor registers its project. The `groups` and `apply`
 commands also do nothing while it is set. A server that is already running keeps running.
 
+## Open it as an app
+
+The dashboard is a browser tab by default. To get a window without browser
+chrome and its own icon:
+
+- **Chrome or Edge:** open the dashboard, then use the browser's "Install as
+  app" (Chrome: the install icon in the address bar, or menu → Cast, save and
+  share → Install page as app) — works the same on macOS and Windows.
+- **Safari (macOS Sonoma+):** File → Add to Dock.
+
+This uses the browser's own app-mode; Agent HUD doesn't need a native wrapper
+for it.
+
 ## Update checks
 
 Every 12 hours the dashboard checks GitHub Releases for a new version tag and shows a
