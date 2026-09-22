@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent HUD — see what your coding agent actually loads</title>
+<meta name="description" content="A local dashboard that shows how many skills each project loads, and lets you group the plugins and skills you use together and apply a different group per project.">
+<link rel="canonical" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
+<link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
+<link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
+<style>
+/* 색 변수 출처: server.py :root (docs/landing-page-plan.md 3절) — 사본 갈라지면 여기부터 맞춘다 */
+:root{
+  --bg:#f5f6f8;--panel:#ffffff;--border:#e5e7eb;--text:#1d2129;--dim:#8a919e;
+  --accent:#3182f6;--on:#00a870;--off:#5f6673;--on-tint:#e3f9ef;--off-tint:#eef0f2;--accent-tint:#eaf2ff;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;--panel:#161b22;--border:#262c36;--text:#e6edf3;--dim:#8b949e;
+    --accent:#58a6ff;--on:#56d364;--off:#8b949e;--on-tint:rgba(63,185,80,.14);--off-tint:rgba(139,148,158,.12);--accent-tint:rgba(88,166,255,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 6px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;
+  font:14px/1.6 -apple-system,"SF Pro Text","Pretendard",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border)}
+.brand{font-size:17px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700}
+.pill a, .pill button{padding:4px 9px;color:var(--dim);text-decoration:none;background:transparent;border:0;font:inherit;cursor:pointer}
+.pill a.active{background:var(--accent);color:#fff}
+.pill button:hover{color:var(--text)}
+main{padding:40px 0 20px}
+section{padding:36px 0;border-top:1px solid var(--border)}
+section:first-of-type{border-top:0;padding-top:8px}
+h1{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin:0 0 12px}
+h2{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:0 0 10px}
+.eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin:0 0 6px}
+.lead{font-size:16px;color:var(--dim);max-width:640px}
+p{max-width:640px}
+.shot{width:100%;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);overflow:hidden;margin:20px 0 0}
+.shot img{display:block;width:100%}
+.cap{font-size:12px;color:var(--dim);margin-top:8px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;box-shadow:var(--shadow)}
+.tile b{display:block;font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.01em}
+.tile span{font-size:12px;color:var(--dim)}
+.src{font-size:11px;color:var(--dim);margin-top:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.grid3 figure{margin:0}
+.grid3 img{width:100%;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+.grid3 figcaption{font-size:12px;color:var(--dim);margin-top:6px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;border:1px solid var(--border);
+  border-radius:999px;padding:3px 10px;color:var(--dim)}
+.b.on{color:var(--on);border-color:var(--on)}
+pre{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.8;color:var(--text);overflow-x:auto;max-width:640px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+table{border-collapse:collapse;font-size:13px;margin-top:8px}
+td{padding:5px 14px 5px 0;border-bottom:1px solid var(--border)}
+td:first-child{color:var(--dim)}
+.honest{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px 20px;box-shadow:var(--shadow)}
+footer{border-top:1px solid var(--border);padding:24px 0 40px;font-size:12px;color:var(--dim);display:flex;gap:16px;flex-wrap:wrap}
+@media (max-width:640px){
+  .tiles,.grid3{grid-template-columns:1fr}
+  h1{font-size:26px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="brand" href="#">Agent HUD</a>
+  <div class="hdr-right">
+    <span class="pill">
+      <a href="https://ganggangstone.github.io/agent-hud/" class="active">EN</a><a href="https://ganggangstone.github.io/agent-hud/ko/">한국어</a>
+    </span>
+    <span class="pill" id="themeToggle">
+      <button id="themeLight">Light</button><button id="themeDark">Dark</button>
+    </span>
+    <a href="https://github.com/ganggangstone/agent-hud" style="font-size:12px;color:var(--dim)">GitHub</a>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <p class="eyebrow">local dashboard</p>
+  <h1>See how many skills this project loads.</h1>
+  <p class="lead">Save the plugins and skills you use together as a group, and apply a different group to each project.</p>
+  <div class="shot"><img src="images/skills.png" alt="Plugins & skills tab showing the load count and token estimate at the top"></div>
+</section>
+
+<section>
+  <h2>Every installed skill loads, whether you use it or not</h2>
+  <p>A coding agent puts every installed skill's name and description into the model's context at session start. The body only gets read when you actually use that skill — but the name and description go in regardless, for skills you never touch in that session.</p>
+  <p>The default way to turn a plugin off writes to your user-wide settings. Turn it off in one project and it's off everywhere.</p>
+</section>
+
+<section>
+  <h2>Measured, not estimated</h2>
+  <div class="tiles">
+    <div class="tile"><b>60</b><span>skills installed on the machine this was built on</span></div>
+    <div class="tile"><b>18,938</b><span>characters across their names and descriptions</span></div>
+    <div class="tile"><b>5,000–9,000</b><span>tokens spent on that, every session</span></div>
+  </div>
+  <p class="src">Per-skill metadata is about 100 tokens per the <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills spec</a>. The real figure depends on how long your installed skills' descriptions are.</p>
+</section>
+
+<section>
+  <h2>Three tabs</h2>
+  <div class="grid3">
+    <figure><img src="images/groups.png" alt="Groups tab"><figcaption>Groups — bundle plugins and skills you use together</figcaption></figure>
+    <figure><img src="images/skills.png" alt="Plugins & skills tab"><figcaption>Plugins &amp; skills — a badge per agent, per skill</figcaption></figure>
+    <figure><img src="images/instructions.png" alt="Agent instructions tab"><figcaption>Agent instructions — every CLAUDE.md / AGENTS.md, indexed</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>Groups</h2>
+  <p>Applying a group links its skills into the project's skill folder and writes the plugin values into that project's settings file. Other projects are untouched. Plugin changes take effect next session.</p>
+  <pre>agent-hud apply backend
+agent-hud groups</pre>
+</section>
+
+<section>
+  <h2>Other agents</h2>
+  <p>The skill format is a public standard, so a folder moves as-is. One checkbox links the same skill into six agents' skill folders. Cursor is not yet verified by hand.</p>
+  <div class="badges">
+    <span class="b on">Claude Code</span><span class="b on">Codex</span><span class="b">Cursor</span>
+    <span class="b on">Copilot</span><span class="b on">Gemini CLI</span><span class="b on">Antigravity</span>
+  </div>
+</section>
+
+<section>
+  <h2>Agent instructions</h2>
+  <p>Finds 30 kinds of instruction files across the project tree and shows size and last-modified time. It does not diff their contents — it's an index, not a drift detector; the comparing is left to you.</p>
+</section>
+
+<section>
+  <h2>Install</h2>
+  <table>
+    <tr><td>Dependencies</td><td>none (standard library)</td></tr>
+    <tr><td>Network</td><td>127.0.0.1 only</td></tr>
+    <tr><td>Account</td><td>not needed</td></tr>
+    <tr><td>License</td><td>MIT</td></tr>
+  </table>
+  <pre>git clone https://github.com/ganggangstone/agent-hud.git
+cd agent-hud &amp;&amp; ./install.sh</pre>
+  <p style="font-size:12.5px;color:var(--dim)">or <span class="mono">brew install ganggangstone/tap/agent-hud</span></p>
+  <p>A browser opens at <span class="mono">127.0.0.1:7717</span>. macOS only — Linux works as a <span class="mono">systemd --user</span> unit, Windows isn't supported yet (<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+</section>
+
+<section>
+  <div class="honest">
+    <p style="margin:0">No account needed. It only reads and writes files on this computer. The only request that leaves it is a GitHub Releases check for a new version.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span>MIT License</span>
+  <a href="https://github.com/ganggangstone/agent-hud">Repository</a>
+  <a href="https://github.com/ganggangstone/agent-hud/issues">Issues</a>
+  <a href="https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md">Design decisions</a>
+</footer>
+</div>
+
+<script>
+var theme = localStorage.getItem('agent-hud-theme') || 'dark';
+function render(){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+}
+document.getElementById('themeLight').onclick = function(){ theme = 'light'; localStorage.setItem('agent-hud-theme', theme); render(); };
+document.getElementById('themeDark').onclick = function(){ theme = 'dark'; localStorage.setItem('agent-hud-theme', theme); render(); };
+render();
+</script>
+</body>
+</html>
