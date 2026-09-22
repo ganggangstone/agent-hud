@@ -339,11 +339,15 @@ cd agent-hud &amp;&amp; ./install.sh</pre>
 </footer>
 
 <script>
-var theme = localStorage.getItem('agent-hud-theme') || 'dark';
+// 명시적으로 고른 적 없으면 시스템 설정을 따른다(다크 강제 안 함) -- 한 번 고르면
+// 그 뒤로는 시스템이 뭐든 고른 대로 고정된다.
+var theme = localStorage.getItem('agent-hud-theme') || '';
 function render(){
-  document.documentElement.setAttribute('data-theme', theme);
-  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
-  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+  if(theme) document.documentElement.setAttribute('data-theme', theme);
+  else document.documentElement.removeAttribute('data-theme');
+  var current = theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.getElementById('themeLight').classList.toggle('active', current === 'light');
+  document.getElementById('themeDark').classList.toggle('active', current === 'dark');
 }
 function set(v){ theme = v; localStorage.setItem('agent-hud-theme', v); render(); }
 document.getElementById('themeLight').onclick = function(){ set('light'); };
