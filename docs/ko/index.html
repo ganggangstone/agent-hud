@@ -161,11 +161,11 @@ footer a:hover{color:var(--text)}
   </svg>
   <h1 class="wm">Agent HUD</h1>
   <p class="say">설치된 스킬과 플러그인을<br>한곳에서 봅니다.<br><span class="soft">이 프로젝트에 필요 없는 건 OFF 합니다.</span></p>
-  <p class="sub">로컬 대시보드입니다. macOS, MIT, 계정이 필요 없습니다.</p>
+  <p class="sub">내 컴퓨터에서 돌아가는 대시보드입니다. 가입도 계정도 필요 없습니다.</p>
   <div class="cmd">git clone https://github.com/ganggangstone/agent-hud.git
 cd agent-hud &amp;&amp; ./install.sh
 <b>또는  brew install ganggangstone/tap/agent-hud</b></div>
-  <p class="fine"><span class="mono">127.0.0.1:7717</span>에 열리고 <span class="mono">launchd</span> 서비스가 계속 띄워둡니다. 이 부분은 macOS 전용이고, Linux는 <span class="mono">systemd --user</span> 유닛이 <span class="mono">server.py</span>를 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+  <p class="fine">브라우저에서 <span class="mono">127.0.0.1:7717</span>로 열리고, 백그라운드에서 계속 켜져 있습니다. 지금은 macOS만 지원합니다. Linux에서는 <span class="mono">server.py</span>를 직접 실행하면 되고, Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
 </header>
 
 <div class="w">
@@ -248,7 +248,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="8" y="230">예시</text>
 </svg>
   </figure>
-  <p class="small dim col-m" style="margin-top:26px">플러그인 3개가 설치된 컴퓨터 한 대에서 잰 값입니다. <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 봅니다. 실제 값은 설명 길이에 따라 다르므로, 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여줍니다.</p>
+  <p class="small dim col-m" style="margin-top:26px">플러그인 3개가 깔린 컴퓨터 한 대에서 재본 예시 값입니다. <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 스킬 하나에 약 100토큰씩 잡습니다. 스킬이 몇 개인지, 설명이 얼마나 긴지에 따라 값이 달라지니, 지금 열어둔 프로젝트의 값은 대시보드가 직접 세어서 보여줍니다.</p>
 </section>
 
 <section class="w tell">
@@ -277,7 +277,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">그룹은 함께 쓰는 플러그인과 스킬입니다. 적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼집니다. 그 내용은 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적히고, 다른 프로젝트는 바뀌지 않습니다. 플러그인 변경은 다음 세션부터 반영됩니다.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">그룹은 함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 고른 프로젝트만 바뀌고 다른 프로젝트는 그대로입니다. 플러그인은 다음 세션부터 반영됩니다.</p>
   <div class="col-m push" style="margin-top:26px;border-top:1px solid var(--border);padding-top:22px">
     <pre>{
   <span class="s">"dev"</span>: {
