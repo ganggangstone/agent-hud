@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent HUD — 이 프로젝트가 스킬 몇 개를 로드하는지</title>
-<meta name="description" content="열어둔 프로젝트가 스킬 몇 개를 로드하는지 보여주는 로컬 대시보드. 함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.">
+<title>Agent HUD — 설치된 스킬과 플러그인을 한곳에서</title>
+<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 본다. 이 프로젝트에 필요 없는 건 끈다. 로컬 대시보드.">
 <link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="x-default" href="https://ganggangstone.github.io/agent-hud/">
 <meta property="og:title" content="Agent HUD">
-<meta property="og:description" content="이 프로젝트가 스킬 몇 개를 로드하는지 보여준다. 함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.">
+<meta property="og:description" content="설치된 스킬과 플러그인을 한곳에서 본다. 이 프로젝트에 필요 없는 건 끈다.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ganggangstone.github.io/agent-hud/ko/">
 <meta property="og:image" content="https://ganggangstone.github.io/agent-hud/images/skills-ko.png">
@@ -243,8 +243,8 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
 
 <div class="wide hero">
   <p class="eyebrow">로컬 대시보드 · macOS · MIT</p>
-  <h1>이 프로젝트가 스킬 몇 개를<br>로드하는지 보여준다.<br><span class="soft">그다음 줄인다.</span></h1>
-  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다. 계정 없이 내 컴퓨터에서 돈다.</p>
+  <h1>설치된 스킬과 플러그인을<br>한곳에서 본다.<br><span class="soft">이 프로젝트에 필요 없는 건 끈다.</span></h1>
+  <p class="lead">함께 쓰는 플러그인과 스킬을 그룹으로 묶어 프로젝트마다 다르게 적용한다.</p>
   <div class="cta">
     <a class="btn" href="#install">설치하기</a>
     <span class="mono">git clone · ./install.sh · 127.0.0.1:7717</span>
@@ -252,7 +252,7 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   <div class="hero-shot frame">
     <img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 로드 개수와 토큰 추정치가 있다" width="1469" height="812">
   </div>
-  <p class="shotnote">플러그인 &amp; 스킬 탭. 맨 위 숫자는 사이드바에서 고른 프로젝트 기준이다.</p>
+  <p class="shotnote">플러그인 &amp; 스킬 탭. 숫자는 사이드바에서 고른 프로젝트 기준이다.</p>
 </div>
 
 <section class="wide">
@@ -261,15 +261,15 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
     <cite>만든 이유</cite>
   </blockquote>
   <div class="col">
-    <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣는다. 대화 중에 어떤 스킬을 쓸지 고르려면 그 목록이 필요하기 때문이다. 본문은 그 스킬을 실제로 쓸 때만 읽지만, 이름과 설명은 그 세션에서 한 번도 안 쓰는 스킬까지 전부 들어간다.</p>
-    <p class="dim">플러그인을 끄는 기본 명령은 사용자 전역 설정 파일에 기록한다. 이 프로젝트에서 껐는데 모든 프로젝트에서 꺼지니, 프로젝트를 옮길 때마다 다시 켜게 된다.</p>
+    <p>코딩 에이전트는 세션을 시작할 때 설치된 스킬마다 이름과 설명을 모델 입력에 넣는다. 본문은 실제로 쓸 때만 읽지만, 이름과 설명은 그 세션에서 한 번도 안 쓰는 스킬까지 전부 들어간다.</p>
+    <p class="dim">플러그인을 끄는 기본 명령은 사용자 전역 설정 파일에 기록한다. 여기서 끄면 모든 프로젝트에서 꺼진다.</p>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">한 대의 컴퓨터에서 재보니</p>
-  <p class="pull"><span class="q">&ldquo;</span>특별히 많이 깔아둔 상태가 아니다.<span class="q">&rdquo;</span></p>
-  <p class="small dim" style="max-width:620px">플러그인 3개가 설치돼 있었다.</p>
+  <p class="eyeh">실측</p>
+  <p class="pull"><span class="q">&ldquo;</span>쓰든 안 쓰든 설치된 스킬은 전부 올라간다.<span class="q">&rdquo;</span></p>
+  <p class="small dim" style="max-width:620px">한 대의 컴퓨터, 플러그인 3개. 특별히 많이 깔아둔 상태가 아니다.</p>
   <figure class="dgm" style="margin-top:34px">
 <svg viewBox="0 0 840 250" role="img" aria-label="다이어그램: 설치된 스킬 60개를 사각형 60개로 그리고, 흘수선 아래에 이 프로젝트가 실제로 로드하는 6개를 둔다.">
   <circle class="ring" cx="70" cy="170" r="30"/>
@@ -340,16 +340,17 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   <text class="m" x="8" y="230">예시</text>
 </svg>
   </figure>
-  <div class="figrow">
-    <span class="fk">흘수선</span>
-    <p>선 위는 설치만 돼 있고 놀고 있는 것이다. 선 아래가 이번 세션 컨텍스트에 실려 가는 것이다.</p>
+  <div class="ledger" style="margin-top:34px">
+    <div class="lrow"><span class="k">설치된 스킬</span><span class="v">60개</span></div>
+    <div class="lrow"><span class="k">그 스킬들의 이름과 설명을 합친 글자 수</span><span class="v">18,938자</span></div>
+    <div class="lrow key"><span class="k">세션마다 거기 쓰이는 토큰</span><span class="v">5,000~9,000</span></div>
   </div>
-  <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 본다. 실제 값은 설치된 스킬들의 설명이 얼마나 긴지에 따라 달라진다. 그래서 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여준다.</p>
+  <p class="src"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills 명세</a>는 스킬 하나의 metadata를 약 100토큰으로 본다. 실제 값은 설명 길이에 따라 다르므로, 대시보드는 남의 컴퓨터 숫자 대신 지금 열어둔 프로젝트의 숫자를 보여준다.</p>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">없던 단위가 그룹이다</p>
-  <p class="pull"><span class="q">&ldquo;</span>다른 프로젝트는 그대로다.<span class="q">&rdquo;</span></p>
+  <p class="eyeh">그룹</p>
+  <p class="pull"><span class="q">&ldquo;</span>켜고 끄는 단위가 그룹이다.<span class="q">&rdquo;</span></p>
   <figure class="dgm" style="margin:0 0 14px">
 <svg viewBox="0 0 840 330" role="img" aria-label="다이어그램: modes.json이 그룹을 갖고 있고, 적용하면 프로젝트 하나의 설정과 스킬 폴더에만 쓰며 다른 프로젝트는 그대로 둔다.">
   <rect class="box" x="310" y="6" width="220" height="62" rx="8"/>
@@ -374,11 +375,10 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <div class="figrow" style="margin-bottom:38px"><span class="fk">적용 범위</span><p>그룹을 적용하면 프로젝트 하나 안에만 쓴다. 다른 프로젝트는 갖고 있던 것을 그대로 갖는다.</p></div>
   <div class="split">
     <div>
-      <p>함께 쓰는 플러그인과 스킬에 이름을 붙여둔다. 적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼지며, 그 내용이 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적힌다.</p>
-      <p class="small dim">설정은 세션이 끝나도 남아 있어서 다음 세션도 같은 상태로 시작한다. 플러그인 변경은 다음 세션부터 반영된다.</p>
+      <p>적용하면 그 그룹의 스킬이 프로젝트 스킬 폴더에 링크되고, 그룹의 플러그인은 켜지고 나머지는 꺼진다. 그 내용은 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 적히고, 다른 프로젝트는 바뀌지 않는다.</p>
+      <p class="small dim">세션이 끝나도 남는다. 플러그인 변경은 다음 세션부터 반영된다.</p>
       <ol class="steps">
         <li>그룹을 만들고 플러그인과 스킬을 담는다.</li>
         <li>사이드바에서 프로젝트를 고른다.</li>
@@ -394,7 +394,7 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   },
   <span class="s">"video"</span>: [<span class="s">"video-tools@local"</span>]
 }</pre>
-      <p class="small dim" style="margin-top:12px">그룹 탭에서 고쳐도 되고 파일을 직접 고쳐도 된다. 파일을 고치면 다음 갱신 때 반영된다.</p>
+      <p class="small dim" style="margin-top:12px">그룹 탭에서 고쳐도 되고 파일을 직접 고쳐도 된다.</p>
     </div>
   </div>
 </section>
@@ -410,14 +410,14 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
     </figure>
     <figure>
       <span class="frame shorter" style="display:block"><img src="../images/instructions-ko.png" alt="에이전트 지침 탭" width="1469" height="812"></span>
-      <figcaption><b>에이전트 지침</b><span>프로젝트 트리에서 지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. 색인이고, 내용 대조는 사람이 한다.</span></figcaption>
+      <figcaption><b>에이전트 지침</b><span>지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. 색인이고, 내용 대조는 사람이 한다.</span></figcaption>
     </figure>
   </div>
 </section>
 
 <section class="wide rule">
-  <p class="eyeh">폴더 하나, 링크 둘, 에이전트 여섯</p>
-  <p class="pull"><span class="q">&ldquo;</span>폴더째 옮겨진다.<span class="q">&rdquo;</span></p>
+  <p class="eyeh">스킬</p>
+  <p class="pull"><span class="q">&ldquo;</span>스킬 폴더 하나를 에이전트 여섯이 읽는다.<span class="q">&rdquo;</span></p>
   <figure class="dgm" style="margin-top:26px">
 <svg viewBox="0 0 840 340" role="img" aria-label="다이어그램: 스킬 폴더 하나가 .claude/skills와 .agents/skills에 심볼릭 링크로 걸리고, 그 두 폴더를 에이전트 여섯 개가 읽는다.">
   <rect class="box" x="8" y="130" width="200" height="80" rx="8"/>
@@ -455,8 +455,8 @@ h1,h2,h3,p,li,figcaption,blockquote,.lead,.k{word-break:keep-all;overflow-wrap:b
   <div class="figrow">
     <span class="fk">심볼릭 링크</span>
     <div>
-      <p>스킬 형식은 공개 표준이다. 에이전트마다 읽는 경로가 다르므로, 대시보드가 스킬 하나를 프로젝트의 스킬 폴더 두 곳에 심볼릭 링크로 건다. 링크 두 개가 에이전트 여섯 개를 덮는다. Cursor와 Copilot은 두 폴더를 다 읽는다.</p>
-      <p class="dim">이 기능은 덤이고, 만든 이유는 위쪽에 있다. 지침 파일은 에이전트마다 따로 두고 대시보드는 목록만 보여준다.</p>
+      <p>스킬 형식은 공개 표준이다. 에이전트마다 읽는 경로가 달라서, 대시보드가 스킬 하나를 두 폴더에 심볼릭 링크로 건다.</p>
+      <p class="dim">덤이고, 만든 이유는 위쪽에 있다.</p>
     </div>
   </div>
 </section>
@@ -487,15 +487,15 @@ cd agent-hud &amp;&amp; ./install.sh</pre>
   <div class="honest">
     <div>
       <h3>로컬 전용</h3>
-      <p>이 컴퓨터의 설정 파일만 읽고 쓴다. 올라가는 데이터가 없고 만들 계정도 없다.</p>
+      <p>이 컴퓨터의 설정 파일만 읽고 쓴다. 올라가는 데이터가 없고 만들 계정도 없다. 내 컴퓨터에서 돈다.</p>
     </div>
     <div>
       <h3>밖으로 나가는 요청 하나</h3>
-      <p>12시간마다 GitHub Releases를 조회해 새 버전이 있는지만 알려준다. 무언가를 내려받거나 설치하지 않는다.</p>
+      <p>12시간마다 GitHub Releases를 조회해 새 버전이 있는지만 알려준다. 내려받는 것은 없다.</p>
     </div>
     <div>
       <h3>읽는 쪽이 기본</h3>
-      <p>쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이다. 지침 파일은 목록만 보여주고 고치지 않는다.</p>
+      <p>쓰는 것은 플러그인 상태와 스킬 심볼릭 링크뿐이다. 지침 파일은 고치지 않는다.</p>
     </div>
   </div>
 </section>
