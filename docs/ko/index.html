@@ -49,7 +49,7 @@ body{background:var(--bg);color:var(--text);margin:0;
 img{max-width:100%}
 /* 한국어는 어절 단위로 끊는다. 기본값은 글자 단위라 문장 중간에서 잘린 것처럼 보인다.
    긴 경로·명령 같은 한 덩어리는 넘치지 않게 예외로 둔다 */
-p,li,figcaption{word-break:keep-all;overflow-wrap:break-word}
+p,li,figcaption{word-break:keep-all;overflow-wrap:break-word;text-wrap:pretty}
 a{color:var(--accent)}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
 
@@ -72,7 +72,7 @@ a{color:var(--accent)}
 .mk{width:clamp(56px,9vw,104px);height:auto;display:block;margin-bottom:clamp(18px,3vw,30px)}
 .wm{font-size:clamp(52px,12.5vw,148px);line-height:.92;letter-spacing:-.045em;font-weight:800;margin:0}
 .say{font-size:clamp(20px,2.7vw,30px);line-height:1.42;letter-spacing:-.02em;font-weight:700;
-  margin:clamp(24px,3.4vw,40px) 0 0;text-wrap:pretty}
+  margin:clamp(24px,3.4vw,40px) 0 0;text-wrap:balance}
 .say .soft{color:var(--dim)}
 
 /* 설치 명령: 상자가 아니라 괘선 사이의 글자 */
@@ -226,7 +226,7 @@ cd agent-hud &amp;&amp; ./install.sh
 
 <div class="w">
   <figure>
-    <div class="shot"><img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 매 세션마다 로드되는 스킬 개수와 사용되는 토큰 추정치를 보여줍니다" width="1469" height="970"></div>
+    <div class="shot"><img src="../images/demo-ko.gif" alt="프로젝트에 app 그룹을 적용하면 스킬 60개(약 6,000토큰)가 6개로 줄어든다" width="1000" height="640"></div>
   </figure>
 </div>
 
@@ -305,7 +305,7 @@ cd agent-hud &amp;&amp; ./install.sh
 </svg>
   </figure>
   <p class="say col-m" style="font-size:clamp(17px,2.1vw,23px);margin-top:26px">쓰는 건 6개인데 읽히는 건 60개.<br><span class="soft">세션을 새로 열 때마다 60개를 다시 읽습니다.</span></p>
-  <p class="small dim col-m" style="margin-top:14px">위 숫자는 <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 컴퓨터 한 대에서 직접 재봤습니다. 스킬마다 설명 길이가 달라서 60개면 5,000~9,000토큰 사이로 나옵니다. 내 프로젝트에서 몇 토큰이 드는지는 대시보드가 세어 보여줍니다.</p>
+  <p class="small dim col-m" style="margin-top:14px">제 컴퓨터에 설치된 스킬 60개로 직접 재 본 값입니다. 스킬마다 설명 길이가 달라서 범위로 적었습니다. 내 프로젝트는 몇 토큰인지 대시보드에서 바로 확인할 수 있습니다.</p>
 </section>
 
 <section class="w tell">
@@ -334,7 +334,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">플러그인을 하나 설치하면 스킬·커맨드·훅이 한꺼번에 들어옵니다. 같이 쓰는 것끼리 그룹으로 묶어두고 프로젝트에 적용하면, 그 프로젝트에서는 묶어둔 것만 켜지고 나머지는 꺼집니다. 설정은 그 프로젝트 폴더 안에만 쓰고 전역 설정 파일은 건드리지 않습니다. 플러그인을 켜고 끈 결과는 다음 세션부터 반영됩니다.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">플러그인을 하나 설치하면 스킬·커맨드·훅이 한꺼번에 들어옵니다. 같이 쓰는 것끼리 그룹으로 묶어두고 프로젝트에 적용하면, 그 프로젝트에서는 묶어둔 것만 켜지고 나머지는 꺼집니다. 다른 프로젝트는 그대로입니다. 플러그인은 다음 세션을 열 때부터 켜지고 꺼집니다.</p>
   
 </section>
 
@@ -379,7 +379,7 @@ cd agent-hud &amp;&amp; ./install.sh
 
 <section class="w tell">
   <p class="say col-n">흩어져 있는 지침 파일도 찾아줍니다.</p>
-  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span> 같은 지침 파일 30종을 찾아 크기와 수정 시각을 보여줍니다. CLAUDE.md는 고쳐뒀는데 AGENTS.md만 예전 그대로인 게 수정 시각에 드러납니다.</p>
+  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span>처럼 에이전트마다 다른 지침 파일을 찾아 크기와 수정 시각을 보여줍니다. 수정 시각을 보면 CLAUDE.md는 고쳐뒀는데 AGENTS.md만 예전 그대로인 게 바로 보입니다.</p>
   <figure style="margin-top:clamp(26px,4vw,44px)">
     <div class="shot"><img src="../images/instructions-ko.png" loading="lazy" decoding="async" alt="에이전트 지침 탭" width="1469" height="580"></div>
   </figure>
@@ -393,7 +393,7 @@ cd agent-hud &amp;&amp; ./install.sh
     <p class="q">내 컴퓨터에서 무엇이 바뀌나요?</p>
     <p class="small dim">그룹을 적용한 프로젝트 안에서 플러그인이 켜지고 꺼지고, 스킬 폴더로 이어지는 링크가 생깁니다. 지침 파일은 목록만 보여줄 뿐 고치지 않습니다.</p>
     <p class="q">되돌리거나 지우려면요?</p>
-    <p class="small dim">대시보드에서 그룹을 해제하거나 <span class="mono">agent-hud apply --off</span>를 실행하면 걸어둔 스킬 링크가 지워집니다. 플러그인을 켜고 끈 값은 그 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 남아 있으니, 그것까지 지우려면 파일에서 <span class="mono">enabledPlugins</span>를 빼면 됩니다. 도구 자체는 <span class="mono">launchctl bootout</span>으로 멈춥니다. <span class="mono">~/.claude/tools/agent-hud/</span> 폴더와 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>까지 지우면 설치하기 전으로 돌아갑니다.</p>
+    <p class="small dim">대시보드에서 그룹을 해제하거나 <span class="mono">agent-hud apply --off</span>를 실행하면 걸어둔 스킬 링크가 지워집니다. 플러그인을 켜고 끈 값은 그 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 남아 있으니, 그것까지 지우려면 파일에서 <span class="mono">enabledPlugins</span>를 빼면 됩니다. 도구를 멈추려면 <span class="mono">launchctl bootout</span>을 실행합니다. <span class="mono">~/.claude/tools/agent-hud/</span> 폴더와 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>까지 지우면 설치하기 전으로 돌아갑니다.</p>
     <p class="q">다른 에이전트도 따로 설정해야 하나요?</p>
     <p class="small dim">Claude Code는 프로젝트를 알아서 등록합니다. Cursor·Codex·Gemini CLI·Antigravity로만 쓰는 프로젝트는 대시보드에서 &#8220;+ 폴더 추가&#8221;로 넣으면 되고, 그 뒤로는 스킬 배지와 그룹 적용이 똑같이 동작합니다.</p>
   </div>
