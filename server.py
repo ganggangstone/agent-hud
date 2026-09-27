@@ -20,7 +20,7 @@ PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 UPDATE_REPO = "ganggangstone/agent-hud"
 UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 24 * 60 * 60
