@@ -648,7 +648,6 @@ def collect_skills(ctx):
             "components": plugin_components(install_path),
             "version": entry.get("version", "?"),
             "enabled": bool(enabled.get(name, False)),
-            "claude_only": True,
             "modes": [m for m, plist in modes.items() if name in plist],
             "source": mp_src.get("repo") or mp_src.get("path") or mp_name or "?",
             "skills": skills,
@@ -667,7 +666,7 @@ def collect_skills(ctx):
         loose.append(sk)
     if loose:
         rows.append({
-            "name": "", "version": "", "enabled": None, "claude_only": False,
+            "name": "", "version": "", "enabled": None,
             "section_state": _section_state(loose),
             "modes": [], "source": ", ".join(sorted({r for sk in loose for r in sk["roots"]})),
             "skills": loose,
