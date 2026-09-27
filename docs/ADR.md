@@ -163,7 +163,7 @@
 
 ## 9. 다른 에이전트 지원
 
-**지원한다.** 처음에는 하지 않기로 했다가 뒤집었다.
+**지원한다.** 처음에는 하지 않기로 했다가 결정을 바꿨다.
 
 **처음에 하지 않은 이유**: 이 도구가 보여주던 것(플러그인 on/off, 그룹, 당시의 스킬 차단)이
 전부 Claude Code 개념이라 옮길 대상이 없었다. 설정 형식도 JSON, TOML, Markdown 규칙
@@ -350,7 +350,7 @@ Copilot(`copilot plugin marketplace`)에도 있다. 다만 매니페스트와 �
 | `settings.local.json`에서 전역으로 켜진 플러그인을 끄기 | 그 폴더에서만 **사라짐** |
 | 설정 없는 폴더 | 전역 값을 따름 |
 
-이 결과를 보고 결정 3을 뒤집었다.
+이 결과를 보고 결정 3을 바꿨다.
 
 **확인하지 못한 것**: 프로젝트 설정의 `enabledPlugins`가 워크스페이스 신뢰를 요구하는지. 문서에는
 `permissions.allow`·`additionalDirectories`·`extraKnownMarketplaces`는 폴더를 신뢰한다고
