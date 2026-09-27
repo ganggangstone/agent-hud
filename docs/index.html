@@ -335,7 +335,7 @@ brew services start agent-hud
   <text class="m" x="466" y="288">.agents/skills/ → 2 links</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A plugin bundles skills, commands and hooks you install in one go. A group is the ones you reach for together, picked out of those. Apply one and this project gets exactly those, and every other plugin is switched off. It writes inside the project folder you picked and never touches your global settings. Plugin changes take effect the next time you start a session.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">A plugin bundles skills, commands and hooks you install in one go. A group is the ones you reach for together, picked out of those. Apply one and this project gets exactly those; everything else is switched off in Claude Code. It writes inside the project folder you picked and never touches your global settings. Plugin changes take effect the next time you start a session.</p>
   
 </section>
 
@@ -396,7 +396,7 @@ brew services start agent-hud
     <p class="q">How do I undo it, or remove it?</p>
     <p class="small dim">Unassign the group in the dashboard and the links to its skills are removed. The plugin on/off values stay in that project&#8217;s <span class="mono">.claude/settings.local.json</span>, so drop <span class="mono">enabledPlugins</span> there if you want them gone. To remove the tool, run <span class="mono">brew services stop agent-hud</span> and <span class="mono">brew uninstall agent-hud</span> if you used Homebrew, or <span class="mono">launchctl bootout gui/$(id -u)/com.agent-hud</span> and delete <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span> if you used the install script. Groups and the project list are in <span class="mono">~/.claude/tools/agent-hud/</span>; delete it too if you don&#8217;t need them.</p>
     <p class="q">Do my other agents need setting up?</p>
-    <p class="small dim">No. Add a project with <span class="mono">+ add a folder</span> in the dashboard and it shows up the same whichever agent you use. Plugins exist only in Claude Code, so switching them on and off applies to Claude Code alone.</p>
+    <p class="small dim">No. Add a project with <span class="mono">+ add a folder</span> in the dashboard and it shows up the same whichever agent you use. Switching plugins and skills on and off applies to Claude Code only; the other agents don&#8217;t read that setting.</p>
   </div>
 </section>
 

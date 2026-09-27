@@ -67,11 +67,11 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 </p>
 
 - **그룹**: 같이 쓰는 플러그인과 스킬을 묶은 목록. 프로젝트에 적용하면 그룹의 스킬을
-  그 프로젝트의 스킬 폴더에 연결하고, 그룹에 든 플러그인만 켜고 나머지는 끈다. 다른
-  프로젝트는 그대로 둔다.
+  그 프로젝트의 스킬 폴더에 연결하고, 그룹에 든 플러그인과 스킬만 켠다. 나머지 플러그인과
+  플러그인 밖 스킬은 Claude Code에서 꺼진다. 다른 프로젝트는 그대로 둔다.
 - **플러그인 & 스킬**: 설치된 스킬을 플러그인별로 보여준다. 선택한 프로젝트에서 그
-  스킬을 읽을 수 있는 에이전트마다 뱃지가 붙는다. Claude Code 플러그인을 여기서 켜고
-  끌 수 있다.
+  스킬을 읽을 수 있는 에이전트마다 뱃지가 붙는다. 플러그인과 플러그인 밖 스킬에는
+  Claude Code용 켜짐/꺼짐 스위치가 있다.
 - **에이전트 지침**: 프로젝트 안의 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/` 같은
   지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. `CLAUDE.md`는 고쳤는데
   `AGENTS.md`는 그대로인 경우가 바로 보인다.
@@ -93,6 +93,10 @@ Code는 `.claude/skills/`를, Codex·Gemini CLI·Antigravity는 `.agents/skills/
 Cursor와 Copilot은 둘 다 읽는다. Agent HUD는 스킬을 복사하지 않고 두 폴더에 연결만 해서,
 어느 폴더를 보는 에이전트든 같은 스킬을 읽는다. 연결을 따라 읽는지는 Claude Code·Codex·
 Gemini CLI·Copilot·Antigravity에서 확인했고, Cursor는 아직 확인하지 않았다.
+
+플러그인에 들지 않은 스킬은 `~/.claude/skills/`에 있든 프로젝트 안에 있든 프로젝트마다 끌 수
+있다. Agent HUD가 프로젝트의 `.claude/settings.local.json`에 `skillOverrides`를 쓰고, 이
+설정은 Claude Code만 읽는다.
 
 플러그인에 든 스킬은 그 플러그인이 켜져 있을 때 Claude Code만 읽는다. 플러그인 & 스킬
 탭의 체크박스를 누르면 프로젝트의 스킬 폴더에 연결되어, 다른 에이전트도 읽고 Claude Code는

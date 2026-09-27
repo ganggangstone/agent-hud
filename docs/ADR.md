@@ -45,6 +45,7 @@
 |---|---|
 | 플러그인 on/off | `<프로젝트>/.claude/settings.local.json`의 `enabledPlugins` |
 | 스킬을 다른 에이전트에 적용 | `<프로젝트>/.claude/skills/`, `<프로젝트>/.agents/skills/`에 심볼릭 링크 |
+| 플러그인 밖 스킬 on/off | `<프로젝트>/.claude/settings.local.json`의 `skillOverrides` |
 
 `settings.local.json`은 Claude Code가 만드는 개인용 설정 파일이라 커밋되지 않는다. 그래서
 프로젝트마다 다르게 둬도 팀 저장소에는 섞이지 않는다.
@@ -65,6 +66,9 @@
 > 스위치를 없앴다. 예전 버전이 쓴 `@`가 든 항목은 서버 시작과 프로젝트 등록 때 두 설정 파일에서
 > 지우고 로그에 남긴다(`tests/test_stale_deny_cleanup.py`). 문서에는 스킬 하나만 끄는
 > 방법으로 적혀 있었지만, 목록에서 빠지는지는 직접 돌려보고서야 알았다.
+> 같은 확인에서 플러그인 밖 스킬은 `skillOverrides`로 목록에서 실제로 빠졌다(→ 10번). 그래서
+> 플러그인 밖 스킬에만 스위치를 다시 달았고, 그룹을 적용할 때도 그룹에 없는 것은 끈다
+> (`tests/test_skill_overrides.py`). Claude Code 2.1.283에서 사용자 스킬과 프로젝트 스킬 모두 다시 확인했다.
 
 링크를 지울 때는 **심볼릭 링크만** 지운다. 같은 이름의 진짜 폴더가 있으면 사용자가 직접 둔
 것이므로 건드리지 않는다. `tests/test_link_skill.py`가 이걸 검사한다.

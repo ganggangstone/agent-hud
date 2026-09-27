@@ -2,6 +2,19 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## 다음 버전 / Unreleased
+
+**플러그인 밖 스킬도 프로젝트마다 켜고 끈다.** `~/.claude/skills`나 프로젝트에 직접 둔 스킬에
+켜짐/꺼짐 스위치가 생겼다. 프로젝트의 `.claude/settings.local.json`에 `skillOverrides`로 쓰고,
+Claude Code에만 적용된다. 그룹을 적용하면 그룹에 없는 플러그인 밖 스킬도 꺼진다. 플러그인에 든
+스킬은 전처럼 플러그인째 켜고 끈다.
+
+**Skills outside a plugin can be switched per project.** Skills in `~/.claude/skills` or in
+the project now have an ON/OFF switch, written as `skillOverrides` in the project's
+`.claude/settings.local.json`; it applies to Claude Code only. Applying a group also turns
+off skills outside a plugin that aren't in the group. Skills inside a plugin still go on
+and off with their plugin.
+
 ## v0.2.1
 
 **업데이트 확인을 하루에 한 번만 한다.** 12시간마다 하던 확인을 하루에 한 번으로 줄였다.

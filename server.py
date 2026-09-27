@@ -581,6 +581,8 @@ def _loaded_count(rows):
         if row["enabled"] is False:          # 꺼진 플러그인
             continue
         for sk in row["skills"]:
+            if sk.get("enabled") is False:     # skillOverrides로 끈 플러그인 밖 스킬
+                continue
             if "Claude Code" in (sk.get("agents") or []):
                 n += 1
     return n
@@ -652,15 +654,17 @@ def collect_skills(ctx):
             "skills": skills,
         })
 
-    # 플러그인에 속하지 않은 스킬들. 스위치가 없다 -- 폴더에 있으면 켜진 것이다.
+    # 플러그인에 속하지 않은 스킬들. Claude Code가 읽는 것에는 스위치가 있다(skillOverrides).
     plugin_ids = {sk["id"] for r in rows for sk in r["skills"]}
+    overrides = skill_overrides(project_dir)[0]
     loose = []
-    for sid, hit in sorted(index.items()):
-        if sid in plugin_ids:
-            continue
+    for sid, hit in _loose_entries(index, plugin_ids):
         name, desc, issues = _skill_meta(hit["path"], sid)
-        loose.append(decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
-                               "path": os.path.dirname(hit["path"])}, []))
+        sk = decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
+                       "path": os.path.dirname(hit["path"])}, [])
+        if "Claude Code" in sk["agents"]:
+            sk["enabled"] = overrides.get(name) not in SKILL_HIDDEN
+        loose.append(sk)
     if loose:
         rows.append({
             "name": "", "version": "", "enabled": None, "claude_only": False,
@@ -743,9 +747,13 @@ def set_plugins(changes, project_dir):
     unknown = [n for n in changes if n not in known]
     if unknown:
         return False, "unknown plugin: " + ", ".join(unknown[:3])
-    path = os.path.join(project_dir, LOCAL_SETTINGS)
-    data = read_json(path, {})
+    data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
     data.setdefault("enabledPlugins", {}).update({k: bool(v) for k, v in changes.items()})
+    return _write_local(project_dir, data)
+
+
+def _write_local(project_dir, data):
+    path = os.path.join(project_dir, LOCAL_SETTINGS)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
@@ -753,6 +761,60 @@ def set_plugins(changes, project_dir):
     except Exception as e:
         return False, str(e)
     return True, ""
+
+
+# 플러그인 밖 스킬(사용자·프로젝트 스킬)은 skillOverrides로 목록에서 뺄 수 있다. 이 두 값이면
+# 빠지는 것을 Claude Code로 직접 확인했다(ADR 10, tests/manual/skill_visibility.sh). 플러그인
+# 스킬에는 듣지 않아서 플러그인은 여전히 통째로 끈다.
+SKILL_HIDDEN = ("off", "user-invocable-only")
+
+
+def skill_overrides(project_dir):
+    """-> (실제로 적용되는 값, 공유 settings.json의 값). 로컬이 공유를 이긴다(직접 확인)."""
+    shared = read_json(os.path.join(project_dir, ".claude", "settings.json")).get("skillOverrides")
+    local = read_json(os.path.join(project_dir, LOCAL_SETTINGS)).get("skillOverrides")
+    shared = shared if isinstance(shared, dict) else {}
+    local = local if isinstance(local, dict) else {}
+    return {**shared, **local}, shared
+
+
+def _loose_entries(index, plugin_ids):
+    return [(sid, hit) for sid, hit in sorted(index.items()) if sid not in plugin_ids]
+
+
+def loose_claude_skills(project_dir):
+    """이 프로젝트에서 Claude Code가 읽는 플러그인 밖 스킬 -> {스킬 이름: 폴더 이름}."""
+    plugin_ids = {sid for skills in plugin_skills().values() for sid in skills}
+    out = {}
+    for sid, hit in _loose_entries(_skill_root_index(project_dir), plugin_ids):
+        if "Claude Code" in hit["agents"]:
+            out[_skill_meta(hit["path"], sid)[0]] = sid
+    return out
+
+
+def set_skill_overrides(changes, project_dir):
+    """{스킬 이름: bool}을 이 프로젝트의 settings.local.json에 쓴다. 켤 때는 키를 지우고,
+    공유 설정이 끄고 있을 때만 "on"을 써서 이긴다."""
+    if not project_dir or not os.path.isdir(project_dir):
+        return False, "project not found"
+    unknown = [n for n in changes if n not in loose_claude_skills(project_dir)]
+    if unknown:
+        return False, "unknown skill: " + ", ".join(unknown[:3])
+    shared = skill_overrides(project_dir)[1]
+    data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
+    ov = data.get("skillOverrides") if isinstance(data.get("skillOverrides"), dict) else {}
+    for name, on in changes.items():
+        if not on:
+            ov[name] = "off"
+        elif shared.get(name) in SKILL_HIDDEN:
+            ov[name] = "on"
+        else:
+            ov.pop(name, None)
+    if ov:
+        data["skillOverrides"] = ov
+    else:
+        data.pop("skillOverrides", None)
+    return _write_local(project_dir, data)
 
 
 # 세트는 함께 쓰는 플러그인과 스킬의 묶음이다. 옛 modes.json은 {이름: [플러그인]} 이었고
@@ -832,6 +894,13 @@ def assign_set(name, project_dir):
         ok, err = set_plugins({pl: pl in members for pl in known_plugin_names()}, project_dir)
         if not ok:
             errors.append(err)
+        # 플러그인 밖 스킬도 같은 규칙: 그룹에 있으면 켜고 없으면 끈다. 1)에서 건 링크까지 본 뒤에 센다.
+        loose = loose_claude_skills(project_dir)
+        if loose:
+            ok, err = set_skill_overrides({nm: nm in wanted or sid in wanted for nm, sid in loose.items()},
+                                          project_dir)
+            if not ok:
+                errors.append(err)
 
     assigned = read_json(SETS_FILE, {})
     if name:
@@ -1115,8 +1184,8 @@ const T = {
     set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
     set_apply: 'Apply to this project', set_applied: 'Applied to this project',
     set_apply_tip: 'Applies to this project only. Other projects are untouched.',
-    assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\n${sk} skills are linked here.\nPlugins on: ${pl}\nEvery other plugin is turned off, in this project only.`,
-    unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins stay as they are.`,
+    assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\n${sk} skills are linked here.\nPlugins on: ${pl}\nEvery other plugin, and every skill not in the group, is turned off, in this project only.`,
+    unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins and skills stay on or off as they are.`,
     kind_plugin: 'plugin', kind_skill: 'skill',
     add_member_ph: '+ add a plugin or skill…',
     member_plugin_tip: 'On in this project',
@@ -1170,6 +1239,9 @@ const T = {
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
     plugin_on_tip: 'On in this project. Click to turn it off (next session)',
     plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
+    skill_on_tip: 'On for Claude Code in this project. Click to turn it off (next session)',
+    skill_off_tip: 'Off for Claude Code in this project. Click to turn it on (next session)',
+    skill_toggle_failed: 'Could not switch that skill: ',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
     from: 'from: ',
@@ -1195,8 +1267,8 @@ const T = {
     set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
     set_apply: '이 프로젝트에 적용', set_applied: '이 프로젝트에 적용됨',
     set_apply_tip: '이 프로젝트에만 적용됩니다. 다른 프로젝트는 그대로입니다.',
-    assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개가 여기 걸립니다.\n켜지는 플러그인: ${pl}\n나머지 플러그인은 꺼집니다. 이 프로젝트에서만요.`,
-    unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인은 그대로 둡니다.`,
+    assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개가 여기 걸립니다.\n켜지는 플러그인: ${pl}\n나머지 플러그인과 그룹에 없는 스킬은 꺼집니다. 이 프로젝트에서만요.`,
+    unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인과 스킬이 켜지고 꺼진 상태는 그대로 둡니다.`,
     kind_plugin: '플러그인', kind_skill: '스킬',
     add_member_ph: '+ 플러그인 또는 스킬 추가…',
     member_plugin_tip: '이 프로젝트에서 켜짐',
@@ -1250,6 +1322,9 @@ const T = {
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
     plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
+    skill_on_tip: '이 프로젝트의 Claude Code에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
+    skill_off_tip: '이 프로젝트의 Claude Code에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
+    skill_toggle_failed: '스킬을 켜고 끄지 못했습니다: ',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
     from: '출처: ',
@@ -1502,6 +1577,16 @@ async function toggle(name, enable, dotEl){
     const d = await r.json();
     if(!d.ok) alert(t().toggle_failed + (d.error || t().error));
   } catch(e){ alert(t().toggle_failed + e); }
+  polling = true;
+  await tick();
+}
+async function toggleSkill(name, enable, el){
+  polling = false; el.classList.add('busy');
+  try{
+    const r = await fetch('/api/skilltoggle', {method:'POST', body: JSON.stringify({name, enable, project: currentProjectDir})});
+    const d = await r.json();
+    if(!d.ok) alert(t().skill_toggle_failed + (d.error || t().error));
+  } catch(e){ alert(t().skill_toggle_failed + e); }
   polling = true;
   await tick();
 }
@@ -1820,6 +1905,15 @@ async function tick(){
           if(hasSkills){
             for(const s of row.skills){
               const srow = document.createElement('div'); srow.className = 'row sub skill-row';
+              if(!isPlugin && s.enabled !== undefined){
+                // 플러그인 밖 스킬만 스위치가 있다. 플러그인 스킬은 플러그인째 켜고 끈다.
+                const ssw = document.createElement('span');
+                ssw.className = 'switch ' + (s.enabled ? 'sw-on' : 'sw-off');
+                ssw.textContent = s.enabled ? t().on : t().off;
+                ssw.title = s.enabled ? t().skill_on_tip : t().skill_off_tip;
+                ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, !s.enabled, ssw); };
+                srow.appendChild(ssw);
+              }
 
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
@@ -1844,7 +1938,8 @@ async function tick(){
               const sec = (p.agents||[]).filter(a => (row.section_state||{})[a] === 'all').join('|');
               if(!secUniform || (s.agents||[]).join('|') !== sec){
                 for(const a of (p.agents||[])){
-                  const on = (s.agents||[]).includes(a);
+                  // 스위치로 끈 스킬은 Claude Code가 읽지 않는다. 폴더를 볼 수 있어도 꺼진 것으로 그린다.
+                  const on = (s.agents||[]).includes(a) && !(a === 'Claude Code' && s.enabled === false);
                   const tag = document.createElement('span');
                   tag.className = 'agenttag ' + (on ? 'yes' : 'no');
                   tag.textContent = shortAgent(a);
@@ -2044,6 +2139,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if project not in known_projects():
                 return self._send_json({"ok": False, "error": "unknown project"}, 400)
             ok, err = set_plugins({payload.get("name", ""): bool(payload.get("enable"))}, project)
+            self._send_json({"ok": ok, "error": err})
+        elif self.path == "/api/skilltoggle":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = set_skill_overrides({payload.get("name", ""): bool(payload.get("enable"))}, project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/group":
             length = int(self.headers.get("Content-Length", 0))

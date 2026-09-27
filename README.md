@@ -68,11 +68,12 @@ installs an `agent-hud` command and runs the same server with `brew services`.
 </p>
 
 - **Groups**: lists of plugins and skills you use together. Applying a group to a project
-  links the group's skills into that project's skill folders, turns the group's plugins
-  on and every other plugin off. Other projects are not changed.
+  links the group's skills into that project's skill folders and turns on its plugins and
+  skills. Every other plugin, and every skill outside a plugin, is turned off for Claude
+  Code. Other projects are not changed.
 - **Plugins & skills**: every installed skill, listed by plugin, with a badge for each
-  agent that can read it in the selected project. You can turn Claude Code plugins on
-  and off here.
+  agent that can read it in the selected project. Plugins, and skills that aren't part of
+  a plugin, have an ON/OFF switch for Claude Code.
 - **Agent instructions**: 30 kinds of instruction files in the project, such as
   `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time.
   You can see at a glance that `CLAUDE.md` was updated but `AGENTS.md` wasn't.
@@ -95,6 +96,10 @@ project, Claude Code reads `.claude/skills/`, Codex, Gemini CLI and Antigravity 
 folders instead of copying it, so an agent reads the same copy whichever folder it looks in.
 Following the link was checked with Claude Code, Codex, Gemini CLI, Copilot and Antigravity,
 not yet with Cursor.
+
+A skill that isn't part of a plugin, whether in `~/.claude/skills/` or in the project, can
+be switched off per project. Agent HUD writes `skillOverrides` into the project's
+`.claude/settings.local.json`, which only Claude Code reads.
 
 A skill inside a plugin is read only by Claude Code, while that plugin is on. The checkbox
 on the Plugins & skills tab links it into the project's skill folders, so the other agents
