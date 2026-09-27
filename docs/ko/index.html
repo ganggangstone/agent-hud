@@ -7,7 +7,7 @@
 <link rel="icon" href="../favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <title>Agent HUD - 설치된 스킬과 플러그인을 한곳에서</title>
-<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 볼 수 있습니다. 이 프로젝트에 필요 없는 건 OFF 합니다. 로컬 대시보드입니다.">
+<meta name="description" content="여기저기 흩어진 스킬과 플러그인을 한곳에서 보고, 이 프로젝트에 필요 없는 건 OFF 합니다. 내 컴퓨터에서만 돌아갑니다.">
 <link rel="canonical" href="https://ganggangstone.github.io/agent-hud/ko/">
 <link rel="alternate" hreflang="en" href="https://ganggangstone.github.io/agent-hud/">
 <link rel="alternate" hreflang="ko" href="https://ganggangstone.github.io/agent-hud/ko/">
@@ -74,7 +74,6 @@ a{color:var(--accent)}
 .say{font-size:clamp(20px,2.7vw,30px);line-height:1.42;letter-spacing:-.02em;font-weight:700;
   margin:clamp(24px,3.4vw,40px) 0 0;text-wrap:pretty}
 .say .soft{color:var(--dim)}
-.sub{color:var(--dim);margin:14px 0 0;font-size:15px}
 
 /* 설치 명령: 상자가 아니라 괘선 사이의 글자 */
 .cmd{margin:clamp(30px,4vw,46px) 0 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
@@ -179,7 +178,7 @@ footer a:hover{color:var(--text)}
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Agent HUD",
-  "description": "여기저기 흩어진 스킬과 플러그인을 한곳에서 볼 수 있는 로컬 대시보드입니다. 프로젝트마다 쓰지 않는 스킬과 플러그인을 꺼둘 수 있습니다.",
+  "description": "여기저기 흩어진 스킬과 플러그인을 한곳에서 보고, 프로젝트마다 쓰지 않는 것은 꺼둘 수 있습니다. 내 컴퓨터에서만 돌아갑니다.",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "macOS",
   "url": "https://ganggangstone.github.io/agent-hud/ko/",
@@ -211,7 +210,6 @@ footer a:hover{color:var(--text)}
   </svg>
   <h1 class="wm">Agent HUD</h1>
   <p class="say">설치된 스킬과 플러그인을<br>한곳에서 볼 수 있습니다.<br><span class="soft">이 프로젝트에 필요 없는 건 OFF 합니다.</span></p>
-  <p class="sub">내 컴퓨터에서 돌아가는 대시보드입니다. 가입도 계정도 필요 없습니다.</p>
   <div class="cmdwrap">
     <div class="cmd" id="cmd">git clone https://github.com/ganggangstone/agent-hud.git
 cd agent-hud &amp;&amp; ./install.sh
@@ -228,12 +226,12 @@ cd agent-hud &amp;&amp; ./install.sh
 
 <div class="w">
   <figure>
-    <div class="shot"><img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 로드 개수와 토큰 추정치가 있습니다" width="1469" height="970"></div>
+    <div class="shot"><img src="../images/skills-ko.png" alt="플러그인 &amp; 스킬 탭. 플러그인 목록 위에 매 세션마다 로드되는 스킬 개수와 사용되는 토큰 추정치를 보여줍니다" width="1469" height="970"></div>
   </figure>
 </div>
 
 <section class="w tell">
-  <p class="say col-m">코딩 에이전트는 세션을 시작할 때<br>설치된 스킬의 이름과 설명을 전부 읽습니다.<br><span class="soft">쓰지 않는 스킬도 마찬가지입니다.</span></p>
+  <p class="say col-m">코딩 에이전트는 세션을 시작할 때<br>설치된 스킬의 이름과 설명을 전부 읽습니다.<br><span class="soft">안 쓰는 스킬도 건너뛰지 않아 토큰 낭비가 발생합니다.</span></p>
   <p class="small dim col-m" style="margin-top:14px">앱을 만드는 중인데 글쓰기 스킬 12개까지 같이 읽힙니다.</p>
   <p class="num"><b>스킬 60개</b> <span>·</span> <b>18,938자</b> <span>·</span> <span>세션마다</span> <b>5,000~9,000토큰</b></p>
   <figure class="dgm" style="margin:clamp(34px,5vw,56px) 0 0">
@@ -306,8 +304,8 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="8" y="230">예시</text>
 </svg>
   </figure>
-  <p class="say col-m" style="font-size:clamp(17px,2.1vw,23px);margin-top:26px">쓰는 건 6개, 읽히는 건 60개.<br><span class="soft">세션을 열 때마다 그렇습니다.</span></p>
-  <p class="small dim col-m" style="margin-top:14px"><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 컴퓨터 한 대에서 직접 재본 예시 값입니다. 스킬마다 설명 길이가 달라서 60개면 5,000~9,000토큰 사이가 됩니다. 내 프로젝트의 실제 값은 대시보드가 세어서 보여줍니다.</p>
+  <p class="say col-m" style="font-size:clamp(17px,2.1vw,23px);margin-top:26px">쓰는 건 6개인데 읽히는 건 60개.<br><span class="soft">세션을 새로 열 때마다 60개를 다시 읽습니다.</span></p>
+  <p class="small dim col-m" style="margin-top:14px">위 숫자는 <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> 표준을 기준으로 컴퓨터 한 대에서 직접 재봤습니다. 스킬마다 설명 길이가 달라서 60개면 5,000~9,000토큰 사이로 나옵니다. 내 프로젝트에서 몇 토큰이 드는지는 대시보드가 세어 보여줍니다.</p>
 </section>
 
 <section class="w tell">
@@ -336,7 +334,7 @@ cd agent-hud &amp;&amp; ./install.sh
   <text class="m" x="466" y="288">.agents/skills/ → 링크 2개</text>
 </svg>
   </figure>
-  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">플러그인은 스킬·커맨드·훅을 한 번에 설치하는 꾸러미입니다. 그룹은 그중 같이 쓰는 것만 골라 묶어둔 것입니다. 적용하면 이 프로젝트에는 그 묶음만 켜지고 나머지는 전부 꺼집니다. 고른 프로젝트 폴더 안에만 씁니다. 전역 설정 파일은 건드리지 않습니다. 플러그인은 다음 세션부터 반영됩니다.</p>
+  <p class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">플러그인을 하나 설치하면 스킬·커맨드·훅이 한꺼번에 들어옵니다. 같이 쓰는 것끼리 그룹으로 묶어두고 프로젝트에 적용하면, 그 프로젝트에서는 묶어둔 것만 켜지고 나머지는 꺼집니다. 설정은 그 프로젝트 폴더 안에만 쓰고 전역 설정 파일은 건드리지 않습니다. 플러그인을 켜고 끈 결과는 다음 세션부터 반영됩니다.</p>
   
 </section>
 
@@ -391,18 +389,18 @@ cd agent-hud &amp;&amp; ./install.sh
   <p class="say col-n">자주 나오는 질문.</p>
   <div class="col-m push" style="margin-top:clamp(26px,3.5vw,40px)">
     <p class="q">왜 macOS만 지원하나요?</p>
-    <p class="small dim">설치 스크립트가 등록하는 <span class="mono">launchd</span> 서비스가 macOS 전용입니다. <span class="mono">server.py</span> 자체에는 OS를 타는 코드가 없어서, Linux에서는 <span class="mono">systemd --user</span> 유닛이 이 파일을 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
+    <p class="small dim">설치 스크립트가 서버를 <span class="mono">launchd</span>에 등록하는데, <span class="mono">launchd</span>는 macOS에만 있습니다. <span class="mono">server.py</span> 자체에는 OS를 타는 코드가 없어서, Linux에서는 <span class="mono">systemd --user</span> 유닛이 이 파일을 실행하게 하면 됩니다. Windows는 아직 지원하지 않습니다(<a href="https://github.com/ganggangstone/agent-hud/issues/1" target="_blank" rel="noopener">#1</a>).</p>
     <p class="q">내 컴퓨터에서 무엇이 바뀌나요?</p>
     <p class="small dim">그룹을 적용한 프로젝트 안에서 플러그인이 켜지고 꺼지고, 스킬 폴더로 이어지는 링크가 생깁니다. 지침 파일은 목록만 보여줄 뿐 고치지 않습니다.</p>
     <p class="q">되돌리거나 지우려면요?</p>
-    <p class="small dim">대시보드에서 그룹을 해제하거나 <span class="mono">agent-hud apply --off</span>를 실행하면 걸어둔 스킬 링크가 지워집니다. 플러그인을 켜고 끈 값은 그 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 남아 있으니, 그것까지 지우려면 파일에서 <span class="mono">enabledPlugins</span>를 빼면 됩니다. 도구 자체는 <span class="mono">launchctl bootout</span>으로 멈춥니다. <span class="mono">~/.claude/tools/agent-hud/</span> 폴더와 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>까지 지우면 남는 게 없습니다.</p>
+    <p class="small dim">대시보드에서 그룹을 해제하거나 <span class="mono">agent-hud apply --off</span>를 실행하면 걸어둔 스킬 링크가 지워집니다. 플러그인을 켜고 끈 값은 그 프로젝트의 <span class="mono">.claude/settings.local.json</span>에 남아 있으니, 그것까지 지우려면 파일에서 <span class="mono">enabledPlugins</span>를 빼면 됩니다. 도구 자체는 <span class="mono">launchctl bootout</span>으로 멈춥니다. <span class="mono">~/.claude/tools/agent-hud/</span> 폴더와 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>까지 지우면 설치하기 전으로 돌아갑니다.</p>
     <p class="q">다른 에이전트도 따로 설정해야 하나요?</p>
     <p class="small dim">Claude Code는 프로젝트를 알아서 등록합니다. Cursor·Codex·Gemini CLI·Antigravity로만 쓰는 프로젝트는 대시보드에서 &#8220;+ 폴더 추가&#8221;로 넣으면 되고, 그 뒤로는 스킬 배지와 그룹 적용이 똑같이 동작합니다.</p>
   </div>
 </section>
 
 <div class="w" style="margin-top:clamp(74px,10vw,132px)">
-  <p class="fine">표준 라이브러리만 쓰는 파이썬 파일 한 개입니다. 무엇을 하는지 직접 열어볼 수 있고, 이 컴퓨터 안에서만 돕니다. 올라가는 데이터도, 만들 계정도 없습니다. 밖으로 나가는 요청은 12시간마다 새 버전이 있는지 확인하는 GitHub Releases 조회 하나뿐입니다.</p>
+  <p class="fine">단일 파이썬 파일에 표준 라이브러리로 구성되어 있으며, 데이터는 로컬에서만 사용됩니다. 하루에 한 번, GitHub Releases에서 새 버전을 확인할 때만 인터넷에 접속합니다.</p>
 </div>
 
 <footer class="w">

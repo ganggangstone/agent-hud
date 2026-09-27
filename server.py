@@ -23,7 +23,7 @@ PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this 
 VERSION = "0.2.0"
 UPDATE_REPO = "ganggangstone/agent-hud"
 UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
-UPDATE_CHECK_INTERVAL_SEC = 12 * 60 * 60
+UPDATE_CHECK_INTERVAL_SEC = 24 * 60 * 60
 
 
 def remember_project(path):

@@ -12,7 +12,7 @@ how many skills a selected project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group per project.
 It reads and writes settings files on the machine it runs on and needs no
 account; the only request that leaves the computer is a GitHub Releases
-check every 12 hours for update notices.
+check once a day for update notices.
 
 ## Links
 
@@ -29,4 +29,4 @@ check every 12 hours for update notices.
 - License: MIT
 - Dependencies: none — a single Python file, standard library only
 - Account: not required
-- Network use: one GitHub Releases check every 12 hours, nothing else
+- Network use: one GitHub Releases check a day, nothing else
