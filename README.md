@@ -139,7 +139,7 @@ skill off.
 | | In the group | Not in the group |
 |---|---|---|
 | Claude Code | On | Plugins and skills outside a plugin are turned off |
-| Codex, Gemini CLI, Antigravity, Cursor, Copilot | Skills are read | Stay as they are |
+| Codex, Gemini CLI, Antigravity, Cursor, Copilot | Skills are read | Not turned off |
 
 If you use more than one agent, keep your skills in `~/.claude/skills` and link them with
 groups. Codex, Gemini CLI and Antigravity then read a skill only in the projects a group

@@ -134,7 +134,7 @@ Cursor 등은 `AGENTS.md`, Cursor는 `.cursor/rules/`, Copilot은
 | | 그룹에 든 것 | 그룹에 없는 것 |
 |---|---|---|
 | Claude Code | 켜진다 | 플러그인과 플러그인 밖 스킬이 꺼진다 |
-| Codex, Gemini CLI, Antigravity, Cursor, Copilot | 스킬을 읽는다 | 그대로 남는다 |
+| Codex, Gemini CLI, Antigravity, Cursor, Copilot | 스킬을 읽는다 | 꺼지지 않는다 |
 
 여러 에이전트를 같이 쓴다면 스킬을 `~/.claude/skills`에 두고 그룹으로 연결하는 게 좋다.
 Codex·Gemini CLI·Antigravity는 그룹으로 연결한 프로젝트에서만 그 스킬을 읽고, Claude Code는
