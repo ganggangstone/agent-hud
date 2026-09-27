@@ -11,21 +11,9 @@
 
 <p align="center">A local dashboard for your coding agents' skills, instructions, and plugin state.</p>
 
-## Contents
-
-- [Background](#background)
-- [What it shows](#what-it-shows)
-- [Concepts](#concepts)
-- [Setting up groups](#setting-up-groups)
-- [Install (macOS)](#install-macos)
-- [Behavior across projects and sessions](#behavior-across-projects-and-sessions)
-- [Managing the service](#managing-the-service)
-- [Open it as an app](#open-it-as-an-app)
-- [Update checks](#update-checks)
-- [Extend](#extend)
-- [Feedback](#feedback)
-- [Why it's built this way](#why-its-built-this-way)
-- [License](#license)
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Applying the app group to a project takes it from 60 skills (about 6,000 tokens) to 6" width="880">
+</p>
 
 ## Background
 
@@ -35,11 +23,8 @@ model needs that list to choose a skill during the conversation. The agent reads
 skill's full body only when the skill is used, but it adds the name and description of
 every installed skill to the context, including skills the session never uses.
 
-The [Agent Skills specification](https://agentskills.io/specification), an open standard
-originally developed by Anthropic, puts one skill's name and description at about 100 tokens. On the author's machine, three plugins had installed
-60 skills. Measured by their actual names and descriptions, that came to 5,000–9,000
-tokens per session. An app project loaded the writing skills and the infrastructure
-skills too.
+On the author's machine, 60 installed skills came to 5,000–9,000 tokens every session.
+An app project was reading the writing skills and the infrastructure skills too.
 
 The default Claude Code command for turning a plugin off (`claude plugin disable`)
 writes to the user-wide settings file. Turning a plugin off in one project turns it off
@@ -49,6 +34,37 @@ Agent HUD shows how many skills the selected project loads. You can save the plu
 skills you use together as a group and apply a different group to each project. It reads
 and writes settings files on this computer and needs no account. The only request that
 leaves the computer is the GitHub Releases lookup that checks for a new version.
+
+## Install (macOS)
+
+```bash
+git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
+./install.sh
+```
+
+Homebrew works too, and gives you an `agent-hud` command as well.
+
+```bash
+brew install ganggangstone/tap/agent-hud
+```
+
+The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
+`modes.json` from the example file, and registers a `launchd` service. After that the
+dashboard keeps running when you close terminals or Claude Code sessions, and restarts
+automatically if the process exits.
+
+The install script prints a hook setting to add to `~/.claude/settings.json`. The hook
+registers the project path with the dashboard when a Claude Code session starts. The
+script does not write the file itself, so it can't overwrite hooks you already have. Copy
+the printed setting in yourself.
+
+Only Claude Code sessions register a project automatically. For a project you work on
+only with Gemini CLI, Antigravity, Codex or Cursor, add it with "+ add a folder" in the dashboard.
+After that, the skill badges and group apply work for those agents the same way.
+
+This install method uses `launchd`, so it works on macOS only. `server.py` itself has no
+OS-specific code. On Linux, set `server.py` as the `ExecStart` of a `systemd --user` unit
+instead of running `install.sh`. Windows is not supported yet ([#1](../../issues/1)).
 
 ## What it shows
 
@@ -178,37 +194,6 @@ Plugin names must match the names on the Plugins & skills tab, including the
 `@marketplace` part. A skill name is the skill's folder name. After you save the file,
 the dashboard picks it up on its next refresh, so you don't need to restart the service.
 
-## Install (macOS)
-
-```bash
-git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
-./install.sh
-```
-
-Homebrew works too, and gives you an `agent-hud` command as well.
-
-```bash
-brew install ganggangstone/tap/agent-hud
-```
-
-The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
-`modes.json` from the example file, and registers a `launchd` service. After that the
-dashboard keeps running when you close terminals or Claude Code sessions, and restarts
-automatically if the process exits.
-
-The install script prints a hook setting to add to `~/.claude/settings.json`. The hook
-registers the project path with the dashboard when a Claude Code session starts. The
-script does not write the file itself, so it can't overwrite hooks you already have. Copy
-the printed setting in yourself.
-
-Only Claude Code sessions register a project automatically. For a project you work on
-only with Gemini CLI, Antigravity, Codex or Cursor, add it with "+ add a folder" in the dashboard.
-After that, the skill badges and group apply work for those agents the same way.
-
-This install method uses `launchd`, so it works on macOS only. `server.py` itself has no
-OS-specific code. On Linux, set `server.py` as the `ExecStart` of a `systemd --user` unit
-instead of running `install.sh`. Windows is not supported yet ([#1](../../issues/1)).
-
 ## Behavior across projects and sessions
 
 One server runs on the computer and every project uses it. When a Claude Code session
@@ -251,7 +236,7 @@ for it.
 
 ## Update checks
 
-Every 12 hours the dashboard checks GitHub Releases for a new version tag and shows a
+Once a day the dashboard checks GitHub Releases for a new version tag and shows a
 notice at the top of the page when one exists. It never downloads or installs anything.
 If you cloned it, run `git pull` in that folder and then `./install.sh` again — the
 service runs the copy in `~/.claude/tools/agent-hud/`, so `git pull` alone does not change

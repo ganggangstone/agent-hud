@@ -11,21 +11,9 @@
 
 <p align="center">코딩 에이전트의 스킬·지침·플러그인 상태를 한 화면에 보여주는 로컬 대시보드</p>
 
-## 목차
-
-- [배경](#배경)
-- [화면 구성](#화면-구성)
-- [개념](#개념)
-- [그룹 설정하기](#그룹-설정하기)
-- [설치 (macOS)](#설치-macos)
-- [여러 프로젝트·세션에서의 동작](#여러-프로젝트세션에서의-동작)
-- [서비스 관리](#서비스-관리)
-- [앱처럼 열기](#앱처럼-열기)
-- [업데이트 확인](#업데이트-확인)
-- [확장하기](#확장하기)
-- [피드백](#피드백)
-- [설계 근거](#설계-근거)
-- [라이선스](#라이선스)
+<p align="center">
+  <img src="docs/images/demo-ko.gif" alt="프로젝트에 app 그룹을 적용하면 스킬 60개(약 6,000토큰)가 6개로 줄어든다" width="880">
+</p>
 
 ## 배경
 
@@ -34,10 +22,8 @@ Claude Code, Codex, Cursor 같은 코딩 에이전트는 세션을 시작할 때
 고르려면 스킬 목록이 필요하기 때문이다. 스킬 본문은 실제로 쓸 때만 읽지만, 이름과
 설명은 그 세션에서 쓰지 않는 스킬까지 전부 들어간다.
 
-Anthropic이 만들어 공개 표준으로 내놓은 [Agent Skills 명세](https://agentskills.io/specification)는
-스킬 하나의 이름과 설명을 약 100토큰으로 본다. 이 도구를 만든 개발자의 컴퓨터에는 플러그인 3개로 스킬 60개가
-설치되어 있었고, 실제 이름·설명 길이로 계산하면 세션마다 5,000~9,000토큰이었다.
-앱 개발 프로젝트에서도 글쓰기용 스킬과 인프라용 스킬이 똑같이 포함된다.
+이 도구를 만든 개발자의 컴퓨터에서는 설치된 스킬 60개가 세션마다 5,000~9,000토큰이었다.
+앱 개발 프로젝트에서도 글쓰기용 스킬과 인프라용 스킬이 똑같이 들어갔다.
 
 Claude Code에서 플러그인을 끄는 기본 명령(`claude plugin disable`)은 사용자 전역
 설정 파일에 기록한다. 그래서 한 프로젝트에서 끄면 다른 프로젝트에서도 꺼진다.
@@ -47,6 +33,36 @@ Agent HUD는 선택한 프로젝트에서 스킬이 몇 개 로드되는지 보�
 플러그인과 스킬을 그룹으로 저장해 두고, 프로젝트마다 다른 그룹을 적용할 수 있다.
 이 컴퓨터의 설정 파일만 읽고 쓰며, 계정이 필요 없다. 컴퓨터 밖으로 나가는 요청은 새
 버전 확인용 GitHub Releases 조회뿐이다.
+
+## 설치 (macOS)
+
+```bash
+git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
+./install.sh
+```
+
+Homebrew로 받아도 된다. 이쪽은 `agent-hud` 명령이 함께 깔린다.
+
+```bash
+brew install ganggangstone/tap/agent-hud
+```
+
+설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, 예제 파일로
+`modes.json`을 만들고, `launchd` 서비스로 등록한다. 등록 후에는 터미널이나 Claude Code
+세션을 닫아도 대시보드가 계속 실행되고, 프로세스가 종료되면 자동으로 다시 시작된다.
+
+설치 스크립트는 `~/.claude/settings.json`에 추가할 훅 설정을 터미널에 출력한다. 이 훅은
+Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등록한다. 설정 파일에 이미 들어
+있는 다른 훅을 덮어쓰지 않도록 스크립트는 파일에 직접 쓰지 않는다. 출력된 내용을 직접
+복사해 넣는다.
+
+자동 등록은 Claude Code 세션에서만 된다. Gemini CLI, Antigravity, Codex, Cursor로만 작업하는 프로젝트는
+대시보드의 "+ 폴더 추가"로 직접 추가한다. 추가한 뒤에는 그 에이전트의 스킬 뱃지와 그룹
+적용이 똑같이 동작한다.
+
+이 설치 방식은 `launchd`를 쓰므로 macOS에서만 동작한다. `server.py` 자체에는 운영체제별
+코드가 없다. 리눅스에서는 `install.sh` 대신 `systemd --user` 유닛의 `ExecStart`에
+`server.py`를 지정한다. Windows는 아직 지원하지 않는다([#1](../../issues/1)).
 
 ## 화면 구성
 
@@ -171,36 +187,6 @@ python3 ~/.claude/tools/agent-hud/server.py apply --off     # 현재 폴더의 �
 스킬 이름은 스킬 폴더 이름이다. 파일을 저장하면 대시보드가 다음 조회 때 반영하므로
 서비스를 재시작하지 않아도 된다.
 
-## 설치 (macOS)
-
-```bash
-git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
-./install.sh
-```
-
-Homebrew로 받아도 된다. 이쪽은 `agent-hud` 명령이 함께 깔린다.
-
-```bash
-brew install ganggangstone/tap/agent-hud
-```
-
-설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, 예제 파일로
-`modes.json`을 만들고, `launchd` 서비스로 등록한다. 등록 후에는 터미널이나 Claude Code
-세션을 닫아도 대시보드가 계속 실행되고, 프로세스가 종료되면 자동으로 다시 시작된다.
-
-설치 스크립트는 `~/.claude/settings.json`에 추가할 훅 설정을 터미널에 출력한다. 이 훅은
-Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등록한다. 설정 파일에 이미 들어
-있는 다른 훅을 덮어쓰지 않도록 스크립트는 파일에 직접 쓰지 않는다. 출력된 내용을 직접
-복사해 넣는다.
-
-자동 등록은 Claude Code 세션에서만 된다. Gemini CLI, Antigravity, Codex, Cursor로만 작업하는 프로젝트는
-대시보드의 "+ 폴더 추가"로 직접 추가한다. 추가한 뒤에는 그 에이전트의 스킬 뱃지와 그룹
-적용이 똑같이 동작한다.
-
-이 설치 방식은 `launchd`를 쓰므로 macOS에서만 동작한다. `server.py` 자체에는 운영체제별
-코드가 없다. 리눅스에서는 `install.sh` 대신 `systemd --user` 유닛의 `ExecStart`에
-`server.py`를 지정한다. Windows는 아직 지원하지 않는다([#1](../../issues/1)).
-
 ## 여러 프로젝트·세션에서의 동작
 
 서버는 컴퓨터에서 하나만 실행되고 모든 프로젝트가 같은 서버를 쓴다. Claude Code 세션이
@@ -241,7 +227,7 @@ tail -f ~/.claude/tools/agent-hud/launchd.err.log             # 로그 보기
 
 ## 업데이트 확인
 
-대시보드는 12시간마다 GitHub Releases에서 새 버전 태그를 확인하고, 새 버전이 있으면 화면
+대시보드는 하루에 한 번 GitHub Releases에서 새 버전 태그를 확인하고, 새 버전이 있으면 화면
 위쪽에 알림을 표시한다. 파일을 내려받거나 설치하지는 않는다. 클론해서 설치했다면 그 폴더에서 `git pull`을 실행한 뒤 `./install.sh`를 다시 실행한다.
 서비스는 `~/.claude/tools/agent-hud/`에 복사된 파일을 실행하므로 `git pull`만으로는
 바뀌지 않는다. Homebrew로 설치했다면 `brew upgrade agent-hud`를 실행한다.
