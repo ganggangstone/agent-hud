@@ -2,6 +2,33 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## 다음 버전 / Unreleased
+
+**업데이트 확인을 하루에 한 번만 한다.** 12시간마다 하던 확인을 하루에 한 번으로 줄였다.
+서버가 다시 켜져도(로그인, 재시작) 마지막 확인에서 하루가 지나기 전에는 확인하지 않는다.
+
+**Update checks run once a day.** Down from every 12 hours, and a restarted server (login,
+relaunch) no longer checks again until a day has passed since the last check.
+
+### 고친 것 / Fixed
+
+- `.claude/settings.json`이 `[]`처럼 JSON 객체가 아니면 그 프로젝트 화면 전체가 비던 문제
+  — a settings file that wasn't a JSON object (such as `[]`) blanked the whole project view
+- Homebrew 설치 안내의 훅이 서비스가 꺼져 있을 때 세션 시작을 붙잡던 문제. 이미 넣어 둔
+  훅은 명령 앞에 `nohup `, 끝에 ` & disown`을 붙이면 된다
+  — the hook printed by the Homebrew install could hold up session start while the service
+  was stopped; for a hook you already added, prefix the command with `nohup ` and end it
+  with ` & disown`
+
+### 문서 / Docs
+
+README 빠른 시작을 세 단계로 줄이고 Homebrew를 기본 설치로 두었다. 훅은 선택 사항이다.
+README와 랜딩 맨 위에 데모 GIF를 넣고, 코드와 다르던 문장을 고쳤다.
+
+The README quickstart is down to three steps with Homebrew as the default install, and the
+hook is optional. The README and landing pages open with a demo GIF, and sentences that
+didn't match the code were corrected.
+
 ## v0.2.0
 
 **프로젝트를 왼쪽 사이드바에서 고른다.** 드롭다운이던 것을 즐겨찾기·최근·검색이 있는
@@ -42,10 +69,6 @@ mustard. The header carries a load-line mark.
 
 ### 고친 것 / Fixed
 
-- JSON 객체가 아닌 설정 파일이 있으면 서버가 죽던 문제
-  — a settings file that was not a JSON object could kill the server
-- 최근 사용 목록이 화면엔 5개만 보이는데 저장은 무한히 쌓이던 문제
-  — the recents list showed 5 but stored without limit
 - 업데이트 알림이 `install.sh` 재실행과 `brew upgrade`를 함께 안내하도록
   — the update notice now points at both `install.sh` and `brew upgrade`
 

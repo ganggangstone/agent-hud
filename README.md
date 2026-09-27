@@ -24,7 +24,8 @@
 Coding agents such as Claude Code, Codex and Cursor put the name and description of every
 installed skill into the context at the start of each session, including skills that
 session never uses. On the author's machine, 60 skills came to 5,000–9,000 tokens per
-session. Turning a plugin off with `claude plugin disable` turns it off in every project.
+session. `claude plugin disable <plugin> -s local` turns a plugin off for one project, but only
+one plugin at a time, and nothing shows how many skills are still loaded.
 
 Agent HUD shows how many skills each project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group to each project.
@@ -90,11 +91,14 @@ installs an `agent-hud` command and runs the same server with `brew services`.
 A folder with a `SKILL.md` file, following the [Agent Skills](https://agentskills.io)
 standard. The six agents read the same format but look in different folders: in a
 project, Claude Code reads `.claude/skills/`, Codex, Gemini CLI and Antigravity read
-`.agents/skills/`, and Cursor and Copilot read both. Agent HUD puts a symbolic link in
-both folders, so all six read one copy of the skill.
+`.agents/skills/`, and Cursor and Copilot read both. Agent HUD links the skill into both
+folders instead of copying it, so an agent reads the same copy whichever folder it looks in.
+Following the link was checked with Claude Code, Codex, Gemini CLI, Copilot and Antigravity,
+not yet with Cursor.
 
-A skill inside a plugin is read only by Claude Code, and only while that plugin is on.
-The checkbox on the Plugins & skills tab links it into the other agents' folders too.
+A skill inside a plugin is read only by Claude Code, while that plugin is on. The checkbox
+on the Plugins & skills tab links it into the project's skill folders, so the other agents
+read it too, and Claude Code reads it even with the plugin off.
 
 ### Instruction file
 
@@ -119,8 +123,7 @@ editing". Groups exist only in Agent HUD and are stored in `modes.json`.
 1. In the Groups tab, click "+ create a new group".
 2. Enter a name and choose the first plugin to add.
 3. Add more plugins and skills from "+ add a plugin or skill…" under the group.
-4. Select a project on the Plugins & skills tab, then click "Apply to this project" in the
-   Groups tab.
+4. Pick a project in the sidebar, then click "Apply to this project" in the Groups tab.
 
 The same from a terminal (`agent-hud` instead of `python3 …/server.py` if you installed
 with Homebrew):
@@ -128,7 +131,7 @@ with Homebrew):
 ```bash
 python3 ~/.claude/tools/agent-hud/server.py groups          # list groups
 python3 ~/.claude/tools/agent-hud/server.py apply dev       # apply "dev" to the current folder
-python3 ~/.claude/tools/agent-hud/server.py apply --off     # remove the group from the current folder
+python3 ~/.claude/tools/agent-hud/server.py apply --off     # remove the group's skill links (plugin on/off stays)
 ```
 
 You can also edit `modes.json` directly. A value written as a single list is a group with
@@ -157,12 +160,13 @@ does not restart the server or change its port.
 
 ```bash
 launchctl list | grep agent-hud                               # check it is running
-launchctl kickstart -k gui/$(id -u)/com.agent-hud             # restart after editing server.py
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.agent-hud.plist  # stop
+launchctl kickstart -k gui/$(id -u)/com.agent-hud             # restart
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.agent-hud.plist  # stop until next login
 tail -f ~/.claude/tools/agent-hud/launchd.err.log             # view logs
 ```
 
-With Homebrew, use `brew services restart agent-hud` and `brew services stop agent-hud`.
+With Homebrew, use `brew services restart agent-hud` and `brew services stop agent-hud`;
+logs are in `$(brew --prefix)/var/log/agent-hud.err.log`.
 
 If `CLAUDE_HUD_DISABLE=1` is set before a session's hook runs, that session neither starts
 a server nor registers its project, and `groups` and `apply` do nothing. A server that is
@@ -172,7 +176,7 @@ already running keeps running.
 
 Click **Install app** in the header to get a window without browser chrome and with its
 own icon. Chrome and Edge install it in one step. In other browsers,
-including Safari, it tells you which menu to use instead (Safari: File → Add to Dock).
+including Safari, it tells you which menu to use instead (Safari on macOS Sonoma or later: File → Add to Dock).
 
 ## Update checks
 
@@ -186,7 +190,7 @@ settings files on this computer only and needs no account.
 
 ## Known limitations
 
-- **macOS only.** The installer relies on `launchd`. `server.py` has no OS-specific code,
+- **macOS only.** The installer relies on `launchd`. `server.py` has no macOS-only code,
   so on Linux you can run it from a `systemd --user` unit instead. Windows is not
   supported yet ([#1](../../issues/1)).
 - **Plugin changes take effect from the next session.** Claude Code reads plugin state

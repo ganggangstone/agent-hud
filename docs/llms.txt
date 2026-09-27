@@ -19,7 +19,7 @@ check once a day for update notices.
 - Homepage (English): https://ganggangstone.github.io/agent-hud/
 - Homepage (Korean): https://ganggangstone.github.io/agent-hud/ko/
 - Repository: https://github.com/ganggangstone/agent-hud
-- Install: `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh` (or `brew install ganggangstone/tap/agent-hud`)
+- Install: `brew install ganggangstone/tap/agent-hud && brew services start agent-hud` (or `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh`)
 - Design decisions: https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md
 
 ## Summary

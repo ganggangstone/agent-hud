@@ -90,8 +90,8 @@ def read_json(path, default=None):
     return default if default is not None else {}
 
 
-# 버전 확인만 하고 다운로드는 사용자가 직접 한다. git으로 받는 도구라 업데이트 경로가
-# 이미 있고(git pull), 실행 중인 서버가 자기 코드를 덮어쓰는 구조를 만들 이유가 없다.
+# 버전 확인만 하고 다운로드는 사용자가 직접 한다. git과 Homebrew에 업데이트 경로가
+# 이미 있고(git pull, brew upgrade), 실행 중인 서버가 자기 코드를 덮어쓰는 구조를 만들 이유가 없다.
 # 근거는 docs/ADR.md 7번.
 def _fetch_latest_release():
     import urllib.request
@@ -1535,9 +1535,8 @@ async function assignSet(name, btn){
   polling = true;
   await tick();
 }
-// 피드백은 GitHub Issues로 받는다. 이 도구를 설치할 수 있는 사람은 전부 GitHub 계정이
-// 있으므로(설치가 git clone + 셸 스크립트 + settings.json 편집이다), 별도 수신 서버를
-// 두는 것보다 이슈 폼 하나가 낫다. 버전은 링크가 미리 채워 보낸다.
+// 피드백은 GitHub Issues로 받는다. 코딩 에이전트를 쓰는 사람이 대상이라 GitHub 계정이
+// 걸림돌이 될 가능성이 낮고, 별도 수신 서버를 두는 것보다 이슈 폼 하나가 낫다. 버전은 링크가 미리 채워 보낸다.
 function renderFeedback(upd){
   const a = document.getElementById('fbLink');
   a.textContent = t().feedback_open;
