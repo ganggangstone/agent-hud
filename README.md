@@ -130,6 +130,23 @@ editing". Groups exist only in Agent HUD and are stored in `modes.json`.
 3. Add more plugins and skills from "+ add a plugin or skill…" under the group.
 4. Pick a project in the sidebar, then click "Apply to this project" in the Groups tab.
 
+### What changes for each agent
+
+Every agent gets to read the group's skills. Switching off what isn't in the group applies
+to Claude Code only, because the other agents have no per-project setting for turning a
+skill off.
+
+| | In the group | Not in the group |
+|---|---|---|
+| Claude Code | On | Plugins and skills outside a plugin are turned off |
+| Codex, Gemini CLI, Antigravity, Cursor, Copilot | Skills are read | Stay as they are |
+
+If you use more than one agent, keep your skills in `~/.claude/skills` and link them with
+groups. Codex, Gemini CLI and Antigravity then read a skill only in the projects a group
+linked it into, and Claude Code can switch it per project. A skill in `~/.agents/skills` is
+read by Codex and Gemini CLI in every project. Cursor and Copilot read both folders
+everywhere, so they can't be split per project.
+
 The same from a terminal (`agent-hud` instead of `python3 …/server.py` if you installed
 with Homebrew):
 

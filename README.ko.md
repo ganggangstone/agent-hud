@@ -126,6 +126,21 @@ Cursor 등은 `AGENTS.md`, Cursor는 `.cursor/rules/`, Copilot은
 3. 그룹 아래의 "+ 플러그인 또는 스킬 추가…"에서 더 넣는다.
 4. 사이드바에서 프로젝트를 고르고, 그룹 탭에서 "이 프로젝트에 적용"을 누른다.
 
+### 에이전트마다 달라지는 것
+
+그룹에 든 스킬은 모든 에이전트가 읽게 된다. 그룹에 없는 것을 끄는 건 Claude Code에만
+적용된다. 다른 에이전트에는 프로젝트마다 스킬을 끄는 설정이 없기 때문이다.
+
+| | 그룹에 든 것 | 그룹에 없는 것 |
+|---|---|---|
+| Claude Code | 켜진다 | 플러그인과 플러그인 밖 스킬이 꺼진다 |
+| Codex, Gemini CLI, Antigravity, Cursor, Copilot | 스킬을 읽는다 | 그대로 남는다 |
+
+여러 에이전트를 같이 쓴다면 스킬을 `~/.claude/skills`에 두고 그룹으로 연결하는 게 좋다.
+Codex·Gemini CLI·Antigravity는 그룹으로 연결한 프로젝트에서만 그 스킬을 읽고, Claude Code는
+프로젝트마다 켜고 끌 수 있다. `~/.agents/skills`에 둔 스킬은 Codex와 Gemini CLI가 모든
+프로젝트에서 읽는다. Cursor와 Copilot은 두 폴더를 모두 전역으로 읽어서 프로젝트마다 나눌 수 없다.
+
 터미널에서도 할 수 있다. Homebrew로 설치했다면 `python3 …/server.py` 대신 `agent-hud`를
 쓴다.
 
