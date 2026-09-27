@@ -94,6 +94,8 @@ jobs:
 
       - name: 수식의 url과 sha256을 새 태그로 바꾸기
         if: steps.has_key.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag="$GITHUB_REF_NAME"
           tarball="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
@@ -120,5 +122,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/agent-hud.rb
+          # 탭 커밋 시각은 워크플로가 돈 시각이 아니라 태그 커밋의 시각을 따른다.
+          when=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .commit.committer.date)
+          export GIT_AUTHOR_DATE="$when" GIT_COMMITTER_DATE="$when"
           git commit -m "agent-hud ${tag}" || { echo "바뀐 게 없습니다"; exit 0; }
           git push

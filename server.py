@@ -78,11 +78,16 @@ def default_project_dir(ctx):
 
 
 def read_json(path, default=None):
+    # 읽는 파일은 전부 JSON 객체다. [] 처럼 형식만 맞는 값을 그대로 넘기면 뒤따르는 .get()에서
+    # 화면 전체가 실패하므로, 객체가 아니면 못 읽은 것과 똑같이 취급한다.
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
     except Exception:
-        return default if default is not None else {}
+        pass
+    return default if default is not None else {}
 
 
 # 버전 확인만 하고 다운로드는 사용자가 직접 한다. git으로 받는 도구라 업데이트 경로가
@@ -99,17 +104,29 @@ def _fetch_latest_release():
     return (data.get("tag_name") or "").lstrip("v") or None
 
 
+def _update_wait(now=None):
+    """마지막 확인에서 하루가 지날 때까지 남은 초. 서버가 다시 떠도(로그인, launchd 재시작)
+    하루에 한 번보다 자주 나가지 않게 한다. 시계가 뒤로 가도 하루보다 오래 기다리지는 않는다."""
+    last = read_json(UPDATE_CACHE_FILE).get("checked_at") or 0
+    left = last + UPDATE_CHECK_INTERVAL_SEC - (time.time() if now is None else now)
+    return min(UPDATE_CHECK_INTERVAL_SEC, max(0, left))
+
+
 def _update_check_loop():
     # 항상 백그라운드 스레드에서만 돈다 — /api/state 요청 경로는 절대 네트워크를 기다리지 않는다.
     while True:
+        time.sleep(_update_wait())
+        latest = read_json(UPDATE_CACHE_FILE).get("latest")
         try:
-            latest = _fetch_latest_release()
-            if latest:
-                with open(UPDATE_CACHE_FILE, "w") as f:
-                    json.dump({"latest": latest, "checked_at": time.time()}, f)
+            latest = _fetch_latest_release() or latest
         except Exception:
-            pass  # 저장소가 아직 비공개거나 오프라인이면 조용히 넘어간다 — 대시보드 본 기능과 무관
-        time.sleep(UPDATE_CHECK_INTERVAL_SEC)
+            pass  # 오프라인이면 조용히 넘어간다 — 대시보드 본 기능과 무관
+        # 실패해도 시각은 남긴다. 요청은 이미 나갔으므로 하루 한 번이라는 약속에 포함된다.
+        try:
+            with open(UPDATE_CACHE_FILE, "w") as f:
+                json.dump({"latest": latest, "checked_at": time.time()}, f)
+        except Exception:
+            pass
 
 
 def collect_update(ctx):
