@@ -12,57 +12,54 @@
 <p align="center">코딩 에이전트의 스킬·지침·플러그인 상태를 한 화면에 보여주는 로컬 대시보드</p>
 
 <p align="center">
+  <a href="https://ganggangstone.github.io/agent-hud/ko/">웹사이트</a> ·
+  <a href="../../releases">릴리스</a> ·
+  <a href="../../issues">이슈</a>
+</p>
+
+<p align="center">
   <img src="docs/images/demo-ko.gif" alt="프로젝트에 app 그룹을 적용하면 스킬 60개(약 6,000토큰)가 6개로 줄어든다" width="880">
 </p>
 
-## 배경
+Claude Code, Codex, Cursor 같은 코딩 에이전트는 세션을 시작할 때 설치된 스킬의 이름과
+설명을 전부 컨텍스트에 넣는다. 그 세션에서 쓰지 않는 스킬도 빠지지 않는다. 만든 사람의
+컴퓨터에서는 스킬 60개가 세션마다 5,000~9,000토큰을 차지했다. 그렇다고
+`claude plugin disable`로 플러그인을 끄면 모든 프로젝트에서 같이 꺼진다.
 
-Claude Code, Codex, Cursor 같은 코딩 에이전트는 세션을 시작할 때 설치된 스킬마다
-이름과 설명을 모델 입력(컨텍스트)에 넣는다. 모델이 대화 중에 어떤 스킬을 쓸지
-고르려면 스킬 목록이 필요하기 때문이다. 스킬 본문은 실제로 쓸 때만 읽지만, 이름과
-설명은 그 세션에서 쓰지 않는 스킬까지 전부 들어간다.
+Agent HUD는 프로젝트마다 스킬이 몇 개 읽히는지 보여준다. 같이 쓰는 플러그인과 스킬을
+그룹으로 묶어두고 프로젝트마다 다른 그룹을 적용할 수 있다.
 
-이 도구를 만든 개발자의 컴퓨터에서는 설치된 스킬 60개가 세션마다 5,000~9,000토큰이었다.
-앱 개발 프로젝트에서도 글쓰기용 스킬과 인프라용 스킬이 똑같이 들어갔다.
+## 빠른 시작 (macOS)
 
-Claude Code에서 플러그인을 끄는 기본 명령(`claude plugin disable`)은 사용자 전역
-설정 파일에 기록한다. 그래서 한 프로젝트에서 끄면 다른 프로젝트에서도 꺼진다.
-프로젝트를 바꿀 때마다 플러그인을 다시 켜고 꺼야 한다.
+1. git이나 Homebrew로 설치한다.
 
-Agent HUD는 선택한 프로젝트에서 스킬이 몇 개 로드되는지 보여 준다. 함께 쓰는
-플러그인과 스킬을 그룹으로 저장해 두고, 프로젝트마다 다른 그룹을 적용할 수 있다.
-이 컴퓨터의 설정 파일만 읽고 쓰며, 계정이 필요 없다. 컴퓨터 밖으로 나가는 요청은 새
-버전 확인용 GitHub Releases 조회뿐이다.
+   ```bash
+   git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
+   ./install.sh
+   ```
 
-## 설치 (macOS)
+   ```bash
+   brew install ganggangstone/tap/agent-hud
+   brew services start agent-hud
+   ```
 
-```bash
-git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
-./install.sh
-```
+2. 설치할 때 터미널에 나온 훅 설정을 `~/.claude/settings.json`에 붙여넣는다. Claude Code
+   세션이 시작될 때마다 이 훅이 프로젝트를 대시보드에 등록한다.
+3. <http://127.0.0.1:7717>을 연다.
+4. 그룹 탭에서 그룹을 만들고, 프로젝트를 고른 뒤 "이 프로젝트에 적용"을 누른다.
 
-Homebrew로 받아도 된다. 이쪽은 `agent-hud` 명령이 함께 깔린다.
+## 설치
 
-```bash
-brew install ganggangstone/tap/agent-hud
-```
+설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, `modes.json.example`을
+본떠 `modes.json`을 만들고, `launchd` 서비스로 등록한다. 그래서 터미널을 닫아도 대시보드는
+계속 돌고, 프로세스가 죽으면 다시 켜진다. Homebrew로 설치하면 `agent-hud` 명령이 생기고,
+같은 서버를 `brew services`가 띄운다.
 
-설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, 예제 파일로
-`modes.json`을 만들고, `launchd` 서비스로 등록한다. 등록 후에는 터미널이나 Claude Code
-세션을 닫아도 대시보드가 계속 실행되고, 프로세스가 종료되면 자동으로 다시 시작된다.
+이미 넣어둔 훅을 덮어쓰지 않도록, 어느 쪽으로 설치해도 설치 과정에서
+`~/.claude/settings.json`은 건드리지 않는다. 터미널에 나온 설정은 사용자가 복사해 넣는다.
 
-설치 스크립트는 `~/.claude/settings.json`에 추가할 훅 설정을 터미널에 출력한다. 이 훅은
-Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등록한다. 설정 파일에 이미 들어
-있는 다른 훅을 덮어쓰지 않도록 스크립트는 파일에 직접 쓰지 않는다. 출력된 내용을 직접
-복사해 넣는다.
-
-자동 등록은 Claude Code 세션에서만 된다. Gemini CLI, Antigravity, Codex, Cursor로만 작업하는 프로젝트는
-대시보드의 "+ 폴더 추가"로 직접 추가한다. 추가한 뒤에는 그 에이전트의 스킬 뱃지와 그룹
-적용이 똑같이 동작한다.
-
-이 설치 방식은 `launchd`를 쓰므로 macOS에서만 동작한다. `server.py` 자체에는 운영체제별
-코드가 없다. 리눅스에서는 `install.sh` 대신 `systemd --user` 유닛의 `ExecStart`에
-`server.py`를 지정한다. Windows는 아직 지원하지 않는다([#1](../../issues/1)).
+Codex, Cursor, Gemini CLI, Antigravity로만 작업하는 프로젝트는 자동으로 등록되지 않는다.
+대시보드의 "+ 폴더 추가"로 넣는다.
 
 ## 화면 구성
 
@@ -72,98 +69,62 @@ Claude Code 세션이 시작될 때 프로젝트 경로를 대시보드에 등�
   <img src="docs/images/instructions-ko.png" alt="에이전트 지침 탭" width="560">
 </p>
 
-탭은 그룹, 플러그인 & 스킬, 에이전트 지침 세 개이고, 한 번에 한 탭만 표시된다. 처음에는
-그룹 탭이 열리고, 이후에는 마지막으로 본 탭이 열린다.
-
-- **그룹**: 함께 쓰는 플러그인과 스킬의 목록. 그룹을 프로젝트에 적용하면 그룹의 스킬을
-  그 프로젝트의 스킬 폴더에 연결하고, 그룹에 든 플러그인은 켜고 나머지 플러그인은 끈다.
-  다른 프로젝트의 설정은 바꾸지 않는다.
-- **플러그인 & 스킬**: 이 컴퓨터에 설치된 스킬 목록. 플러그인별로 나누고, 플러그인에
-  속하지 않은 스킬은 별도 항목에 표시한다. 플러그인 줄에는 선택한 프로젝트에서 그
-  플러그인의 스킬을 읽을 수 있는 에이전트(Claude Code·Codex·Cursor·Copilot·
-  Gemini CLI·Antigravity)만 뱃지로 붙는다. 읽지 못하는 에이전트는 줄마다 뱃지를
-  차지하는 대신 체크박스 툴팁에 모아 보여준다. 플러그인 안의 스킬은 플러그인 줄과
-  다를 때만 뱃지를 다시 보여주고, 그때는 전부 보여준다. 읽지 못하는 에이전트는
-  취소선으로 표시된다. 이 탭에서 Claude Code 플러그인을 켜고 끌 수도 있다
-  (켜짐/꺼짐 스위치).
-- **에이전트 지침**: 프로젝트 폴더에서 `CLAUDE.md`, `AGENTS.md`, `.clinerules`,
-  `.cursor/rules/` 등 30종의 지침 파일을 찾아 크기와 수정 시각을 표시한다. 에이전트마다
-  지침 파일이 따로 있어서, 예를 들어 `CLAUDE.md`는 고쳤는데 `AGENTS.md`는 옛 내용으로
-  남은 경우를 수정 시각으로 찾을 수 있다.
-  등록된 서브에이전트 목록도 이 탭에 있다.
-
-기본 테마는 다크 모드이고 ☀/☾ 버튼으로 바꿀 수 있다. EN/한국어 버튼으로 언어를 바꿀 수
-있다. 두 설정 모두 브라우저의 `localStorage`에 저장된다.
+- **그룹**: 같이 쓰는 플러그인과 스킬을 묶은 목록. 프로젝트에 적용하면 그룹의 스킬을
+  그 프로젝트의 스킬 폴더에 연결하고, 그룹에 든 플러그인만 켜고 나머지는 끈다. 다른
+  프로젝트는 그대로 둔다.
+- **플러그인 & 스킬**: 설치된 스킬을 플러그인별로 보여준다. 선택한 프로젝트에서 그
+  스킬을 읽을 수 있는 에이전트마다 뱃지가 붙는다. Claude Code 플러그인을 여기서 켜고
+  끌 수 있다.
+- **에이전트 지침**: 프로젝트 안의 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/` 같은
+  지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. `CLAUDE.md`는 고쳤는데
+  `AGENTS.md`는 그대로인 경우가 바로 보인다.
 
 ## 개념
 
-개념마다 어느 도구의 기능인지가 다르다.
-
-| 개념 | 적용 범위 |
+| 개념 | 어디에 속하나 |
 |---|---|
-| [스킬](#스킬-공통) | 공통: Agent Skills 표준을 따르는 모든 에이전트 |
-| [지침 파일](#지침-파일-에이전트별) | 에이전트별: 도구마다 파일 이름이 다름 |
-| [플러그인](#플러그인-claude-code) | Claude Code |
-| [마켓플레이스](#마켓플레이스-claude-code) | Claude Code |
-| [그룹](#그룹-agent-hud) | Agent HUD |
+| [스킬](#스킬) | Agent Skills 표준을 따르는 모든 에이전트 |
+| [지침 파일](#지침-파일) | 에이전트마다 따로, 파일 이름도 다름 |
+| [플러그인](#플러그인) | Claude Code |
+| [그룹](#그룹) | Agent HUD |
 
-### 스킬 [공통]
+### 스킬
 
-`SKILL.md` 파일과 필요한 부속 파일을 담은 폴더. [Agent Skills](https://agentskills.io)
-표준 형식이라 Claude Code, Codex, Cursor, Copilot, Gemini CLI, Antigravity가 같은 폴더를
-변환 없이 읽는다. 다만 에이전트마다 스킬을 찾는 폴더가 다르다. 프로젝트 안에서는 Claude
-Code가 `.claude/skills/`만, Codex·Gemini CLI·Antigravity는 `.agents/skills/`를, Cursor와
-Copilot은 두 폴더를 모두 읽는다. Antigravity의 전역 스킬은 `~/.gemini/config/skills/`에
-있다. Agent HUD는 프로젝트의 두 폴더에 심볼릭 링크를 만들어 스킬 하나를 여섯 에이전트가
-모두 읽게 한다.
+`SKILL.md` 파일이 든 폴더다. [Agent Skills](https://agentskills.io) 표준을 따르므로
+여섯 에이전트가 같은 형식을 읽지만, 찾아보는 폴더는 다르다. 프로젝트 안에서 Claude
+Code는 `.claude/skills/`를, Codex·Gemini CLI·Antigravity는 `.agents/skills/`를 읽고,
+Cursor와 Copilot은 둘 다 읽는다. Agent HUD는 스킬을 복사하지 않고 두 폴더에 연결만 해서,
+스킬 하나를 여섯 에이전트가 같이 읽게 한다.
 
-플러그인에 들어 있는 스킬은 그 플러그인을 켠 Claude Code만 읽는다. 플러그인 & 스킬 탭의
-체크박스를 누르면 다른 에이전트의 스킬 폴더에도 연결된다. Agent HUD에서 플러그인 이름을
-누르면 그 플러그인의 스킬 목록과 각 `SKILL.md`의 설명이 표시된다.
+플러그인에 든 스킬은 그 플러그인이 켜져 있을 때 Claude Code만 읽는다. 플러그인 & 스킬
+탭의 체크박스를 누르면 다른 에이전트의 폴더에도 연결된다.
 
-### 지침 파일 [에이전트별]
+### 지침 파일
 
-에이전트가 세션마다 읽는 마크다운 규칙 파일. Claude Code는 `CLAUDE.md`(전역
-`~/.claude/CLAUDE.md`, 프로젝트 `<프로젝트>/CLAUDE.md`)를 읽고, Codex·Cursor 등은
-`AGENTS.md`를, Cursor는 `.cursor/rules/`를, Copilot은 `.github/copilot-instructions.md`를
-읽는다. Agent HUD는 이 파일들의 목록만 표시하고 내용은 수정하지 않는다.
+에이전트가 세션마다 읽는 마크다운 규칙 파일이다. Claude Code는 `CLAUDE.md`, Codex와
+Cursor 등은 `AGENTS.md`, Cursor는 `.cursor/rules/`, Copilot은
+`.github/copilot-instructions.md`를 읽는다. Agent HUD는 목록만 보여주고 고치지 않는다.
 
-### 플러그인 [Claude Code]
+### 플러그인
 
-스킬, 서브에이전트, 커맨드, 훅을 묶어서 배포하는 단위. `claude plugin install`로
-설치한다. 켜짐·꺼짐 값은 설정 파일의 `enabledPlugins`에 저장된다. Agent HUD에서
-플러그인 옆 켜짐/꺼짐 스위치를 누르면 선택한 프로젝트의 `.claude/settings.local.json`에
-이 값을 기록한다. 다른 프로젝트에는 영향이 없고, 다음 세션부터 적용된다.
+스킬, 서브에이전트, 커맨드, 훅을 한꺼번에 설치하는 묶음이다. `claude plugin install`로
+설치한다. Agent HUD에서 켜고 끈 값은 선택한 프로젝트의 `.claude/settings.local.json`의
+`enabledPlugins`에만 적히므로, 다른 프로젝트는 바뀌지 않는다.
 
-플러그인에 든 스킬 하나만 컨텍스트에서 뺄 수는 없고, 플러그인을 꺼야 빠진다.
-`permissions.deny`에 `"Skill(플러그인:스킬)"`을 넣으면 호출은 막히지만, 스킬 이름과
-설명은 세션마다 그대로 로드된다(직접 확인, [docs/ADR.md](docs/ADR.md) 10번). 토큰이 줄지 않으므로
-Agent HUD에는 스킬 단위 차단 스위치를 두지 않는다.
+### 그룹
 
-### 마켓플레이스 [Claude Code]
+같이 쓰는 플러그인과 스킬에 이름을 붙여 묶어둔 것이다. "글쓰기", "영상 편집" 같은
+이름으로 만든다. Agent HUD에만 있고 `modes.json`에 저장된다.
 
-플러그인을 내려받는 출처. git 저장소나 로컬 경로를 `claude plugin marketplace add`로 등록한다.
-Agent HUD에서 플러그인 이름에 마우스를 올리면 출처가 표시된다. 마켓플레이스를 추가하거나
-삭제하는 기능은 없다. 어떤 출처를 신뢰할지는 사용자가 `claude` CLI로 직접 결정해야 하기 때문이다.
-
-### 그룹 [Agent HUD]
-
-Agent HUD에만 있는 기능. 함께 쓰는 플러그인과 스킬에 이름을 붙여 저장한 목록이다.
-예를 들어 "글쓰기" 그룹과 "영상 편집" 그룹을 따로 만든다. 목록은 `modes.json`에 저장되고,
-그룹 탭에서 관리하거나 파일을 직접 편집할 수 있다.
-
-## 그룹 설정하기
+## 그룹 만들기
 
 1. 그룹 탭에서 "+ 새 그룹 만들기"를 누른다.
-2. 그룹 이름을 입력하고, 처음 넣을 플러그인 하나를 선택한다.
-3. 그룹 항목 아래의 "+ 플러그인 또는 스킬 추가…"에서 플러그인과 스킬을 더 넣는다.
-4. 플러그인 & 스킬 탭에서 프로젝트를 선택한 뒤, 그룹 탭에서 "이 프로젝트에 적용"을 누른다.
+2. 이름을 적고 처음 넣을 플러그인을 고른다.
+3. 그룹 아래의 "+ 플러그인 또는 스킬 추가…"에서 더 넣는다.
+4. 플러그인 & 스킬 탭에서 프로젝트를 고르고, 그룹 탭에서 "이 프로젝트에 적용"을 누른다.
 
-적용하면 그룹의 스킬이 그 프로젝트의 스킬 폴더에 연결되고, 그룹에 든 플러그인은 켜지고
-나머지 플러그인은 꺼진다. 다른 프로젝트의 설정은 바뀌지 않는다. 플러그인 변경은 다음
-세션부터 적용된다.
-
-터미널에서도 같은 작업을 할 수 있다.
+터미널에서도 할 수 있다. Homebrew로 설치했다면 `python3 …/server.py` 대신 `agent-hud`를
+쓴다.
 
 ```bash
 python3 ~/.claude/tools/agent-hud/server.py groups          # 그룹 목록
@@ -171,7 +132,7 @@ python3 ~/.claude/tools/agent-hud/server.py apply dev       # 현재 폴더에 "
 python3 ~/.claude/tools/agent-hud/server.py apply --off     # 현재 폴더의 그룹 해제
 ```
 
-`modes.json`을 직접 편집해도 된다. 값을 목록 하나로만 쓰면 플러그인만 있는 그룹이 된다.
+`modes.json`을 직접 고쳐도 된다. 값을 목록 하나로만 쓰면 플러그인만 든 그룹이 된다.
 
 ```json
 {
@@ -183,74 +144,66 @@ python3 ~/.claude/tools/agent-hud/server.py apply --off     # 현재 폴더의 �
 }
 ```
 
-플러그인 이름은 플러그인 & 스킬 탭에 표시된 이름과 `@마켓플레이스` 부분까지 같아야 한다.
-스킬 이름은 스킬 폴더 이름이다. 파일을 저장하면 대시보드가 다음 조회 때 반영하므로
-서비스를 재시작하지 않아도 된다.
+플러그인 이름은 플러그인 & 스킬 탭에 나온 이름과 `@마켓플레이스` 부분까지 같아야 한다.
+스킬 이름은 스킬 폴더 이름이다. 파일을 저장하면 대시보드가 다음 새로고침 때 읽으므로
+아무것도 다시 시작하지 않아도 된다.
 
-## 여러 프로젝트·세션에서의 동작
+## 여러 프로젝트와 세션
 
-서버는 컴퓨터에서 하나만 실행되고 모든 프로젝트가 같은 서버를 쓴다. Claude Code 세션이
-시작되면 훅이 실행 중인 서버가 있는지 확인한다. 서버가 있으면 현재 프로젝트 경로만
-등록하고, 없으면 서버를 새로 실행한다. 같은 프로젝트에서 터미널을 열거나 닫아도 서버는
-재시작되지 않고 포트도 바뀌지 않는다. 서버를 새로 실행할 때는 브라우저에 대시보드 탭이
-열린다.
-
-예전 버전은 스킬 차단 항목을 `Skill(플러그인@마켓플레이스:스킬)` 형식으로 썼는데, Claude
-Code는 이 형식을 인식하지 않는다. 서버가 시작되거나 프로젝트가 등록될 때 Agent HUD는
-프로젝트의 `.claude/settings.local.json`과 `.claude/settings.json`에서 이 형식의 항목만
-지우고, 지운 항목을 로그에 남긴다. 다른 규칙은 그대로 둔다.
-
-플러그인 & 스킬 탭과 에이전트 지침 탭의 제목 아래 드롭다운에서 프로젝트를 선택한다. 그룹
-탭은 거기서 선택한 프로젝트에 적용된다. "+ 폴더 추가"로 훅 없이도 프로젝트를 추가할 수 있다.
+서버는 컴퓨터에 하나만 돌고 모든 프로젝트가 같이 쓴다. Claude Code 세션이 시작되면 훅이
+프로젝트를 이미 돌고 있는 서버에 등록한다. 서버가 없으면 새로 띄우고 브라우저에 대시보드를
+연다. 터미널을 열고 닫아도 서버가 다시 시작되거나 포트가 바뀌지 않는다.
 
 ## 서비스 관리
 
 ```bash
-launchctl list | grep agent-hud                               # 실행 상태 확인
-launchctl kickstart -k gui/$(id -u)/com.agent-hud             # server.py 수정 후 재시작
+launchctl list | grep agent-hud                               # 돌고 있는지 확인
+launchctl kickstart -k gui/$(id -u)/com.agent-hud             # server.py를 고친 뒤 재시작
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.agent-hud.plist  # 중지
 tail -f ~/.claude/tools/agent-hud/launchd.err.log             # 로그 보기
 ```
 
-세션 훅이 실행되기 전에 환경변수 `CLAUDE_HUD_DISABLE=1`을 설정하면 그 세션은 서버를
-실행하지도, 프로젝트를 등록하지도 않는다. 이 값이 설정된 동안에는 `groups`, `apply`
-명령도 동작하지 않는다. 이미 실행 중인 서버는 계속 동작한다.
+Homebrew로 설치했다면 `brew services restart agent-hud`, `brew services stop agent-hud`를
+쓴다.
+
+세션 훅이 돌기 전에 `CLAUDE_HUD_DISABLE=1`을 설정해 두면 그 세션에서는 서버가 뜨지 않고
+프로젝트도 등록되지 않는다. `groups`와 `apply` 명령도 아무것도 하지 않는다. 이미 돌고
+있는 서버는 그대로 돈다.
 
 ## 앱처럼 열기
 
-브라우저 테두리 없이 창 하나에, 독립된 아이콘으로 열고 싶다면 화면 위쪽의 **앱으로 설치**를
-누르세요. Chrome·Edge에서는 한 번에 설치됩니다(macOS·Windows 동일). 그 기능이 없는
-브라우저(Safari 포함)에서는 버튼을 눌러도 자동으로 안 되니, 그 브라우저에서 직접 하는
-방법(Safari: 파일 → Dock에 추가)을 안내창으로 보여줍니다.
-
-브라우저 자체의 앱 모드를 쓰는 것이라 Agent HUD가 따로 네이티브 래퍼를 만들 필요는 없습니다.
+화면 위쪽의 **앱으로 설치**를 누르면 브라우저 테두리 없는 창이 따로 뜨고, 전용 아이콘도 생긴다.
+Chrome과 Edge에서는 바로 설치된다. 이 기능이 없는 브라우저(Safari 포함)에서는 직접
+설치하는 메뉴 위치를 알려준다(Safari: 파일 → Dock에 추가).
 
 ## 업데이트 확인
 
-대시보드는 하루에 한 번 GitHub Releases에서 새 버전 태그를 확인하고, 새 버전이 있으면 화면
-위쪽에 알림을 표시한다. 파일을 내려받거나 설치하지는 않는다. 클론해서 설치했다면 그 폴더에서 `git pull`을 실행한 뒤 `./install.sh`를 다시 실행한다.
-서비스는 `~/.claude/tools/agent-hud/`에 복사된 파일을 실행하므로 `git pull`만으로는
-바뀌지 않는다. Homebrew로 설치했다면 `brew upgrade agent-hud`를 실행한다.
+대시보드는 하루에 한 번 GitHub Releases에서 새 버전이 있는지 확인하고, 있으면 화면 위쪽에
+알려준다. 내려받거나 설치하지는 않는다. 서비스는 `~/.claude/tools/agent-hud/`에 복사해 둔 파일을
+돌리므로, 클론해서 설치했다면 `git pull` 뒤에 `./install.sh`를 다시 실행한다. Homebrew로 설치했다면 `brew upgrade agent-hud`를 실행한다.
 
-## 확장하기
+컴퓨터 밖으로 나가는 요청은 이 확인뿐이다. Agent HUD는 이 컴퓨터의 설정 파일만 읽고
+고치며, 계정이 없어도 된다.
 
-패널을 추가하려면 `def collect_x(ctx) -> dict` 형태의 함수를 작성하고 `PANELS` 목록에
-넣는다.
+## 알려진 한계
 
-## 피드백
+- **macOS만 지원한다.** 설치 스크립트가 `launchd`를 쓰기 때문이다. `server.py`에는
+  운영체제를 타는 코드가 없어서, 리눅스에서는 `systemd --user` 유닛으로 돌리면 된다.
+  Windows는 아직 지원하지 않는다([#1](../../issues/1)).
+- **플러그인을 켜고 끄면 다음 세션부터 적용된다.** Claude Code가 세션을 시작할 때
+  플러그인 상태를 읽기 때문이다.
+- **플러그인에 든 스킬 하나만 뺄 수는 없다.** `permissions.deny`에 넣으면 호출은
+  막히지만 이름과 설명은 세션마다 그대로 들어가서 토큰이 줄지 않는다
+  ([docs/ADR.md](docs/ADR.md) 10번). 플러그인을 통째로 꺼야 빠진다.
+- **자동 등록은 Claude Code 세션에서만 된다.** 다른 에이전트로 작업하는 프로젝트는
+  "+ 폴더 추가"로 넣는다.
 
-버그 제보와 제안은 [Issues](../../issues)에 남긴다. 대시보드 아래쪽의 "피드백 보내기 ↗"
-링크를 누르면 버전이 미리 입력된 이슈 양식이 열린다. 영어와 한국어 모두 가능하다.
+## 피드백과 기여
 
-## 릴리스
-
-`v`로 시작하는 태그를 밀면 GitHub Actions가 릴리스를 만든다. 대시보드의 업데이트 알림이
-그 릴리스를 읽는다. 검사는 push와 PR마다 자동으로 돈다.
-
-## 설계 근거
-
-대안을 비교해서 정한 결정(의존성 없는 단일 파일, 플러그인·스킬 상태를 읽고 쓰는 방식,
-웹소켓 대신 폴링을 쓰는 이유)은 [docs/ADR.md](docs/ADR.md)에 기록되어 있다.
+버그와 제안은 [Issues](../../issues)에 남긴다. 한국어로 써도 된다. 대시보드 아래쪽의
+"피드백 보내기 ↗"를 누르면 버전이 미리 채워진 이슈 양식이 열린다. 클론한 폴더에서
+직접 실행해 보거나, 검사를 돌리거나, 패널을 추가하려면 [CONTRIBUTING.md](CONTRIBUTING.md)를
+본다. 설계를 어떻게 정했고 어떤 대안을 버렸는지는 [docs/ADR.md](docs/ADR.md)에 있다.
 
 ## 라이선스
 
