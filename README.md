@@ -31,35 +31,32 @@ skills you use together as a group and apply a different group to each project.
 
 ## Quickstart (macOS)
 
-1. Install it, with git or with Homebrew.
-
-   ```bash
-   git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
-   ./install.sh
-   ```
+1. Install it with Homebrew.
 
    ```bash
    brew install ganggangstone/tap/agent-hud
    brew services start agent-hud
    ```
 
-2. Add the hook setting the installer prints to `~/.claude/settings.json`. It registers
-   each project with the dashboard when a Claude Code session starts.
-3. Open <http://127.0.0.1:7717>.
-4. In the Groups tab, create a group, pick a project, and click "Apply to this project".
+2. Open <http://127.0.0.1:7717> and add the project folder you work in with "+ add a folder"
+   in the sidebar. If you use Claude Code, paste the hook setting the installer prints into
+   `~/.claude/settings.json` and you can skip this: each folder you open a session in is added
+   for you.
+3. In the Groups tab, create a group and click "Apply to this project".
 
 ## Install
+
+Without Homebrew, clone the repository and run the install script:
+
+```bash
+git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
+./install.sh
+```
 
 The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
 `modes.json` from the example file, and registers a `launchd` service, so the dashboard
 keeps running after you close terminals and restarts if the process exits. Homebrew
 installs an `agent-hud` command and runs the same server with `brew services`.
-
-Neither installer writes the hook into `~/.claude/settings.json` itself, so hooks you
-already have are never overwritten. Copy the printed setting in yourself.
-
-Projects you work on only with Codex, Cursor, Gemini CLI or Antigravity are not
-registered automatically. Add them with "+ add a folder" in the dashboard.
 
 ## What it shows
 
@@ -153,9 +150,7 @@ saved file on its next refresh, so you don't need to restart anything.
 
 ## Behavior across projects and sessions
 
-One server runs on the computer and every project uses it. When a Claude Code session
-starts, the hook registers the project with the running server, or starts a server and
-opens the dashboard in a browser tab if none is running. Opening or closing terminals
+One server runs on the computer and every project uses it. Opening or closing terminals
 does not restart the server or change its port.
 
 ## Managing the service
@@ -200,8 +195,6 @@ settings files on this computer only and needs no account.
   from being invoked, but its name and description still load every session, so it
   saves no tokens ([docs/ADR.md](docs/ADR.md) section 10). Turning the whole plugin off
   is the only way.
-- **Only Claude Code sessions register projects automatically.** Projects for other
-  agents need "+ add a folder".
 
 ## Feedback and contributing
 

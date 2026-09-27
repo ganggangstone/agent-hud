@@ -31,35 +31,31 @@ Agent HUD는 프로젝트마다 스킬이 몇 개 읽히는지 보여준다. 같
 
 ## 빠른 시작 (macOS)
 
-1. git이나 Homebrew로 설치한다.
-
-   ```bash
-   git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
-   ./install.sh
-   ```
+1. Homebrew로 설치한다.
 
    ```bash
    brew install ganggangstone/tap/agent-hud
    brew services start agent-hud
    ```
 
-2. 설치할 때 터미널에 나온 훅 설정을 `~/.claude/settings.json`에 붙여넣는다. Claude Code
-   세션이 시작될 때마다 이 훅이 프로젝트를 대시보드에 등록한다.
-3. <http://127.0.0.1:7717>을 연다.
-4. 그룹 탭에서 그룹을 만들고, 프로젝트를 고른 뒤 "이 프로젝트에 적용"을 누른다.
+2. <http://127.0.0.1:7717>을 열고, 사이드바의 "+ 폴더 추가"로 작업 중인 프로젝트 폴더를 넣는다.
+   Claude Code를 쓴다면 설치할 때 나온 훅 설정을 `~/.claude/settings.json`에 넣어 두면 이
+   단계를 건너뛸 수 있다. 세션을 연 폴더가 알아서 들어간다.
+3. 그룹 탭에서 그룹을 만들고 "이 프로젝트에 적용"을 누른다.
 
 ## 설치
+
+Homebrew를 쓰지 않는다면 저장소를 받아 설치 스크립트를 돌린다.
+
+```bash
+git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-hud
+./install.sh
+```
 
 설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, `modes.json.example`을
 본떠 `modes.json`을 만들고, `launchd` 서비스로 등록한다. 그래서 터미널을 닫아도 대시보드는
 계속 돌고, 프로세스가 죽으면 다시 켜진다. Homebrew로 설치하면 `agent-hud` 명령이 생기고,
 같은 서버를 `brew services`가 띄운다.
-
-이미 넣어둔 훅을 덮어쓰지 않도록, 어느 쪽으로 설치해도 설치 과정에서
-`~/.claude/settings.json`은 건드리지 않는다. 터미널에 나온 설정은 사용자가 복사해 넣는다.
-
-Codex, Cursor, Gemini CLI, Antigravity로만 작업하는 프로젝트는 자동으로 등록되지 않는다.
-대시보드의 "+ 폴더 추가"로 넣는다.
 
 ## 화면 구성
 
@@ -150,9 +146,8 @@ python3 ~/.claude/tools/agent-hud/server.py apply --off     # 현재 폴더의 �
 
 ## 여러 프로젝트와 세션
 
-서버는 컴퓨터에 하나만 돌고 모든 프로젝트가 같이 쓴다. Claude Code 세션이 시작되면 훅이
-프로젝트를 이미 돌고 있는 서버에 등록한다. 서버가 없으면 새로 띄우고 브라우저에 대시보드를
-연다. 터미널을 열고 닫아도 서버가 다시 시작되거나 포트가 바뀌지 않는다.
+서버는 컴퓨터에 하나만 돌고 모든 프로젝트가 같이 쓴다. 터미널을 열고 닫아도 서버가 다시
+시작되거나 포트가 바뀌지 않는다.
 
 ## 서비스 관리
 
@@ -195,8 +190,6 @@ Chrome과 Edge에서는 바로 설치된다. 이 기능이 없는 브라우저(S
 - **플러그인에 든 스킬 하나만 뺄 수는 없다.** `permissions.deny`에 넣으면 호출은
   막히지만 이름과 설명은 세션마다 그대로 들어가서 토큰이 줄지 않는다
   ([docs/ADR.md](docs/ADR.md) 10번). 플러그인을 통째로 꺼야 빠진다.
-- **자동 등록은 Claude Code 세션에서만 된다.** 다른 에이전트로 작업하는 프로젝트는
-  "+ 폴더 추가"로 넣는다.
 
 ## 피드백과 기여
 

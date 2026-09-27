@@ -396,7 +396,7 @@ cd agent-hud &amp;&amp; ./install.sh
     <p class="q">How do I undo it, or remove it?</p>
     <p class="small dim">Unassign the group and the skill links it made are removed (from the dashboard, or <span class="mono">agent-hud apply --off</span>). The plugin on/off values stay in that project&#8217;s <span class="mono">.claude/settings.local.json</span>, so drop <span class="mono">enabledPlugins</span> there if you want them gone. The tool itself stops with <span class="mono">launchctl bootout</span>; delete <span class="mono">~/.claude/tools/agent-hud/</span> and <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span> and nothing is left.</p>
     <p class="q">Do my other agents need setting up?</p>
-    <p class="small dim">Claude Code registers a project on its own. For one you use only with Cursor, Codex, Gemini CLI or Antigravity, add it with <span class="mono">+ add a folder</span> in the dashboard; skill badges and group apply then work the same way.</p>
+    <p class="small dim">No. Add a project with <span class="mono">+ add a folder</span> in the dashboard and it works the same whichever agent you use.</p>
   </div>
 </section>
 
