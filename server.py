@@ -188,7 +188,7 @@ def brew_update(prefix, latest):
                 tail = (r.stderr or r.stdout).strip().splitlines()
                 return False, tail[-1] if tail else f"{cmd[1]} failed"
         r = subprocess.run([brew, "list", "--versions", "agent-hud"], capture_output=True, text=True, timeout=60)
-        if latest not in r.stdout.split()[1:]:
+        if all(newer(latest, v) for v in r.stdout.split()[1:]):
             return False, "Homebrew does not have the new version yet"
         return True, ""
     except Exception as e:
@@ -219,6 +219,13 @@ def start_in_background():
                      env=dict(os.environ, AGENT_HUD_NO_BROWSER="1"))
 
 
+def newer(a, b):
+    """a가 b보다 새 버전인가. 설치본이 저장해 둔 최신 버전보다 앞서 있으면(확인은 하루 한 번이다)
+    알림을 띄우지 않아야 한다."""
+    v = lambda s: tuple(int(x) for x in re.findall(r"\d+", s or ""))
+    return v(a) > v(b)
+
+
 def collect_update(ctx):
     cached = read_json(UPDATE_CACHE_FILE, {})
     latest = cached.get("latest")
@@ -226,7 +233,7 @@ def collect_update(ctx):
         "panel": "update",
         "version": VERSION,
         "latest": latest,
-        "has_update": bool(latest) and latest != VERSION,
+        "has_update": newer(latest, VERSION),
         "repo": UPDATE_REPO,
         "brew": bool(brew_prefix()),
     }

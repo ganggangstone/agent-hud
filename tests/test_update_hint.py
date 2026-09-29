@@ -49,7 +49,20 @@ def check_brew_prefix():
         assert hud.brew_prefix(other) is None, "다른 formula 안의 파일을 agent-hud로 봤다"
 
 
+def check_newer():
+    # 설치본이 저장된 최신 버전보다 앞서면(릴리스 직후 업그레이드) 알림이 뜨면 안 된다.
+    assert hud.newer("0.4.1", "0.4.0") and hud.newer("0.10.0", "0.9.9")
+    assert not hud.newer("0.4.0", "0.4.1") and not hud.newer("0.4.0", "0.4.0")
+    assert not hud.newer(None, "0.4.0")
+    cache = os.path.join(tempfile.mkdtemp(), "c.json")
+    hud.UPDATE_CACHE_FILE = cache
+    for latest, shown in (("0.0.1", False), (hud.VERSION, False), ("999.0.0", True)):
+        hud.write_json(cache, {"latest": latest})
+        assert hud.collect_update({})["has_update"] is shown, latest
+
+
 def main():
+    check_newer()
     check_prompt()
     check_brew_prefix()
     print("PASS")
