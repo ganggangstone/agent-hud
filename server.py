@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, re, socket, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+import json, os, re, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -15,12 +15,15 @@ CLAUDE_DIR = os.path.join(HOME, ".claude")
 # 갈리는 곳에 놓이므로, 사용자 데이터를 거기 두면 그룹과 프로젝트 목록이 날아간다.
 TOOL_DIR = os.environ.get("AGENT_HUD_HOME") or os.path.dirname(os.path.abspath(__file__))
 os.makedirs(TOOL_DIR, exist_ok=True)
-PORT_FILE = os.path.join(TOOL_DIR, ".port")
 PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
 VERSION = "0.3.0"
+# 주소는 늘 같아야 한다. "앱으로 설치"한 Dock 아이콘과 북마크가 이 주소에 묶이므로, 포트가 밀리면
+# 그것들이 다른 프로그램을 열게 된다. 개발 도구가 흔히 쓰는 번호(3000, 8000, 8080 등)와 겹치지 않고,
+# macOS가 임시로 나눠 주는 범위(49152~)보다 아래인 번호를 쓴다.
+PORT = int(os.environ.get("AGENT_HUD_PORT") or 41717)
 UPDATE_REPO = "ganggangstone/agent-hud"
 UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 24 * 60 * 60
@@ -90,11 +93,9 @@ def read_json(path, default=None):
     return default if default is not None else {}
 
 
-# 버전 확인만 하고 다운로드는 사용자가 직접 한다. git과 Homebrew에 업데이트 경로가
-# 이미 있고(git pull, brew upgrade), 실행 중인 서버가 자기 코드를 덮어쓰는 구조를 만들 이유가 없다.
-# 근거는 docs/ADR.md 7번.
+# 여기서는 새 버전이 있는지만 확인한다. 내려받는 건 사용자가 알림의 버튼을 눌렀을 때 brew가 하고
+# (brew_update), git 설치본은 에이전트에게 맡길 문장을 복사해 준다. 근거는 docs/ADR.md 7번.
 def _fetch_latest_release():
-    import urllib.request
     req = urllib.request.Request(
         f"https://api.github.com/repos/{UPDATE_REPO}/releases/latest",
         headers={"Accept": "application/vnd.github+json", "User-Agent": "agent-hud"},
@@ -129,6 +130,67 @@ def _update_check_loop():
             pass
 
 
+def brew_prefix(path=__file__):
+    """Homebrew로 설치됐으면 brew가 있는 접두 경로(/opt/homebrew 등), 아니면 None.
+    formula가 server.py를 <접두>/Cellar/agent-hud/<버전>/libexec/에 둔다."""
+    marker = os.sep + os.path.join("Cellar", "agent-hud") + os.sep
+    here = os.path.realpath(path)
+    if marker not in here:
+        return None
+    prefix = here.split(marker)[0]
+    return prefix if os.path.isfile(os.path.join(prefix, "bin", "brew")) else None
+
+
+_update_lock = threading.Lock()
+
+
+def brew_update(prefix, latest):
+    """버튼 한 번으로 Homebrew 설치본을 올린다. (ok, 오류 문장)을 돌려준다.
+    파일을 바꾸는 건 brew다 -- 서버는 명령을 부르고 끝나면 새 코드로 다시 뜰 뿐이다.
+    git으로 설치한 쪽은 코드를 고쳐 쓰고 있을 수 있어 이 경로를 열지 않는다(ADR 7번)."""
+    if not _update_lock.acquire(blocking=False):
+        return False, "already updating"
+    try:
+        brew = os.path.join(prefix, "bin", "brew")
+        # upgrade 전에 update를 따로 부른다. brew는 24시간 안에 한 번 받은 탭을 다시 받지
+        # 않아서, 릴리스 직후에는 upgrade만으로는 새 버전을 못 볼 수 있다.
+        for cmd in ([brew, "update"], [brew, "upgrade", "agent-hud"]):
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+            if r.returncode != 0:
+                tail = (r.stderr or r.stdout).strip().splitlines()
+                return False, tail[-1] if tail else f"{cmd[1]} failed"
+        r = subprocess.run([brew, "list", "--versions", "agent-hud"], capture_output=True, text=True, timeout=60)
+        if latest not in r.stdout.split()[1:]:
+            return False, "Homebrew does not have the new version yet"
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+    finally:
+        _update_lock.release()
+
+
+def restart_into(prefix):
+    """brew가 새 코드를 깔았으니 같은 프로세스를 새 코드로 바꾼다. launchd 서비스로 떠 있어도
+    PID가 그대로라 서비스가 끊기지 않는다. 열려 있는 탭이 알아서 새로고침하므로 새 탭은 열지 않는다."""
+    time.sleep(1)  # 응답이 브라우저에 닿을 시간
+    exe = os.path.join(prefix, "bin", "agent-hud")
+    os.environ["AGENT_HUD_NO_BROWSER"] = "1"
+    os.execv(exe, [exe])
+
+
+def start_in_background():
+    """`agent-hud open`이 서버가 꺼져 있을 때 부른다. Homebrew 설치본이면 서비스를 켜서 로그인할
+    때도 뜨게 하고, 아니면 이 파일을 셸과 떨어진 프로세스로 띄운다."""
+    prefix = brew_prefix()
+    if prefix:
+        subprocess.run([os.path.join(prefix, "bin", "brew"), "services", "start", "agent-hud"],
+                       capture_output=True, timeout=120)
+        return
+    subprocess.Popen([sys.executable, os.path.abspath(__file__)], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     env=dict(os.environ, AGENT_HUD_NO_BROWSER="1"))
+
+
 def collect_update(ctx):
     cached = read_json(UPDATE_CACHE_FILE, {})
     latest = cached.get("latest")
@@ -138,6 +200,7 @@ def collect_update(ctx):
         "latest": latest,
         "has_update": bool(latest) and latest != VERSION,
         "repo": UPDATE_REPO,
+        "brew": bool(brew_prefix()),
     }
 
 
@@ -156,7 +219,7 @@ def collect_groups(ctx):
             "name": gname,
             "assigned": gname == assigned,
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
-                     + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk)} for sk in skills],
+                     + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk, sources[sk])} for sk in skills],
         })
     return {"title": "Groups", "groups": groups,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
@@ -518,9 +581,26 @@ def _link_path(project_dir, rel, skill):
     return os.path.join(project_dir, rel.replace("/", os.sep), skill)
 
 
+def project_skills():
+    """{스킬 이름: (원본 폴더, 프로젝트)}. 대시보드에 등록된 프로젝트 안에 실제 폴더로 놓인 스킬.
+    한 프로젝트에서만 쓰던 스킬도 그룹에 넣어 다른 프로젝트에 걸 수 있게 한다. 링크는 원본으로
+    받지 않는다 -- 다른 곳을 가리키는 링크를 원본으로 삼으면 링크를 가리키는 링크가 생긴다."""
+    out = {}
+    for proj in known_projects():
+        for rel, _agents in SKILL_ROOTS_PROJECT:
+            root = os.path.join(proj, rel.replace("/", os.sep))
+            if not os.path.isdir(root):
+                continue
+            for name in sorted(os.listdir(root)):
+                d = os.path.join(root, name)
+                if not os.path.islink(d) and os.path.isfile(os.path.join(d, "SKILL.md")):
+                    out.setdefault(name, (d, proj))
+    return out
+
+
 def skill_sources(project_dir):
-    """{스킬 이름: 원본 폴더}. 원본은 플러그인 폴더나 사용자 스킬 폴더에서만 찾는다 --
-    프로젝트 안의 링크를 원본으로 삼으면 자기 자신을 가리키게 된다."""
+    """{스킬 이름: 원본 폴더}. 플러그인, 사용자 스킬 폴더, 등록된 프로젝트의 실제 스킬 폴더 순으로
+    찾고, 이름이 겹치면 앞의 것을 쓴다."""
     out = {}
     for skills in plugin_skills().values():
         out.update(skills)
@@ -532,12 +612,18 @@ def skill_sources(project_dir):
             d = os.path.join(root, name)
             if os.path.isfile(os.path.join(d, "SKILL.md")):
                 out.setdefault(name, d)
+    for name, (d, _proj) in project_skills().items():
+        out.setdefault(name, d)
     return out
 
 
-def skill_is_shared(project_dir, name):
-    """이 프로젝트의 모든 스킬 폴더에 링크가 걸려 있나."""
-    return all(os.path.islink(_link_path(project_dir, d, name)) for d in GROUP_LINK_DIRS)
+def skill_is_shared(project_dir, name, src=None):
+    """이 프로젝트의 모든 스킬 폴더에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
+    자체면 된다(원본이 이 프로젝트 안에 있는 경우)."""
+    src = src or skill_sources(project_dir).get(name)
+    real = os.path.realpath(src) if src else None
+    return all(os.path.islink(p) or (real is not None and os.path.realpath(p) == real)
+               for p in (_link_path(project_dir, d, name) for d in GROUP_LINK_DIRS))
 
 
 def link_skill(name, on, project_dir):
@@ -626,7 +712,7 @@ def collect_skills(ctx):
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
-        skill["shared"] = skill_is_shared(project_dir, skill["id"])
+        skill["shared"] = skill_is_shared(project_dir, skill["id"], sources.get(skill["id"]))
         skill["linkable"] = skill["id"] in sources
         READABLE_PATHS.add(os.path.join(skill["path"], "SKILL.md"))
         return skill
@@ -1250,7 +1336,11 @@ const T = {
     usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · ${cpu}% CPU`),
     period_tip: 'How often this page re-reads the files',
     switching: 'switching…',
-    update_available: (v, latest, repo) => `↑ v${latest} available (you're on v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">see release</a>, then <code>git pull</code> in your clone and run <code>./install.sh</code> (Homebrew: <code>brew upgrade agent-hud</code>)`,
+    update_available: (v, latest, repo) => `↑ A new version is out: v${latest} (you're on v${v}) · <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">what's new</a>`,
+    update_now: 'Update now', update_running: 'Updating… this can take a minute or two. The page reloads when it is done.',
+    update_failed: e => `Could not update: ${e}. You can also ask your AI agent: copy the sentence below.`,
+    update_copy: 'Copy a request for your AI agent', update_copied: 'Copied. Paste it into Claude Code or whichever agent you use.',
+    update_prompt: (latest, repo) => `Update agent-hud to v${latest}. Follow the "Updating" steps in https://github.com/${repo}#updating`,
     feedback_open: 'send feedback ↗',
   },
   ko: {
@@ -1333,7 +1423,11 @@ const T = {
     usage: (mb, cpu) => `${mb}MB` + (cpu === null ? '' : ` · CPU ${cpu}%`),
     period_tip: '이 화면이 파일을 얼마나 자주 다시 읽을지',
     switching: '바꾸는 중…',
-    update_available: (v, latest, repo) => `↑ v${latest} 나왔습니다 (지금은 v${v}) — <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">릴리스 보기</a> 후 클론한 폴더에서 <code>git pull</code>, <code>./install.sh</code> 실행 (Homebrew: <code>brew upgrade agent-hud</code>)`,
+    update_available: (v, latest, repo) => `↑ 새 버전이 나왔습니다: v${latest} (지금은 v${v}) · <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">바뀐 점</a>`,
+    update_now: '지금 업데이트', update_running: '업데이트하는 중입니다. 1~2분 걸릴 수 있고, 끝나면 화면이 새로고침됩니다.',
+    update_failed: e => `업데이트하지 못했습니다: ${e}. AI 에이전트에게 맡기려면 아래 문장을 복사해 붙여넣으세요.`,
+    update_copy: 'AI에게 보낼 문장 복사', update_copied: '복사했습니다. Claude Code나 쓰는 AI 에이전트 창에 붙여넣으세요.',
+    update_prompt: (latest, repo) => `agent-hud를 최신 버전(v${latest})으로 업데이트해줘. https://github.com/${repo}#updating 의 "Updating" 절차를 따라줘.`,
     feedback_open: '피드백 보내기 ↗',
   },
 };
@@ -1626,20 +1720,72 @@ function renderFeedback(upd){
   a.textContent = t().feedback_open;
   a.href = `https://github.com/${upd.repo}/issues/new?template=feedback.yml&version=${encodeURIComponent(upd.version)}`;
 }
+// 업데이트 알림. Homebrew 설치본은 버튼 하나로 끝낸다(brew가 파일을 바꾸고 서버가 새 코드로 다시 뜬다).
+// git 설치본은 코드를 고쳐 쓰고 있을 수 있어 에이전트에게 맡길 문장을 복사해 준다.
+// 배너는 tick마다 다시 그려지므로 버튼 상태는 updState에 둔다.
+let updState = '';  // '' | 'running' | 'copied' | 'failed'
+let updError = '';
+function renderUpdate(upd){
+  const el = document.getElementById('updateBanner');
+  if(!(upd && upd.has_update)){ el.style.display = 'none'; return; }
+  el.innerHTML = t().update_available(upd.version, upd.latest, upd.repo) + ' ';
+  const prompt = t().update_prompt(upd.latest, upd.repo);
+  const copyBtn = () => {
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = t().update_copy;
+    b.onclick = async () => {
+      try{ await navigator.clipboard.writeText(prompt); updState = updState === 'failed' ? 'failed' : 'copied'; }
+      catch(e){ window.prompt('', prompt); }
+      renderUpdate(upd);
+    };
+    return b;
+  };
+  if(updState !== 'running'){
+    if(upd.brew && updState !== 'failed'){
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t().update_now;
+      b.onclick = () => runUpdate(upd);
+      el.append(b);
+    } else {
+      el.append(copyBtn());
+    }
+  }
+  const msg = updState === 'running' ? t().update_running
+    : updState === 'copied' ? t().update_copied
+    : updState === 'failed' ? t().update_failed(updError) : '';
+  if(msg){ const m = document.createElement('div'); m.style.marginTop = '6px'; m.textContent = msg; el.append(m); }
+  if(updState === 'failed'){ const q = document.createElement('code'); q.textContent = prompt; el.append(q); }
+  el.style.display = '';
+}
+async function runUpdate(upd){
+  updState = 'running'; renderUpdate(upd);
+  try{
+    const r = await fetch('/api/update', {method: 'POST', body: '{}'});
+    const d = await r.json();
+    if(d.ok){
+      // 서버가 새 코드로 다시 뜨는 동안에는 응답이 없다. 다시 응답하면 새로고침한다.
+      await new Promise(r => setTimeout(r, 2000));
+      for(let i = 0; i < 60; i++){
+        try{ if((await fetch('/manifest.json')).ok) break; } catch(e){}
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      location.reload(); return;
+    }
+    updState = 'failed'; updError = d.error || 'unknown error';
+  } catch(e){ updState = 'failed'; updError = String(e); }
+  renderUpdate(upd);
+}
 async function tick(){
   if(!polling) return;
   const r = await fetch(stateUrl()); const d = await r.json();
   const upd = d.panels.find(p => p.panel === 'update');
-  const updEl = document.getElementById('updateBanner');
-  if(upd && upd.has_update){
-    updEl.innerHTML = t().update_available(upd.version, upd.latest, upd.repo);
-    updEl.style.display = '';
-  } else {
-    updEl.style.display = 'none';
-  }
+  renderUpdate(upd);
   if(upd) renderFeedback(upd);
   renderSidebar(d.panels.find(p => p.known_projects) || {known_projects: [], project_dir: selectedProject});
-  const app = document.getElementById('app'); app.innerHTML='';
+  const app = document.getElementById('app');
+  // 탭 안의 드롭다운이나 입력 칸을 쓰는 중이면 이번 갱신은 건너뛴다. 다시 그리면 그 요소가
+  // 새것으로 바뀌어, 펼쳐 둔 "플러그인 또는 스킬 추가" 목록이 몇 초 만에 닫힌다.
+  const busy = document.activeElement;
+  if(busy && app.contains(busy) && ['SELECT', 'INPUT', 'TEXTAREA'].includes(busy.tagName)) return;
+  app.innerHTML='';
   for(const p of d.panels){
     if(p.project_dir) currentProjectDir = p.project_dir;
     if(p.title !== activeTab) continue;
@@ -2200,15 +2346,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": True})
             else:
                 self._send_json({"ok": False, "error": "directory not found"}, 400)
+        elif self.path == "/api/update":
+            prefix = brew_prefix()
+            if not prefix:
+                return self._send_json({"ok": False, "error": "not a Homebrew install"}, 400)
+            ok, err = brew_update(prefix, read_json(UPDATE_CACHE_FILE).get("latest"))
+            self._send_json({"ok": ok, "error": err})
+            if ok:
+                threading.Thread(target=restart_into, args=(prefix,), daemon=True).start()
         else:
             self._send_json({"ok": False, "error": "not found"}, 404)
 
 
-def port_alive(port):
+# 127.0.0.1로 가는 요청이 환경 변수의 프록시로 새지 않게 한다.
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def hud_alive(port):
+    """그 포트에서 응답하는 게 Agent HUD인지 본다. 다른 프로그램이 그 포트를 쓰는데 열려 있다는
+    것만 보고 '이미 떠 있다'고 끝내면, 대시보드가 영영 뜨지 않는다."""
     try:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.3):
-            return True
-    except OSError:
+        with LOCAL.open(f"http://127.0.0.1:{port}/manifest.json", timeout=1) as r:
+            return json.loads(r.read()).get("name") == "Agent HUD"
+    except Exception:
         return False
 
 
@@ -2248,6 +2408,7 @@ def cli_apply(group, project_dir):
 
 
 USAGE = """agent-hud                      대시보드를 띄웁니다
+agent-hud open                 대시보드를 브라우저로 엽니다 (꺼져 있으면 띄운 뒤 엽니다)
 agent-hud groups               그룹 목록
 agent-hud apply <그룹> [폴더]   그룹을 폴더에 적용 (기본: 현재 폴더)
 agent-hud apply --off [폴더]    적용 해제"""
@@ -2273,38 +2434,66 @@ def main():
         sys.exit(cli_apply(group, target))
     if len(sys.argv) > 2 and sys.argv[1] == "--register":
         PROJECT_DIR = os.path.abspath(sys.argv[2])
+    registering = len(sys.argv) > 2 and sys.argv[1] == "--register"
+    opening = bool(argv) and argv[0] == "open"
+    port = PORT
+    url = f"http://127.0.0.1:{port}"
 
-    base_port = 7717
-    if os.path.exists(PORT_FILE) and port_alive(int(open(PORT_FILE).read().strip() or 0)):
-        # already running: just register this project (if any) and exit, no new server/tab
-        port = int(open(PORT_FILE).read().strip())
+    def hand_off():
+        # 이미 떠 있는 대시보드에 넘긴다. `open`이면 탭만 열고, 아니면(세션 훅, 서비스) 이 폴더만
+        # 알려준다. 서비스가 부를 때 탭을 열면 launchd가 되살릴 때마다 탭이 쌓이므로 `open`에서만 연다.
+        if opening:
+            webbrowser.open(url, new=0, autoraise=True)
+            return
         try:
-            import urllib.request
             req = urllib.request.Request(
-                f"http://127.0.0.1:{port}/api/register",
+                f"{url}/api/register",
                 data=json.dumps({"path": PROJECT_DIR}).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=2)
+            LOCAL.open(req, timeout=2)
         except Exception:
             pass
-        return
+
+    if hud_alive(port):
+        return hand_off()
+
+    if opening:
+        # 꺼져 있으면 서버를 따로 띄우고, 응답할 때까지 기다렸다가 연다. 이 명령이 직접 서버가 되면
+        # 터미널이나 에이전트의 셸을 붙잡고 끝나지 않고, 그 셸이 닫힐 때 대시보드도 같이 죽는다.
+        start_in_background()
+        for _ in range(40):
+            if hud_alive(port):
+                webbrowser.open(url, new=0, autoraise=True)
+                return
+            time.sleep(0.25)
+        print(f"agent-hud: the dashboard did not start. Is another program using port {port}?", file=sys.stderr)
+        sys.exit(1)
 
     register_project(PROJECT_DIR)
     cleanup_known_projects()
-    port = base_port
-    for _ in range(10):
-        if not port_alive(port):
-            break
-        port += 1
-    with open(PORT_FILE, "w") as f:
-        f.write(str(port))
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    httpd = socketserver.ThreadingTCPServer(("127.0.0.1", port), Handler)
+    # 다른 프로그램이 이 포트를 쓰고 있으면 옆 번호로 가지 않는다(위 PORT 설명).
+    warned = False
+    while True:
+        try:
+            httpd = socketserver.ThreadingTCPServer(("127.0.0.1", port), Handler)
+            break
+        except OSError:
+            if hud_alive(port):
+                return hand_off()  # 다른 Agent HUD가 한발 먼저 떴다
+            if registering:
+                return  # 세션 훅은 기다리지 않는다. 기다리면 세션을 열 때마다 프로세스가 하나씩 쌓인다
+            if not warned:
+                print(f"agent-hud: port {port} is used by another program. Waiting for it to be free.",
+                      file=sys.stderr, flush=True)
+                warned = True
+            time.sleep(30)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     threading.Thread(target=_update_check_loop, daemon=True).start()
-    webbrowser.open(f"http://127.0.0.1:{port}", new=0, autoraise=False)
+    if not os.environ.pop("AGENT_HUD_NO_BROWSER", None):
+        webbrowser.open(url, new=0, autoraise=opening)
     # keep process alive in background; parent hook detaches us
     while True:
         time.sleep(3600)

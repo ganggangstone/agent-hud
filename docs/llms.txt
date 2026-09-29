@@ -11,15 +11,17 @@ of a session, whether that session uses the skill or not. Agent HUD shows
 how many skills a selected project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group per project.
 It reads and writes settings files on the machine it runs on and needs no
-account; the only request that leaves the computer is a GitHub Releases
-check once a day for update notices.
+account. On its own it makes one request, a GitHub Releases check once a
+day for update notices; a Homebrew install can also update itself when the
+user clicks Update now, and then Homebrew does the download.
 
 ## Links
 
 - Homepage (English): https://ganggangstone.github.io/agent-hud/
 - Homepage (Korean): https://ganggangstone.github.io/agent-hud/ko/
 - Repository: https://github.com/ganggangstone/agent-hud
-- Install: `brew install ganggangstone/tap/agent-hud && brew services start agent-hud` (or `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh`)
+- Install with an AI agent: ask it to "Install Agent HUD from https://github.com/ganggangstone/agent-hud and follow the For AI agents section of its README"
+- Install: `brew install --cask ganggangstone/tap/agent-hud-app` (app icon plus the `agent-hud` command), or `brew install ganggangstone/tap/agent-hud && brew services start agent-hud` for the command only (or `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh`)
 - Design decisions: https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md
 
 ## Summary
@@ -29,4 +31,4 @@ check once a day for update notices.
 - License: MIT
 - Dependencies: none — a single Python file, standard library only
 - Account: not required
-- Network use: one GitHub Releases check a day, nothing else
+- Network use: one GitHub Releases check a day; Homebrew downloads an update only when the user clicks Update now

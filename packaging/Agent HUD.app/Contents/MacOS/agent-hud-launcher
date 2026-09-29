@@ -1,0 +1,7 @@
+#!/bin/sh
+# Agent HUD 앱 아이콘을 누르면 도는 스크립트. 대시보드를 브라우저로 열고, 꺼져 있으면 띄운 뒤 연다.
+# 명령은 Homebrew formula가 깐다(cask가 그 formula에 기댄다).
+for b in /opt/homebrew/bin/agent-hud /usr/local/bin/agent-hud; do
+  if [ -x "$b" ]; then exec "$b" open; fi
+done
+open "https://github.com/ganggangstone/agent-hud#quickstart-macos"

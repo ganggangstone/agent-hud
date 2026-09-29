@@ -13,7 +13,7 @@ def load(env_home):
         "import importlib.util, json, sys;"
         f"spec=importlib.util.spec_from_file_location('hud', {SERVER!r});"
         "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
-        "print(json.dumps([m.TOOL_DIR, m.PROJECTS_FILE, m.MODES_FILE, m.SETS_FILE, m.PORT_FILE]))"
+        "print(json.dumps([m.TOOL_DIR, m.PROJECTS_FILE, m.MODES_FILE, m.SETS_FILE]))"
     )
     env = dict(os.environ)
     env.pop("AGENT_HUD_HOME", None)

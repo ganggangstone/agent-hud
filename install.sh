@@ -23,7 +23,7 @@ launchctl load "$PLIST"
 
 echo ""
 echo "Agent HUD installed and running (launchd service com.agent-hud)."
-echo "Dashboard: check \$HOME/.claude/tools/agent-hud/.port for the live port (starts at 7717)."
+echo "Dashboard: http://127.0.0.1:41717"
 echo ""
 echo "To have each Claude Code session register itself with the dashboard, add this to"
 echo "~/.claude/settings.json under \"hooks\" -> \"SessionStart\":"

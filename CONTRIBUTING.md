@@ -6,7 +6,10 @@
 python3 server.py
 ```
 
-It serves on `127.0.0.1:7717` and reads local files only. `install.sh` copies
+It serves on `127.0.0.1:41717` and reads local files only. If the installed
+dashboard is already running, a checkout started with `python3 server.py` just hands
+over to it and exits; run it as `AGENT_HUD_PORT=41718 python3 server.py` to try your
+changes side by side. `install.sh` copies
 `server.py` into `~/.claude/tools/agent-hud/` and registers a launchd service;
 that copy is a build artifact. **Edit the checkout, never the installed copy** —
 a copy you can edit while it runs will quietly get ahead of the source.
@@ -61,12 +64,21 @@ nothing for users.
   Skills spec.
 - **`tests/test_subprojects.py`** — subfolders that are projects of their own
   show up in the folder picker.
-- **`tests/test_update_hint.py`** — the update notice tells people to rerun
-  `install.sh` (or `brew upgrade`), since the service runs an installed copy
-  that `git pull` alone does not change.
+- **`tests/test_update_hint.py`** — the request a cloned install copies for its
+  AI agent points at a README section that exists and gives both update paths
+  (`git pull` then `install.sh`, or `brew upgrade`), and the Homebrew check
+  (`brew_prefix`) tells a Homebrew install from a clone or another formula.
 - **`tests/test_install_app.py`** — `/manifest.json` and `/icon.png` are valid
   and the page actually links the manifest. Whether Chrome offers the install
   prompt for real can only be checked in a browser.
+- **`tests/test_mac_app.py`** — `packaging/Agent HUD.app` has a valid `Info.plist`,
+  its launcher is executable and runs `agent-hud open`, and the icon it names exists. The
+  `agent-hud-app` cask in the tap installs this folder from the release tarball.
+- **`tests/test_project_skill_source.py`** — a skill that lives only inside a registered
+  project can be a group source, links are never taken as sources, plugin and user skills
+  win name clashes, and the source project's real folder is left alone.
+- **`tests/test_port_owner.py`** — when another program answers on the dashboard's
+  port, the dashboard does not treat it as already running.
 
 If you add a check, **break the thing it checks and watch it fail.** A check
 that has never failed is a check nobody has verified.
@@ -96,6 +108,7 @@ take its neighbour with it.
 
 ```
 agent-hud                      start the dashboard
+agent-hud open                 open it in the browser, starting it first if needed
 agent-hud groups               list groups, and which one this folder uses
 agent-hud apply <group> [dir]  apply a group to a folder (default: cwd)
 agent-hud apply --off [dir]    stop using one here
@@ -107,7 +120,7 @@ with `AGENT_HUD_HOME=~/.claude/tools/agent-hud` to act on the installed data.
 
 ## Where its data lives
 
-`projects.json`, `modes.json`, `project-sets.json` and `.port` sit next to
+`projects.json`, `modes.json` and `project-sets.json` sit next to
 `server.py` by default. Set `AGENT_HUD_HOME` to put them somewhere else — the
 Homebrew formula does exactly that, because a package manager replaces the code
 directory on every upgrade and would take your groups with it.

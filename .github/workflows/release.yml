@@ -118,10 +118,24 @@ jobs:
               sys.exit("수식에서 url/sha256을 못 찾았습니다")
           open(path, "w").write(s2)
           PY
+          # 앱 아이콘 cask도 같은 태그 tarball을 받으므로 버전과 sha256만 같이 바꾼다
+          c=tap/Casks/agent-hud-app.rb
+          if [ -f "$c" ]; then
+            python3 - "$c" "${tag#v}" "$sha" <<'PY'
+          import re, sys
+          path, ver, sha = sys.argv[1:4]
+          s = open(path).read()
+          s2 = re.sub(r'version "[^"]+"', f'version "{ver}"', s, count=1)
+          s2 = re.sub(r'sha256 "[^"]+"', f'sha256 "{sha}"', s2, count=1)
+          if s2 == s:
+              sys.exit("cask에서 version/sha256을 못 찾았습니다")
+          open(path, "w").write(s2)
+          PY
+          fi
           cd tap
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/agent-hud.rb
+          git add Formula/agent-hud.rb Casks
           # 탭 커밋 시각은 워크플로가 돈 시각이 아니라 태그 커밋의 시각을 따른다.
           when=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .commit.committer.date)
           export GIT_AUTHOR_DATE="$when" GIT_COMMITTER_DATE="$when"

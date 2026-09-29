@@ -32,19 +32,34 @@ Agent HUD는 프로젝트마다 스킬이 몇 개 읽히는지 보여준다. 같
 
 ## 빠른 시작 (macOS)
 
-1. Homebrew로 설치한다.
+AI 코딩 에이전트를 쓰고 있다면 설치를 통째로 맡길 수 있다. Claude Code, Codex 등 쓰는
+에이전트에 이렇게 말하면 된다.
+
+> https://github.com/ganggangstone/agent-hud 에서 Agent HUD를 설치해줘. README의 "For AI agents" 절을 따라줘.
+
+직접 설치하려면:
+
+1. Homebrew로 설치한다. 응용 프로그램 폴더에 Agent HUD 앱이 생기고 `agent-hud` 명령도 깔린다.
 
    ```bash
-   brew install ganggangstone/tap/agent-hud
-   brew services start agent-hud
+   brew install --cask ganggangstone/tap/agent-hud-app
    ```
 
-2. <http://127.0.0.1:7717>을 열고, 사이드바의 "+ 폴더 추가"로 작업 중인 프로젝트 폴더를 넣는다.
+2. Launchpad나 응용 프로그램 폴더에서 **Agent HUD**를 연다. 브라우저에 대시보드
+   (<http://127.0.0.1:41717>)가 열린다. 사이드바의 "+ 폴더 추가"로 작업 중인 프로젝트 폴더를 넣는다.
    Claude Code를 쓴다면 설치할 때 나온 훅 설정을 `~/.claude/settings.json`에 넣어 두면 이
    단계를 건너뛸 수 있다. 세션을 연 폴더가 알아서 들어간다.
 3. 그룹 탭에서 그룹을 만들고 "이 프로젝트에 적용"을 누른다.
 
 ## 설치
+
+위 명령은 Homebrew 패키지 두 개를 설치한다. 대시보드와 명령을 담은 `agent-hud` formula,
+그리고 `agent-hud open`을 실행하는 앱 아이콘인 `agent-hud-app` cask다. 명령만 쓰려면:
+
+```bash
+brew install ganggangstone/tap/agent-hud
+brew services start agent-hud
+```
 
 Homebrew를 쓰지 않는다면 저장소를 받아 설치 스크립트를 돌린다.
 
@@ -119,6 +134,12 @@ Cursor 등은 `AGENTS.md`, Cursor는 `.cursor/rules/`, Copilot은
 같이 쓰는 플러그인과 스킬에 이름을 붙여 묶어둔 것이다. "글쓰기", "영상 편집" 같은
 이름으로 만든다. Agent HUD에만 있고 `modes.json`에 저장된다.
 
+그룹에는 플러그인의 스킬, 사용자 스킬 폴더(`~/.claude/skills`, `~/.agents/skills` 등)의 스킬,
+그리고 사이드바에 있는 프로젝트 가운데 한 곳 안에만 있는 스킬을 넣을 수 있다. 마지막 것은
+목록에 어느 프로젝트 것인지 같이 나온다. 다른 프로젝트에는 그 프로젝트 폴더를 가리키는 링크가
+걸리므로, 그 프로젝트를 옮기거나 지우면 링크가 끊긴다. 이름이 겹치면 플러그인, 사용자 스킬
+폴더, 프로젝트 순으로 앞의 것을 쓴다.
+
 ## 그룹 만들기
 
 1. 그룹 탭에서 "+ 새 그룹 만들기"를 누른다.
@@ -181,7 +202,12 @@ tail -f ~/.claude/tools/agent-hud/launchd.err.log             # 로그 보기
 ```
 
 Homebrew로 설치했다면 `brew services restart agent-hud`, `brew services stop agent-hud`를
-쓴다. 로그는 `$(brew --prefix)/var/log/agent-hud.err.log`에 있다.
+쓴다. 로그는 `$(brew --prefix)/var/log/agent-hud.err.log`에 있다. `agent-hud open`은
+대시보드를 브라우저로 연다. 꺼져 있으면 먼저 띄운다.
+
+대시보드는 늘 41717번 포트를 쓴다. 그래서 북마크와 앱으로 설치한 아이콘이 계속 맞는 주소를
+연다. 다른 프로그램이 이미 그 포트를 쓰고 있으면 다른 번호로 옮기지 않고 비기를 기다리며,
+로그에 그렇게 적는다.
 
 세션 훅이 돌기 전에 `CLAUDE_HUD_DISABLE=1`을 설정해 두면 그 세션에서는 서버가 뜨지 않고
 프로젝트도 등록되지 않는다. `groups`와 `apply` 명령도 아무것도 하지 않는다. 이미 돌고
@@ -193,14 +219,22 @@ Homebrew로 설치했다면 `brew services restart agent-hud`, `brew services st
 Chrome과 Edge에서는 바로 설치된다. 이 기능이 없는 브라우저(Safari 포함)에서는 직접
 설치하는 메뉴 위치를 알려준다(Safari, macOS Sonoma 이상: 파일 → Dock에 추가).
 
-## 업데이트 확인
+## 업데이트
 
 대시보드는 하루에 한 번 GitHub Releases에서 새 버전이 있는지 확인하고, 있으면 화면 위쪽에
-알려준다. 내려받거나 설치하지는 않는다. 서비스는 `~/.claude/tools/agent-hud/`에 복사해 둔 파일을
-돌리므로, 클론해서 설치했다면 `git pull` 뒤에 `./install.sh`를 다시 실행한다. Homebrew로 설치했다면 `brew upgrade agent-hud`를 실행한다.
+알려준다.
 
-컴퓨터 밖으로 나가는 요청은 이 확인뿐이다. Agent HUD는 이 컴퓨터의 설정 파일만 읽고
-고치며, 계정이 없어도 된다.
+- **Homebrew로 설치했다면** 알림의 **지금 업데이트**를 누른다. 대시보드가 `brew update`와
+  `brew upgrade agent-hud`를 실행하고 새 코드로 다시 뜬 뒤 화면이 새로고침된다. 터미널에서는
+  `brew update && brew upgrade agent-hud && brew services restart agent-hud`.
+- **클론해서 설치했다면** **AI에게 보낼 문장 복사**를 눌러 에이전트에 붙여넣거나, 클론한
+  폴더에서 `git pull` 뒤에 `./install.sh`를 실행한다. 서비스는 `~/.claude/tools/agent-hud/`에
+  복사해 둔 파일을 돌리므로 `git pull`만으로는 바뀌지 않는다. `./install.sh`가 새 파일을
+  복사하고 서비스를 다시 켠다.
+
+대시보드가 스스로 보내는 요청은 하루 한 번의 이 확인뿐이다. 업데이트를 내려받는 건
+**지금 업데이트**를 눌렀을 때뿐이고, 내려받는 일은 Homebrew가 한다. Agent HUD는 이 컴퓨터의
+설정 파일만 읽고 고치며, 계정이 없어도 된다.
 
 ## 한계
 

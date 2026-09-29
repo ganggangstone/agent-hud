@@ -32,20 +32,37 @@ skills you use together as a group and apply a different group to each project.
 
 ## Quickstart (macOS)
 
-1. Install it with Homebrew.
+If you use an AI coding agent, it can do the whole install for you. Paste this into
+Claude Code, Codex, or whichever agent you use:
+
+> Install Agent HUD from https://github.com/ganggangstone/agent-hud. Follow the "For AI agents" section of its README.
+
+To do it yourself:
+
+1. Install it with Homebrew. This puts an Agent HUD app in Applications and installs the
+   `agent-hud` command.
 
    ```bash
-   brew install ganggangstone/tap/agent-hud
-   brew services start agent-hud
+   brew install --cask ganggangstone/tap/agent-hud-app
    ```
 
-2. Open <http://127.0.0.1:7717> and add the project folder you work in with "+ add a folder"
-   in the sidebar. If you use Claude Code, paste the hook setting the installer prints into
-   `~/.claude/settings.json` and you can skip this: each folder you open a session in is added
-   for you.
+2. Open **Agent HUD** from Launchpad or Applications. The dashboard opens in your browser at
+   <http://127.0.0.1:41717>. Add the project folder you work in with "+ add a folder" in the
+   sidebar. If you use Claude Code, paste the hook setting the installer prints into
+   `~/.claude/settings.json` and you can skip this: each folder you open a session in is
+   added for you.
 3. In the Groups tab, create a group and click "Apply to this project".
 
 ## Install
+
+The command above installs two Homebrew packages: the `agent-hud` formula (the dashboard
+and its command) and the `agent-hud-app` cask (an app icon that runs `agent-hud open`).
+If you only want the command:
+
+```bash
+brew install ganggangstone/tap/agent-hud
+brew services start agent-hud
+```
 
 Without Homebrew, clone the repository and run the install script:
 
@@ -58,6 +75,26 @@ The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
 `modes.json` from the example file, and registers a `launchd` service, so the dashboard
 keeps running after you close terminals and restarts if the process exits. Homebrew
 installs an `agent-hud` command and runs the same server with `brew services`.
+
+## For AI agents
+
+Steps for an agent asked to install, open, or update Agent HUD on the user's Mac.
+
+1. **Install.** If `brew` is available, run
+   `brew install --cask ganggangstone/tap/agent-hud-app && brew services start agent-hud`.
+   The first installs the dashboard, its command and an app icon; the second keeps it running
+   from login and opens it in the browser. Otherwise clone this repository (for example to `~/agent-hud`) and run `./install.sh` in it.
+2. **Register sessions (Claude Code only).** Add a `SessionStart` hook to
+   `~/.claude/settings.json`. Merge it into any hooks already there; do not replace them.
+   The command is `nohup agent-hud --register "$PWD" >/dev/null 2>&1 & disown` for a Homebrew
+   install, or `nohup python3 "$HOME/.claude/tools/agent-hud/server.py" --register "$PWD" >/dev/null 2>&1 & disown`
+   for a cloned one.
+3. **Open.** `agent-hud open` for a Homebrew install, or `open http://127.0.0.1:41717`.
+   With the cask installed, tell the user they can reopen it any time from **Agent HUD** in
+   Launchpad.
+4. **Update.** Follow [Updating](#updating). For a cloned install you need the clone's folder;
+   if you did not install it yourself, ask the user where it is. Tell the user which version
+   was installed before and after.
 
 ## What it shows
 
@@ -122,6 +159,12 @@ selected project's `.claude/settings.local.json`, so other projects are not affe
 
 A named list of plugins and skills you use together, such as "writing" or "video
 editing". Groups exist only in Agent HUD and are stored in `modes.json`.
+
+A group can hold plugin skills, skills in your user skill folders (`~/.claude/skills`,
+`~/.agents/skills` and so on), and skills that live inside one of the projects in the
+sidebar. The last kind shows its project's name in the list. Other projects get a link to
+that project's folder, so moving or deleting that project breaks the link. When two skills
+share a name, a plugin skill wins over a user skill, and a user skill over a project one.
 
 ## Setting up groups
 
@@ -188,7 +231,12 @@ tail -f ~/.claude/tools/agent-hud/launchd.err.log             # view logs
 ```
 
 With Homebrew, use `brew services restart agent-hud` and `brew services stop agent-hud`;
-logs are in `$(brew --prefix)/var/log/agent-hud.err.log`.
+logs are in `$(brew --prefix)/var/log/agent-hud.err.log`. `agent-hud open` opens the
+dashboard in your browser, starting it first if it is not running.
+
+The dashboard always uses port 41717, so bookmarks and the installed app keep working. If
+another program already uses that port, the dashboard waits for it to be free instead of
+moving to another number, and says so in the log.
 
 If `CLAUDE_HUD_DISABLE=1` is set before a session's hook runs, that session neither starts
 a server nor registers its project, and `groups` and `apply` do nothing. A server that is
@@ -200,15 +248,22 @@ Click **Install app** in the header to get a window without browser chrome and w
 own icon. Chrome and Edge install it in one step. In other browsers,
 including Safari, it tells you which menu to use instead (Safari on macOS Sonoma or later: File → Add to Dock).
 
-## Update checks
+## Updating
 
 Once a day the dashboard checks GitHub Releases for a new version and shows a notice at
-the top of the page when there is one. It never downloads or installs anything. If you
-cloned it, run `git pull` and then `./install.sh` again, because the service runs the copy
-in `~/.claude/tools/agent-hud/`. With Homebrew, run `brew upgrade agent-hud`.
+the top of the page when there is one.
 
-This check is the only request that leaves the computer. Agent HUD reads and writes
-settings files on this computer only and needs no account.
+- **Homebrew:** click **Update now** in the notice. The dashboard runs `brew update` and
+  `brew upgrade agent-hud`, restarts itself on the new code, and the page reloads. From a
+  terminal: `brew update && brew upgrade agent-hud && brew services restart agent-hud`.
+- **Cloned:** click **Copy a request for your AI agent** and paste it into your agent, or
+  run `git pull` in the clone and then `./install.sh`. The service runs the copy in
+  `~/.claude/tools/agent-hud/`, so `git pull` alone changes nothing; `./install.sh` copies
+  the new file and restarts the service.
+
+The daily check is the only request the dashboard makes on its own. It downloads an update
+only when you click **Update now**, and Homebrew does the downloading. Agent HUD reads and
+writes settings files on this computer only and needs no account.
 
 ## Known limitations
 

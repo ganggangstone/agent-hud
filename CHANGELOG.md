@@ -2,6 +2,60 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## 다음 버전 / Unreleased
+
+**Homebrew로 설치했다면 업데이트 알림의 버튼 하나로 업데이트된다.** "지금 업데이트"를 누르면
+대시보드가 `brew update`와 `brew upgrade agent-hud`를 실행하고 새 코드로 다시 뜬다. git으로
+설치했다면 AI 에이전트에게 보낼 업데이트 요청 문장을 복사해 준다. README에 에이전트가 따라 할
+설치·열기·업데이트 절차를 적었다.
+
+**With a Homebrew install, one button in the update notice updates it.** "Update now" runs
+`brew update` and `brew upgrade agent-hud`, then restarts the dashboard on the new code.
+A cloned install gets a button that copies an update request for your AI agent. The README
+now has install, open, and update steps written for an agent to follow.
+
+**주소가 `127.0.0.1:41717`로 고정된다.** 전에는 7717에서 시작해 자리가 차 있으면 다음 번호로
+밀려서, 북마크와 앱으로 설치한 아이콘이 다른 프로그램을 열 수 있었다. 이제 다른 프로그램이
+41717을 쓰고 있으면 비기를 기다리고 로그에 알린다. `AGENT_HUD_PORT`로 바꿀 수 있다. 또 그 포트에
+응답하는 게 Agent HUD일 때만 이미 떠 있다고 본다. 전에는 열려 있기만 하면 떠 있다고 보고 끝내서,
+다른 프로그램이 그 포트를 쓰면 서버가 뜨자마자 끝나기를 반복했다.
+
+**한 프로젝트 안에만 있는 스킬도 그룹에 넣는다.** 전에는 플러그인과 사용자 스킬 폴더의 스킬만
+그룹 후보였다. 이제 사이드바의 프로젝트 안에 실제 폴더로 놓인 스킬도 목록에
+나오고, 그룹을 적용한 다른 프로젝트에는 그 폴더를 가리키는 링크가 걸린다.
+
+**그룹의 "플러그인 또는 스킬 추가" 목록이 몇 초 만에 닫히던 문제를 고쳤다.** 화면이 주기마다 탭을
+통째로 다시 그리면서 펼쳐 둔 목록도 새로 만들었다. 이제 탭 안의 목록이나 입력 칸을 쓰는 동안에는
+다시 그리지 않는다.
+
+**`agent-hud open`으로 대시보드를 연다.** 떠 있으면 브라우저 탭을 열고, 꺼져 있으면 띄운 뒤 연다.
+
+**응용 프로그램 폴더에 Agent HUD 앱이 생긴다.** `brew install --cask ganggangstone/tap/agent-hud-app`로
+설치하면 Launchpad에서 누를 수 있는 앱 아이콘과 `agent-hud` 명령이 함께 깔린다. 앱은 `agent-hud open`을
+실행한다.
+
+**The address is fixed at `127.0.0.1:41717`.** It used to start at 7717 and move up when
+that port was taken, so bookmarks and the installed app could open another program. Now, if
+another program holds 41717, the dashboard waits for it and says so in the log;
+`AGENT_HUD_PORT` changes the port. It also treats the port as its own only when Agent HUD
+answers there. Before, any open port counted, so another program on it made the server exit
+on every start.
+
+**Skills that live inside one project can go into a group.** Only plugin skills and user
+skill folders used to be candidates. A skill kept as a real folder inside a project in the
+sidebar now appears in the list, and other projects the group is applied to get a
+link to that folder.
+
+**The "add a plugin or skill" list in a group no longer closes after a few seconds.** The
+page redrew the whole tab on every refresh, replacing the open list. It now skips the redraw
+while you are using a list or text field in the tab.
+
+**`agent-hud open` opens the dashboard,** starting it first if it is not running.
+
+**An Agent HUD app in Applications.** `brew install --cask ganggangstone/tap/agent-hud-app`
+installs an app icon you can click in Launchpad along with the `agent-hud` command. The app
+runs `agent-hud open`.
+
 ## v0.3.0
 
 **플러그인 밖 스킬도 프로젝트마다 켜고 끈다.** `~/.claude/skills`나 프로젝트에 직접 둔 스킬에

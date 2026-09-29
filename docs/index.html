@@ -212,9 +212,8 @@ footer a:hover{color:var(--text)}
   <p class="say">Every skill and plugin you<br>have installed, in one place.<br><span class="soft">Off for the projects that don't need them.</span></p>
   <p class="sub">A dashboard that runs on your own computer. No sign-up, no account.</p>
   <div class="cmdwrap">
-    <div class="cmd" id="cmd">brew install ganggangstone/tap/agent-hud
-brew services start agent-hud
-<b>or  git clone https://github.com/ganggangstone/agent-hud.git &amp;&amp; cd agent-hud &amp;&amp; ./install.sh</b></div>
+    <div class="cmd" id="cmd">brew install --cask ganggangstone/tap/agent-hud-app
+<b>or tell your AI agent: Install Agent HUD from github.com/ganggangstone/agent-hud</b></div>
     <button class="copy" type="button" id="cp">
       <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
       <svg class="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
@@ -222,7 +221,7 @@ brew services start agent-hud
     </button>
   </div>
   <p class="plat"><span class="badge">macOS only, for now</span></p>
-  <p class="fine">Then open <span class="mono">127.0.0.1:7717</span> in your browser. It keeps running in the background after that.</p>
+  <p class="fine">Then open Agent HUD from Launchpad. The dashboard opens in your browser at <span class="mono">127.0.0.1:41717</span>.</p>
 </header>
 
 <div class="w">
@@ -401,7 +400,7 @@ brew services start agent-hud
 </section>
 
 <div class="w" style="margin-top:clamp(74px,10vw,132px)">
-  <p class="fine">The whole thing is one Python file that uses nothing but the standard library. You can read it yourself, and it runs only on your computer. Nothing is uploaded and there is no account to make. Only one request leaves the machine: a GitHub Releases check once a day, to see whether a newer version exists.</p>
+  <p class="fine">The whole thing is one Python file that uses nothing but the standard library. You can read it yourself, and it runs only on your computer. Nothing is uploaded and there is no account to make. On its own it makes one request: a GitHub Releases check once a day, to see whether a newer version exists. If you installed with Homebrew and click Update now, Homebrew downloads the new version.</p>
 </div>
 
 <footer class="w">
