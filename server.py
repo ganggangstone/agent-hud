@@ -142,6 +142,22 @@ def _update_check_loop():
             pass
 
 
+def pick_folder():
+    """브라우저는 고른 폴더의 실제 경로를 페이지에 알려주지 않는다. 서버가 이 맥에서 돌고 있으니
+    Finder의 폴더 고르기 창을 서버가 띄운다. 창을 띄울 수 없으면 None(경로를 직접 입력받는다),
+    취소하면 ""."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        r = subprocess.run(["osascript", "-e", "activate", "-e", "POSIX path of (choose folder)"],
+                           capture_output=True, text=True, timeout=600)
+    except Exception:
+        return None
+    if r.returncode:
+        return "" if "-128" in r.stderr else None       # -128: 사용자가 취소했다
+    return r.stdout.strip().rstrip("/") or "/"
+
+
 def brew_prefix(path=__file__):
     """Homebrew로 설치됐으면 brew가 있는 접두 경로(/opt/homebrew 등), 아니면 None.
     formula가 server.py를 <접두>/Cellar/agent-hud/<버전>/libexec/에 둔다."""
@@ -1637,9 +1653,13 @@ function renderSidebarList(){
   const add = document.createElement('div'); add.className = 'sb-add'; add.textContent = t().add_project;
   add.title = t().add_project_tip;
   add.onclick = async () => {
-    const path = (prompt(t().add_project_prompt) || '').trim();
-    if(!path) return;
     polling = false;
+    let path = '';
+    try{
+      const p = await (await fetch('/api/pick-folder', {method:'POST'})).json();
+      path = p.ok ? p.path : (prompt(t().add_project_prompt) || '').trim();
+    } catch(e){ path = (prompt(t().add_project_prompt) || '').trim(); }
+    if(!path){ polling = true; return; }
     try{
       const r = await fetch('/api/register', {method:'POST', body: JSON.stringify({path})});
       const d = await r.json();
@@ -2344,6 +2364,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not ok:
                     errs.append(f"{n}: {err}")
             self._send_json({"ok": not errs, "error": "; ".join(errs[:3])})
+        elif self.path == "/api/pick-folder":
+            path = pick_folder()
+            self._send_json({"ok": path is not None, "path": path or ""})
         elif self.path == "/api/register":
             length = int(self.headers.get("Content-Length", 0))
             try:
