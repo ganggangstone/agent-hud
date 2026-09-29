@@ -2,6 +2,17 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.4.2
+
+**설치본이 마지막으로 확인한 최신 버전보다 새것이면 업데이트 알림이 뜨지 않는다.** 최신 버전은 하루에
+한 번만 확인한다. 그 사이에 `brew upgrade`로 먼저 올리면 "새 버전이 나왔습니다: v0.4.0 (지금은 v0.4.1)"처럼
+옛 버전을 권했고, 버튼을 누르면 "Homebrew does not have the new version yet"으로 실패했다.
+
+**No update notice when the installed version is newer than the last one checked.** The
+latest version is checked once a day. Upgrading with `brew upgrade` in between made the notice
+offer the older version ("v0.4.0 is out, you're on v0.4.1"), and its button failed with
+"Homebrew does not have the new version yet".
+
 ## v0.4.1
 
 **세션 여러 개를 한꺼번에 열면 사이드바의 프로젝트 목록이 비던 문제를 고쳤다.** 두 곳이 동시에
