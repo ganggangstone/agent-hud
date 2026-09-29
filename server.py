@@ -29,33 +29,46 @@ UPDATE_CACHE_FILE = os.path.join(TOOL_DIR, ".update_check.json")
 UPDATE_CHECK_INTERVAL_SEC = 24 * 60 * 60
 
 
+# 세션 훅과 화면 폴링이 동시에 목록을 고친다. 잠그지 않으면 한쪽이 읽는 사이 다른 쪽이 쓰다 만 파일을
+# 읽고, 못 읽은 것을 빈 목록으로 알고 그 위에 써서 목록이 통째로 사라진다.
+_projects_lock = threading.Lock()
+
+
+def write_json(path, data, **kw):
+    """다 쓴 뒤에 바꿔 끼운다. 쓰는 도중에 읽는 쪽이 반쯤 쓴 파일을 보지 않는다."""
+    tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, **kw)
+    os.replace(tmp, path)
+
+
 def remember_project(path):
     """이미 아는 프로젝트면 아무것도 하지 않는다. 발견할 때마다 시각을 갱신하면
     자동 발견된 폴더가 매번 목록 맨 위로 올라온다."""
     if path in ("/", HOME):
         return
-    projects = read_json(PROJECTS_FILE, {})
-    if path in projects:
-        return
-    projects[path] = time.time() - 86400        # 직접 연 프로젝트보다 뒤에 놓는다
-    try:
-        with open(PROJECTS_FILE, "w") as f:
-            json.dump(projects, f)
-    except Exception:
-        pass
+    with _projects_lock:
+        projects = read_json(PROJECTS_FILE, {})
+        if path in projects:
+            return
+        projects[path] = time.time() - 86400        # 직접 연 프로젝트보다 뒤에 놓는다
+        try:
+            write_json(PROJECTS_FILE, projects)
+        except Exception:
+            pass
 
 
 def register_project(path):
     """Record a project dir as 'seen' so the dashboard can offer it in the project dropdown."""
     if path in ("/", HOME):
         return  # server's own cwd under launchd, not a real project
-    projects = read_json(PROJECTS_FILE, {})
-    projects[path] = time.time()
-    try:
-        with open(PROJECTS_FILE, "w") as f:
-            json.dump(projects, f)
-    except Exception:
-        pass
+    with _projects_lock:
+        projects = read_json(PROJECTS_FILE, {})
+        projects[path] = time.time()
+        try:
+            write_json(PROJECTS_FILE, projects)
+        except Exception:
+            pass
     if os.path.isdir(path):
         remove_stale_skill_denies(path)
 
@@ -124,8 +137,7 @@ def _update_check_loop():
             pass  # 오프라인이면 조용히 넘어간다 — 대시보드 본 기능과 무관
         # 실패해도 시각은 남긴다. 요청은 이미 나갔으므로 하루 한 번이라는 약속에 포함된다.
         try:
-            with open(UPDATE_CACHE_FILE, "w") as f:
-                json.dump({"latest": latest, "checked_at": time.time()}, f)
+            write_json(UPDATE_CACHE_FILE, {"latest": latest, "checked_at": time.time()})
         except Exception:
             pass
 
@@ -920,8 +932,7 @@ def read_sets():
 
 def write_sets(sets):
     try:
-        with open(MODES_FILE, "w") as f:
-            json.dump(sets, f, ensure_ascii=False, indent=2)
+        write_json(MODES_FILE, sets, ensure_ascii=False, indent=2)
         return True, ""
     except Exception as e:
         return False, str(e)
@@ -993,8 +1004,7 @@ def assign_set(name, project_dir):
     else:
         assigned.pop(project_dir, None)
     try:
-        with open(SETS_FILE, "w") as f:
-            json.dump(assigned, f, ensure_ascii=False, indent=2)
+        write_json(SETS_FILE, assigned, ensure_ascii=False, indent=2)
     except Exception as e:
         errors.append(str(e))
     return (not errors), "; ".join(errors)[:300]

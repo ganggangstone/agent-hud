@@ -77,6 +77,8 @@ nothing for users.
 - **`tests/test_project_skill_source.py`** — a skill that lives only inside a registered
   project can be a group source, links are never taken as sources, plugin and user skills
   win name clashes, and the source project's real folder is left alone.
+- **`tests/test_projects_race.py`** — sessions registering at the same moment neither corrupt
+  the project list nor drop entries from it.
 - **`tests/test_port_owner.py`** — when another program answers on the dashboard's
   port, the dashboard does not treat it as already running.
 
