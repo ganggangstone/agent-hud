@@ -50,7 +50,9 @@ To do it yourself:
    <http://127.0.0.1:41717>. Add the project folder you work in with "+ add a folder" in the
    sidebar. If you use Claude Code, paste the hook setting the installer prints into
    `~/.claude/settings.json` and you can skip this: each folder you open a session in is
-   added for you.
+   added for you. Agent HUD does not search your disk for projects. The sidebar lists only
+   folders added one of these two ways, so projects you opened before adding the hook need
+   "+ add a folder" once.
 3. In the Groups tab, create a group and click "Apply to this project".
 
 ## Install
@@ -162,9 +164,9 @@ editing". Groups exist only in Agent HUD and are stored in `modes.json`.
 
 A group can hold plugin skills, skills in your user skill folders (`~/.claude/skills`,
 `~/.agents/skills` and so on), and skills that live inside one of the projects in the
-sidebar. The last kind shows its project's name in the list. Other projects get a link to
-that project's folder, so moving or deleting that project breaks the link. When two skills
-share a name, a plugin skill wins over a user skill, and a user skill over a project one.
+sidebar. For the last kind, other projects get a link to that project's folder, so moving or
+deleting that project breaks the link. When two skills share a name, a plugin skill wins
+over a user skill, and a user skill over a project one.
 
 ## Setting up groups
 
