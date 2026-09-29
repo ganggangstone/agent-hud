@@ -2,7 +2,7 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
-## 다음 버전 / Unreleased
+## v0.4.0
 
 **Homebrew로 설치했다면 업데이트 알림의 버튼 하나로 업데이트된다.** "지금 업데이트"를 누르면
 대시보드가 `brew update`와 `brew upgrade agent-hud`를 실행하고 새 코드로 다시 뜬다. git으로
