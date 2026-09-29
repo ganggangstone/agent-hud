@@ -2,6 +2,25 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.4.1
+
+**세션 여러 개를 한꺼번에 열면 사이드바의 프로젝트 목록이 비던 문제를 고쳤다.** 두 곳이 동시에
+목록 파일을 쓰면 파일이 깨졌고, 그다음 읽는 쪽이 빈 목록으로 알고 그 위에 새로 써서 그전까지
+쌓인 프로젝트가 전부 사라졌다. 그룹 파일도 같은 방식으로 쓰도록 고쳤다. 이미 사라진 프로젝트는
+세션을 다시 열거나 "+ 폴더 추가"로 넣으면 돌아온다.
+
+**"+ 폴더 추가"가 Finder의 폴더 고르기 창을 띄운다.** 전에는 경로를 직접 입력해야 했다. Finder 창을
+띄울 수 없는 환경에서는 전처럼 경로를 입력받는다.
+
+**Opening several sessions at once no longer empties the sidebar's project list.** Two writes
+to the list at the same moment could corrupt the file, and the next reader took it as empty
+and wrote over it, dropping every project added before. Group files are now written the same
+safe way. Projects already lost come back when you open a session there again or add them
+with "+ add a folder".
+
+**"+ add a folder" opens the Finder folder picker.** You used to type the path. Where the
+picker can't open, it still asks for the path.
+
 ## v0.4.0
 
 **Homebrew로 설치했다면 업데이트 알림의 버튼 하나로 업데이트된다.** "지금 업데이트"를 누르면
