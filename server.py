@@ -1914,6 +1914,7 @@ async function tick(){
         addSel.onchange = () => {
           if(!addSel.value) return;
           const [kind, ...rest] = addSel.value.split(':');
+          addSel.blur();  // 포커스가 남아 있으면 render가 갱신을 건너뛰어, 추가한 줄이 안 보인다
           editGroup('add', g.name, rest.join(':'), kind);
         };
         addRow.appendChild(addSel);
