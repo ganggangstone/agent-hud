@@ -2,6 +2,22 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.4.3
+
+**사이드바에서 프로젝트를 목록에서 뺄 수 있다.** 전에는 한 번 올라간 프로젝트를 뺄 방법이 없었다.
+프로젝트 줄에 마우스를 올리면 × 버튼이 보인다. 목록에서만 빼고 폴더와 그 안의 설정은 그대로 둔다.
+그 폴더에서 세션을 다시 열면 목록에 다시 올라온다.
+
+**그룹에 플러그인이나 스킬을 추가하면 바로 목록에 보인다.** 전에는 저장은 됐는데 화면의 다른 곳을
+누르기 전까지 새 줄이 나타나지 않아서, 추가가 안 된 것처럼 보였다.
+
+**You can remove a project from the sidebar.** There was no way to take a project off the list
+once it was there. Hover over a project and click ×. It only leaves the list; the folder and
+its settings stay as they are. Opening a session in that folder adds it back.
+
+**Adding a plugin or skill to a group shows it right away.** It was saved, but the new row
+didn't appear until you clicked somewhere else on the page, so it looked like nothing happened.
+
 ## v0.4.2
 
 **설치본이 마지막으로 확인한 최신 버전보다 새것이면 업데이트 알림이 뜨지 않는다.** 최신 버전은 하루에
