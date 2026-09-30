@@ -73,6 +73,18 @@ def register_project(path):
         remove_stale_skill_denies(path)
 
 
+def unregister_project(path):
+    """목록에서만 뺀다. 폴더와 그 안의 설정은 건드리지 않는다."""
+    with _projects_lock:
+        projects = read_json(PROJECTS_FILE, {})
+        if projects.pop(path, None) is None:
+            return
+        try:
+            write_json(PROJECTS_FILE, projects)
+        except Exception:
+            pass
+
+
 def known_projects():
     # 지워진 디렉터리는 뺀다. 남겨두면 대시보드가 없는 폴더를 기본 선택해 빈 화면을 보인다.
     projects = read_json(PROJECTS_FILE, {})
@@ -1142,6 +1154,8 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro 
 .sb-item:hover .sb-pin{opacity:1}
 .sb-item.active .sb-pin{opacity:1;color:var(--accent)}
 .sb-item.pinned .sb-pin{opacity:1;color:var(--accent)}
+.sb-item .sb-pin.sb-rm{margin-left:0;font-size:14px;line-height:1;opacity:0;color:var(--dim)}
+.sb-item:hover .sb-pin.sb-rm{opacity:1}
 .sb-empty{font-size:12px;color:var(--dim);padding:6px 8px}
 .sb-add{font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:0 8px}
 .sb-add:hover{opacity:.75}
@@ -1337,6 +1351,8 @@ const T = {
   sidebar_favorites: 'Favorites', sidebar_recent: 'Recent', sidebar_all: 'All',
   sidebar_no_match: 'No folder matches that search',
   pin_tip: 'Pin to favorites', unpin_tip: 'Remove from favorites',
+  forget_tip: 'Remove from this list',
+  forget_confirm: p => `Remove this folder from the list?\n\n${p}\n\nThe folder and its settings stay as they are. It comes back when you run an agent session there.`,
   install_app: 'Install app',
   install_manual: 'This browser can’t install it automatically.<br><b>Chrome, Edge:</b> the install icon in the address bar.<br><b>Safari (macOS Sonoma+):</b> File → Add to Dock.',
   loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
@@ -1424,6 +1440,8 @@ const T = {
   sidebar_favorites: '즐겨찾기', sidebar_recent: '최근 사용', sidebar_all: '전체',
   sidebar_no_match: '검색 결과가 없습니다',
   pin_tip: '즐겨찾기에 추가', unpin_tip: '즐겨찾기에서 제거',
+  forget_tip: '목록에서 빼기',
+  forget_confirm: p => `이 폴더를 목록에서 뺄까요?\n\n${p}\n\n폴더와 그 안의 설정은 그대로 둡니다. 그 폴더에서 에이전트 세션을 열면 다시 나타납니다.`,
   install_app: '앱으로 설치',
   install_manual: '이 브라우저는 자동 설치가 안 됩니다.<br><b>Chrome·Edge:</b> 주소창의 설치 아이콘.<br><b>Safari(macOS 소노마 이상):</b> 파일 → Dock에 추가.',
   loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
@@ -1561,6 +1579,15 @@ function toggleFavorite(path){
   favorites = favorites.includes(path) ? favorites.filter(p => p !== path) : [...favorites, path];
   saveFavorites(); renderSidebar(lastPanels);
 }
+async function forgetProject(path){
+  if(!confirm(t().forget_confirm(path))) return;
+  try{ await fetch('/api/unregister', {method:'POST', body: JSON.stringify({path})}); }
+  catch(e){ alert(t().error + e); return; }
+  favorites = favorites.filter(p => p !== path); saveFavorites();
+  delete recents[path]; localStorage.setItem('agent-hud-recents', JSON.stringify(recents));
+  if(selectedProject === path){ selectedProject = ''; localStorage.removeItem('agent-hud-project'); }
+  await tick();
+}
 function chooseProject(path){
   selectedProject = path; localStorage.setItem('agent-hud-project', path);
   recents[path] = Date.now();
@@ -1634,6 +1661,10 @@ function renderSidebarList(){
         : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.6 6.6L21 9.3l-5 4.6L17.3 21 12 17.6 6.7 21 8 13.9l-5-4.6 6.4-.7L12 2z"/></svg>';
       pin.onclick = (e) => { e.stopPropagation(); toggleFavorite(path); };
       it.appendChild(pin);
+      const rm = document.createElement('button'); rm.className = 'sb-pin sb-rm';
+      rm.title = t().forget_tip; rm.textContent = '×';
+      rm.onclick = (e) => { e.stopPropagation(); forgetProject(path); };
+      it.appendChild(rm);
       it.onclick = () => chooseProject(path);
       g.appendChild(it);
     }
@@ -2387,6 +2418,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": True})
             else:
                 self._send_json({"ok": False, "error": "directory not found"}, 400)
+        elif self.path == "/api/unregister":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            unregister_project(payload.get("path", ""))
+            self._send_json({"ok": True})
         elif self.path == "/api/update":
             prefix = brew_prefix()
             if not prefix:
