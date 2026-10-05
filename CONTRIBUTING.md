@@ -2,6 +2,11 @@
 
 ## Run it from the checkout
 
+`dev` is the development branch; `main` is the distribution branch. Make changes in a
+separate worktree, run the checks, and push to `dev`. Both branches run CI. Merge verified
+changes into `main` before creating a release tag: the release workflow rejects commits
+that are not in `main`. A push to `dev` alone does not create a release.
+
 ```bash
 python3 server.py
 ```
@@ -34,8 +39,9 @@ GitHub Actions runs the same loop on every push and pull request
 without you running them. `node` is the only thing beyond Python that the checks need,
 for the `--check` passes over inline `<script>` blocks.
 
-Pushing a `v*` tag triggers `.github/workflows/release.yml`: it refuses to publish when
-the tag and `VERSION` in `server.py` disagree, runs the checks, and creates the release.
+Pushing a `v*` tag triggers `.github/workflows/release.yml`: it verifies that the commit
+is in `main`, refuses to publish when the tag and `VERSION` in `server.py` disagree,
+runs the checks, and creates the release.
 The dashboard's update notice reads `releases/latest`, so a tag without a release does
 nothing for users.
 
@@ -114,6 +120,8 @@ agent-hud open                 open it in the browser, starting it first if need
 agent-hud groups               list groups, and which one this folder uses
 agent-hud apply <group> [dir]  apply a group to a folder (default: cwd)
 agent-hud apply --off [dir]    stop using one here
+agent-hud worktrees [dir]      list related worktrees and skill file states
+agent-hud worktrees apply [dir] add saved skills before starting an agent
 ```
 
 `apply` calls the same `assign_set()` the dashboard does and needs no running
@@ -122,10 +130,23 @@ with `AGENT_HUD_HOME=~/.claude/tools/agent-hud` to act on the installed data.
 
 ## Where its data lives
 
-`projects.json`, `modes.json` and `project-sets.json` sit next to
+`projects.json`, `modes.json`, `project-sets.json` and `worktree-skills.json` sit next to
 `server.py` by default. Set `AGENT_HUD_HOME` to put them somewhere else — the
 Homebrew formula does exactly that, because a package manager replaces the code
 directory on every upgrade and would take your groups with it.
+
+`worktree-skills.json` stores repository defaults, per-worktree exclusions/custom
+selections, application results and the links created by this feature. It is personal
+state, ignored by Git. A file lock also coordinates the background worker, HTTP requests
+and the pre-launch CLI across processes. Automatic application uses the same additive
+writer as manual application; no worktree settings or existing entries are deleted.
+
+`tests/test_worktrees.py` uses temporary repositories and linked worktrees, actual HTTP
+requests and CLI subprocesses. It covers identity, conflicts, symlinked parents, deletion,
+opt-in discovery, exclusions and custom skill sources. It does not establish live agent
+skill discovery. `tests/test_release_branch.py` executes the release branch guard against
+temporary Git history, proving an unmerged development commit is rejected and a main
+commit is allowed.
 
 ## Adding a panel
 

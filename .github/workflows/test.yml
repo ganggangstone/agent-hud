@@ -2,7 +2,7 @@ name: 검사
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:

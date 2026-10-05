@@ -223,6 +223,38 @@ saved file on its next refresh, so you don't need to restart anything.
 One server runs on the computer and every project uses it. Opening or closing terminals
 does not restart the server or change its port.
 
+In **Plugins & skills**, expand **Worktrees in this repository** to see checkouts of
+the same Git repository. Select skills, directories and worktrees, preview the paths,
+then add missing skills. Existing directories, broken links and links to a different
+source are kept and reported. This shares skill files only; it does not copy plugin
+hooks, agents, MCP configuration or settings, or apply a group’s plugin switches.
+Subfolder configurations cannot be applied to the whole repository through this control.
+
+**Save and enable for new worktrees** stores the selected skill sources as the repository
+default. While HUD is running, it checks for new worktrees every 15 seconds and adds only
+missing links. Existing worktrees are unchanged when you enable or update the default;
+select them for manual application. Each worktree can use the default, be excluded, or
+save a separate selection. Disabling automatic application preserves existing links.
+Sources are pinned to the paths you selected; moving/deleting a source or replacing a
+plugin cache version is reported rather than silently choosing a same-named skill.
+Removed worktrees are disabled. Paths under `/Volumes` are left unchecked.
+
+The first agent session may start before the background check finishes. If you need the
+files in place before launch, run `agent-hud worktrees apply` inside that checkout,
+using the same HUD data directory as the dashboard. It applies the saved default or
+custom selection and respects exclusions; it does not start or restart an agent.
+`agent-hud worktrees` prints the file states without applying anything.
+
+File states do not prove what an existing session can use. [Codex](https://learn.chatgpt.com/docs/build-skills)
+detects skill changes automatically; check `/skills`, and restart only if updates do not
+appear. [Claude Code](https://code.claude.com/docs/en/skills#edit-a-skill-during-a-session)
+may need `/reload-skills` if the top-level directory did not exist when the session began.
+On Claude Code 2.1.277 and later, a worktree without its own `.claude/skills` can read the
+main checkout’s skills. Creating that directory stops the fallback, so choose only
+`.agents/skills` to share with Codex alone. These session behaviors follow the official
+documentation; this change was tested with temporary Git worktrees and HTTP/browser
+requests, not live Codex or Claude sessions.
+
 ## Managing the service
 
 ```bash

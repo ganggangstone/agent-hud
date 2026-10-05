@@ -1,6 +1,8 @@
 projects.json
 modes.json
 project-sets.json
+worktree-skills.json
+worktree-skills.json.lock
 launchd.out.log
 launchd.err.log
 __pycache__/

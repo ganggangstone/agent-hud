@@ -25,6 +25,14 @@ jobs:
         with:
           node-version: '22'
 
+      - name: 배포 브랜치에 반영된 커밋인지
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::main에 반영되지 않은 커밋은 릴리스할 수 없습니다. dev에서 검증한 뒤 main에 반영하세요."
+            exit 1
+          fi
+
       # 태그만 밀고 server.py의 VERSION을 안 올리면 대시보드가 헌 번호를 계속 보여준다
       - name: 태그와 server.py의 VERSION이 같은지
         run: |

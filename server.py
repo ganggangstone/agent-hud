@@ -7,6 +7,8 @@ Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
 import json, os, re, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+from contextlib import contextmanager
+import fcntl
 
 HOME = os.path.expanduser("~")
 CLAUDE_DIR = os.path.join(HOME, ".claude")
@@ -668,9 +670,10 @@ def skill_is_shared(project_dir, name, src=None):
     """이 프로젝트의 모든 스킬 폴더에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
     자체면 된다(원본이 이 프로젝트 안에 있는 경우)."""
     src = src or skill_sources(project_dir).get(name)
-    real = os.path.realpath(src) if src else None
-    return all(os.path.islink(p) or (real is not None and os.path.realpath(p) == real)
-               for p in (_link_path(project_dir, d, name) for d in GROUP_LINK_DIRS))
+    if not _valid_skill_name(name):
+        return False
+    return bool(src) and all(_skill_path_state(project_dir, d, name, src) in ("linked", "original")
+                            for d in GROUP_LINK_DIRS)
 
 
 def link_skill(name, on, project_dir):
@@ -679,26 +682,435 @@ def link_skill(name, on, project_dir):
     그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
+    if not _valid_skill_name(name):
+        return False, "invalid skill name"
     src = skill_sources(project_dir).get(name)
     if not src:
         return False, "unknown skill"
     try:
         for rel in GROUP_LINK_DIRS:
             dst = _link_path(project_dir, rel, name)
+            state = _skill_path_state(project_dir, rel, name, src)
+            if state == "blocked":
+                return False, "skill directory is linked or inaccessible"
             if on:
-                if os.path.islink(dst):
-                    if os.path.realpath(dst) == os.path.realpath(src):
-                        continue
-                    os.unlink(dst)
-                elif os.path.exists(dst):
+                if state in ("linked", "original", "occupied"):
                     continue  # 진짜 폴더는 사용자 것이다. 건드리지 않는다.
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                os.symlink(src, dst)
+                if state != "missing":
+                    return False, "existing link has a different or unavailable source"
+                result = _create_skill_link(project_dir, rel, name, src)
+                if result not in ("created", "linked", "original"):
+                    return False, "skill link could not be created: " + result
             elif os.path.islink(dst):
+                if local_path(dst) != local_path(src):
+                    return False, "existing link has a different source"
                 os.unlink(dst)  # 링크만 지운다
     except Exception as e:
         return False, str(e)
     return True, ""
+
+
+# Local HUD data, never written into a checkout or an agent's settings.
+WORKTREE_FILE = os.path.join(TOOL_DIR, "worktree-skills.json")
+_worktree_lock = threading.RLock()
+WORKTREE_POLL_SECONDS = 15
+
+
+@contextmanager
+def _worktree_transaction():
+    # The setup CLI and server are separate processes; a thread lock alone can
+    # lose an exclusion or a newly saved default during automatic application.
+    with _worktree_lock:
+        with open(WORKTREE_FILE + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def local_path(path):
+    """Resolve local aliases without traversing /Volumes, including symlink aliases.
+
+    Conservatively leave every /Volumes path unchecked: Git's list can mention an
+    unavailable network checkout and inspecting it can mount or scan that share.
+    """
+    if not isinstance(path, str) or not path or "\0" in path:
+        return None
+    path = os.path.abspath(path)
+    for _ in range(40):
+        parts = path.split(os.sep)
+        cur = os.sep
+        for i, part in enumerate(parts[1:], 1):
+            cur = os.path.join(cur, part)
+            if cur == "/Volumes" or cur.startswith("/Volumes/"):
+                return None
+            if os.path.islink(cur):
+                target = os.readlink(cur)
+                if not os.path.isabs(target):
+                    target = os.path.join(os.path.dirname(cur), target)
+                path = os.path.abspath(os.path.join(target, *parts[i + 1:]))
+                break
+        else:
+            return path
+    return None
+
+
+def _git_read(path, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    try:
+        p = subprocess.run(["git", "-C", path, *args], env=env,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=3)
+        return os.fsdecode(p.stdout) if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def git_repository(path):
+    path = local_path(path)
+    if not path or not os.path.isdir(path):
+        return None
+    top = _git_read(path, "rev-parse", "--show-toplevel")
+    common = _git_read(path, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if top is None or common is None:
+        return None
+    top, common = local_path(top.removesuffix("\n")), local_path(common.removesuffix("\n"))
+    return {"root": top, "common_dir": common} if top and common else None
+
+
+def git_worktrees(repo):
+    raw = _git_read(repo["root"], "worktree", "list", "--porcelain", "-z")
+    if raw is None:
+        return None  # distinguish an unavailable Git query from an empty list
+    rows, row = [], {}
+    for field in raw.split("\0"):
+        if not field:
+            if row:
+                path = local_path(row["path"])
+                actual = git_repository(path) if path else None
+                row["available"] = bool(actual and actual["root"] == path and
+                                        actual["common_dir"] == repo["common_dir"] and not row.get("prunable"))
+                row["path"] = path or row["path"]
+                rows.append(row)
+                row = {}
+        elif field.startswith("worktree "):
+            row = {"path": field[9:], "branch": "", "detached": False}
+        elif field.startswith("branch "):
+            row["branch"] = field[7:].removeprefix("refs/heads/")
+        elif field == "detached":
+            row["detached"] = True
+        elif field.startswith("prunable") or field == "bare":
+            row["prunable"] = True
+    return rows
+
+
+def _valid_skill_name(name):
+    return isinstance(name, str) and bool(name) and name not in (".", "..") and not any(
+        c in name for c in ("/", "\\", "\0"))
+
+
+def _skill_file_readable(source):
+    if not source:
+        return False
+    md = local_path(os.path.join(source, "SKILL.md"))
+    if not md or not os.path.isfile(md):
+        return False
+    try:
+        with open(md, "rb") as file:
+            file.read(1)
+        return True
+    except OSError:
+        return False
+
+
+def _skill_path_state(project, rel, name, source):
+    # A linked parent directory must never become a write-through to another checkout.
+    cur = project
+    for part in rel.split("/"):
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur) or (os.path.lexists(cur) and not os.path.isdir(cur)):
+            return "blocked"
+    dst = os.path.join(cur, name)
+    real_src = local_path(source)
+    if not _skill_file_readable(real_src):
+        return "source_missing"
+    if os.path.islink(dst):
+        real = local_path(dst)
+        if real is None:
+            return "blocked"
+        if not _skill_file_readable(real):
+            return "broken"
+        return "linked" if real == real_src else "conflict"
+    if os.path.lexists(dst):
+        return "original" if local_path(dst) == real_src else "occupied"
+    return "missing"
+
+
+def _validated_worktree_config(project, config, trusted=False):
+    if not isinstance(config, dict):
+        raise ValueError("invalid skill configuration")
+    dirs, skills = config.get("dirs"), config.get("skills")
+    if not isinstance(dirs, list) or not dirs or any(d not in GROUP_LINK_DIRS for d in dirs):
+        raise ValueError("choose supported skill directories")
+    if not isinstance(skills, list) or not skills:
+        raise ValueError("choose at least one skill")
+    sources = skill_sources(project) if not trusted else {}
+    out, seen = [], set()
+    for item in skills:
+        if not isinstance(item, dict) or not _valid_skill_name(item.get("name")):
+            raise ValueError("invalid skill name")
+        name, source = item["name"], local_path(item.get("source"))
+        if name in seen:
+            raise ValueError("duplicate skill name")
+        seen.add(name)
+        if not _skill_file_readable(source):
+            raise ValueError("skill source is unavailable: " + name)
+        if not trusted and source != local_path(sources.get(name)):
+            # Preserve the actual source of a shared project skill even when a
+            # same-named plugin or user skill wins the general source index.
+            existing = [local_path(_link_path(project, d, name)) for d in GROUP_LINK_DIRS]
+            if source not in existing:
+                raise ValueError("unknown skill source: " + name)
+        out.append({"name": name, "source": source})
+    return {"skills": out, "dirs": list(dict.fromkeys(dirs))}
+
+
+def _worktree_plan(project, targets, config, trusted=False):
+    project = local_path(project)
+    repo = git_repository(project)
+    if not repo or project != repo["root"]:
+        raise ValueError("select a repository checkout root")
+    config = _validated_worktree_config(project, config, trusted)
+    worktrees = git_worktrees(repo)
+    if worktrees is None:
+        raise ValueError("could not read worktree list")
+    available = {r["path"] for r in worktrees if r["available"]}
+    if not isinstance(targets, list) or not targets:
+        raise ValueError("choose a worktree")
+    targets = [local_path(t) for t in targets]
+    if any(t not in available for t in targets):
+        raise ValueError("worktree is unavailable or belongs to a different repository")
+    rows = [{"project": target, "dir": rel, "name": sk["name"], "source": sk["source"],
+             "state": _skill_path_state(target, rel, sk["name"], sk["source"])}
+            for target in dict.fromkeys(targets) for rel in config["dirs"] for sk in config["skills"]]
+    return repo, config, rows
+
+
+def preview_worktree_skills(project, targets, config):
+    try:
+        _, _, rows = _worktree_plan(project, targets, config)
+        return {"ok": True, "rows": rows}
+    except (ValueError, OSError) as e:
+        return {"ok": False, "error": str(e), "rows": []}
+
+
+def _fill_skill_link(row, repo):
+    """Create one absent entry through directory FDs; never unlink an existing entry."""
+    target = row["project"]
+    actual = git_repository(target)
+    if not actual or actual != {"root": target, "common_dir": repo["common_dir"]}:
+        return "unavailable"
+    return _create_skill_link(target, row["dir"], row["name"], row["source"])
+
+
+def _create_skill_link(target, rel, name, source):
+    target = local_path(target)
+    if not target or not os.path.isdir(target):
+        return "unavailable"
+    state = _skill_path_state(target, rel, name, source)
+    if state != "missing":
+        return state
+    fds = []
+    try:
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open(target, flags); fds.append(fd)
+        for part in rel.split("/"):
+            try:
+                os.mkdir(part, dir_fd=fd)
+            except FileExistsError:
+                pass
+            fd = os.open(part, flags, dir_fd=fd); fds.append(fd)
+        # Check that the open root is still the visible checkout before writing.
+        opened, visible = os.fstat(fds[0]), os.stat(target, follow_symlinks=False)
+        if (opened.st_dev, opened.st_ino) != (visible.st_dev, visible.st_ino):
+            return "unavailable"
+        if not _skill_file_readable(source):
+            return "source_missing"
+        os.symlink(source, name, dir_fd=fd)
+        return "created"
+    except FileExistsError:
+        return _skill_path_state(target, rel, name, source)
+    except OSError:
+        return "blocked"
+    finally:
+        for fd in reversed(fds):
+            os.close(fd)
+
+
+def _apply_worktree_skills(project, targets, config, data, trusted=False):
+    try:
+        repo, _, rows = _worktree_plan(project, targets, config, trusted)
+        for row in rows:
+            row["state"] = _fill_skill_link(row, repo)
+            if row["state"] == "created":
+                dst = _link_path(row["project"], row["dir"], row["name"])
+                data.setdefault("links", {})[dst] = row["source"]
+        good = {"created", "linked", "original"}
+        return {"ok": all(r["state"] in good for r in rows), "rows": rows}
+    except (ValueError, OSError) as e:
+        return {"ok": False, "error": str(e), "rows": []}
+
+
+def apply_worktree_skills(project, targets, config):
+    with _worktree_transaction():
+        data = read_json(WORKTREE_FILE)
+        result = _apply_worktree_skills(project, targets, config, data)
+        try:
+            write_json(WORKTREE_FILE, data, ensure_ascii=False, indent=2)
+        except OSError as e:
+            result.update(ok=False, error=str(e))
+        return result
+
+
+def set_worktree_policy(project, config, enabled):
+    with _worktree_transaction():
+        try:
+            repo = git_repository(project)
+            if not repo or local_path(project) != repo["root"]:
+                raise ValueError("select a repository checkout root")
+            data = read_json(WORKTREE_FILE)
+            old = data.setdefault("repos", {}).get(repo["common_dir"], {})
+            if enabled:
+                config = _validated_worktree_config(project, config)
+                rows = git_worktrees(repo)
+                if rows is None:
+                    raise ValueError("could not read worktree list")
+                # Enabling or changing a default never changes existing worktrees.
+                old.update(config=config, project=repo["root"], seen=[r["path"] for r in rows], targets=[])
+            old["enabled"] = bool(enabled)
+            data["repos"][repo["common_dir"]] = old
+            write_json(WORKTREE_FILE, data, ensure_ascii=False, indent=2)
+            return {"ok": True}
+        except (ValueError, OSError) as e:
+            return {"ok": False, "error": str(e)}
+
+
+def set_worktree_override(project, target, mode, config=None):
+    with _worktree_transaction():
+        try:
+            repo = git_repository(project)
+            target = local_path(target)
+            if not repo or local_path(project) != repo["root"]:
+                raise ValueError("select a repository checkout root")
+            rows = git_worktrees(repo)
+            if rows is None or target not in {r["path"] for r in rows if r["available"]}:
+                raise ValueError("worktree is unavailable")
+            if mode not in ("inherit", "exclude", "custom"):
+                raise ValueError("unknown worktree mode")
+            entry = {"mode": mode}
+            if mode == "custom":
+                entry["config"] = _validated_worktree_config(project, config)
+            data = read_json(WORKTREE_FILE)
+            policy = data.setdefault("repos", {}).setdefault(repo["common_dir"], {})
+            policy.setdefault("overrides", {})[target] = entry
+            write_json(WORKTREE_FILE, data, ensure_ascii=False, indent=2)
+            return {"ok": True}
+        except (ValueError, OSError) as e:
+            return {"ok": False, "error": str(e)}
+
+
+def auto_apply_worktrees_once():
+    with _worktree_transaction():
+        data = read_json(WORKTREE_FILE)
+        before = json.dumps(data, sort_keys=True)
+        for common, policy in data.get("repos", {}).items():
+            if not policy.get("enabled"):
+                continue
+            repo = git_repository(policy.get("project"))
+            if not repo or repo["common_dir"] != common:
+                continue
+            rows = git_worktrees(repo)
+            if rows is None:
+                continue
+            seen = set(policy.get("seen", []))
+            targets = set(policy.get("targets", []))
+            for row in rows:
+                path = row["path"]
+                if not row["available"]:
+                    continue
+                if path not in seen:
+                    targets.add(path); seen.add(path)
+                if path not in targets:
+                    continue
+                override = policy.get("overrides", {}).get(path, {})
+                if override.get("mode") == "exclude":
+                    continue
+                config = override.get("config", policy.get("config"))
+                result = _apply_worktree_skills(repo["root"], [path], config, data, trusted=True)
+                results = policy.setdefault("results", {})
+                previous = results.get(path, {})
+                # Keep the last application time stable when a poll changes nothing.
+                states = [{**r, "state": "linked" if r["state"] == "created" else r["state"]}
+                          for r in result["rows"]]
+                summary = {"ok": result["ok"], "error": result.get("error", ""), "rows": states}
+                if any(previous.get(k) != v for k, v in summary.items()):
+                    results[path] = {**summary, "at": time.time()}
+            policy.update(seen=sorted(seen), targets=sorted(targets))
+        if json.dumps(data, sort_keys=True) != before:
+            write_json(WORKTREE_FILE, data, ensure_ascii=False, indent=2)
+
+
+def _worktree_apply_loop():
+    while True:
+        try:
+            auto_apply_worktrees_once()
+        except Exception as e:
+            print(f"agent-hud: worktree skill application failed: {e}", file=sys.stderr)
+        time.sleep(WORKTREE_POLL_SECONDS)
+
+
+def collect_worktrees(project):
+    repo = git_repository(project)
+    if not repo:
+        return None
+    data = read_json(WORKTREE_FILE)
+    policy = data.get("repos", {}).get(repo["common_dir"], {})
+    candidates = dict(skill_sources(project))
+    # Actual project entries take priority here: the selected source is pinned,
+    # not replaced later by a same-named skill from another installation.
+    for rel in GROUP_LINK_DIRS:
+        root = os.path.join(project, rel)
+        if os.path.islink(root) or not os.path.isdir(root):
+            continue
+        for name in os.listdir(root):
+            src = local_path(os.path.join(root, name))
+            if _skill_file_readable(src):
+                candidates[name] = src
+    skills = [{"name": n, "source": s, "selected": any(
+        _skill_path_state(project, d, n, s) in ("linked", "original") for d in GROUP_LINK_DIRS)}
+        for n, s in sorted(candidates.items()) if _valid_skill_name(n) and local_path(s)]
+    rows = git_worktrees(repo)
+    if rows is not None:
+        # Previously known but now removed/pruned checkouts remain visible and
+        # disabled. Listing history never probes or recreates these paths.
+        current = {r["path"] for r in rows}
+        historical = set(policy.get("seen", [])) | set(policy.get("overrides", {}))
+        for path in sorted(historical - current):
+            rows.append({"path": path, "branch": "", "detached": False, "available": False})
+        for row in rows:
+            override = policy.get("overrides", {}).get(row["path"], {})
+            row["mode"] = override.get("mode", "inherit")
+            config = override.get("config", policy.get("config"))
+            row["config"] = config
+            row["result"] = policy.get("results", {}).get(row["path"])
+            config = config or {"skills": [sk for sk in skills if sk.get("selected")], "dirs": GROUP_LINK_DIRS}
+            row["skills"] = [{"name": sk["name"], "dir": d,
+                              "state": _skill_path_state(row["path"], d, sk["name"], sk["source"])}
+                             for d in config["dirs"] for sk in config["skills"]] if config and row["available"] else []
+    return {"common_dir": repo["common_dir"], "rows": rows or [], "query_failed": rows is None,
+            "can_apply": local_path(project) == repo["root"], "enabled": bool(policy.get("enabled")),
+            "config": policy.get("config"), "skills": skills, "poll_seconds": WORKTREE_POLL_SECONDS}
 
 
 def _loaded_count(rows):
@@ -813,6 +1225,7 @@ def collect_skills(ctx):
         "has_local": has_local,
         "project_dir": project_dir,
         "known_projects": known_projects(),
+        "worktrees": collect_worktrees(project_dir),
     }
 
 
@@ -1304,6 +1717,30 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <script>
 const T = {
   en: {
+  wt_title: 'Worktrees in this repository',
+  wt_intro: 'Share selected skills without changing plugins, hooks, agents or settings. Existing folders and links are kept.',
+  wt_root_only: 'Select the repository checkout root to apply skills. Subfolder configurations stay local to that folder.',
+  wt_query_failed: 'Could not read the Git worktree list.',
+  wt_skills: 'Skills to share', wt_targets: 'Choose worktrees',
+  wt_preview: 'Preview', wt_apply: 'Add missing skills',
+  wt_auto_on: 'Save and enable for new worktrees', wt_auto_off: 'Disable automatic application',
+  wt_auto_active: 'Automatic application is enabled. Saving a new default affects future worktrees only.',
+  wt_auto_inactive: 'Automatic application is off. Existing skills remain when you disable it.',
+  wt_poll: n => `While HUD is running, new worktrees are checked every ${n} seconds. The first session may start before application finishes.`,
+  wt_session: 'These are file states, not a live session skill list. Codex detects skill changes; confirm with /skills. Claude may need /reload-skills if this directory did not exist at session start.',
+  wt_claude: 'Creating .claude/skills can stop newer Claude Code from reading the main checkout’s skills. Choose .agents/skills only if you want to share with Codex alone.',
+  wt_confirm: 'Add only missing skills at the paths in this preview? Conflicts and existing files are kept. The target is checked again before writing.',
+  wt_auto_confirm: 'Save this selection as the repository default for future worktrees? Existing worktrees are unchanged. No skills are deleted.',
+  wt_override_confirm: 'Save this worktree’s automatic application choice? A custom choice uses the skills and directories selected above. Existing skills are kept.',
+  wt_inherit: 'Repository default', wt_exclude: 'Exclude from automatic application', wt_custom: 'Use selection above',
+  wt_mode_inherit: 'Default', wt_mode_exclude: 'Excluded', wt_mode_custom: 'Custom',
+  wt_saved: 'Saved', wt_unavailable: 'Unavailable or unchecked', wt_detached: 'detached HEAD',
+  wt_preview_needed: 'Select skills and worktrees, then preview the result.',
+  wt_created: 'Added', wt_linked: 'Connected', wt_original: 'Source folder',
+  wt_missing: 'Missing', wt_broken: 'Broken link', wt_conflict: 'Different source',
+  wt_occupied: 'Existing file or folder', wt_blocked: 'Linked or inaccessible directory',
+  wt_source_missing: 'Source unavailable', wt_choose: 'Choose at least one skill, directory and worktree.',
+  wt_applied_at: at => `Last automatic application: ${new Date(at*1000).toLocaleString()}`,
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
@@ -1393,6 +1830,30 @@ const T = {
     feedback_open: 'send feedback ↗',
   },
   ko: {
+  wt_title: '같은 저장소의 worktree',
+  wt_intro: '선택한 스킬만 공유합니다. 기존 폴더·링크와 플러그인·훅·에이전트·설정은 유지됩니다.',
+  wt_root_only: '스킬을 적용하려면 저장소의 worktree 루트를 선택하세요. 하위 폴더의 구성은 그 폴더에만 적용됩니다.',
+  wt_query_failed: 'Git worktree 목록을 읽지 못했습니다.',
+  wt_skills: '공유할 스킬', wt_targets: 'worktree 선택',
+  wt_preview: '미리보기', wt_apply: '없는 스킬 추가',
+  wt_auto_on: '저장하고 새 worktree에 자동 적용', wt_auto_off: '자동 적용 끄기',
+  wt_auto_active: '자동 적용이 켜져 있습니다. 새 기본 구성을 저장하면 이후에 만든 worktree부터 적용됩니다.',
+  wt_auto_inactive: '자동 적용이 꺼져 있습니다. 꺼도 기존 스킬은 유지됩니다.',
+  wt_poll: n => `HUD 실행 중에는 ${n}초마다 새 worktree를 확인합니다. 첫 세션이 스킬 적용보다 먼저 시작될 수 있습니다.`,
+  wt_session: '파일 상태를 표시합니다. 실행 중인 세션의 스킬 목록은 /skills에서 확인하세요. Codex는 변경을 감지하며, Claude는 세션 시작 때 없던 디렉터리라면 /reload-skills가 필요할 수 있습니다.',
+  wt_claude: '.claude/skills를 만들면 최신 Claude Code가 원본 checkout에서 대신 읽던 스킬이 빠질 수 있습니다. Codex에만 공유하려면 .agents/skills만 선택하세요.',
+  wt_confirm: '미리보기에 나온 경로에 없는 스킬만 추가할까요? 기존 파일·링크와 충돌 항목은 유지하고, 쓰기 전에 대상 상태를 다시 확인합니다.',
+  wt_auto_confirm: '선택한 구성을 저장소의 새 worktree에 자동 적용할까요? 이미 있는 worktree는 바꾸지 않으며 스킬을 삭제하지 않습니다.',
+  wt_override_confirm: '이 worktree의 자동 적용 방식을 저장할까요? 별도 구성은 위에서 선택한 스킬과 디렉터리를 사용합니다. 기존 스킬은 유지됩니다.',
+  wt_inherit: '저장소 기본 구성', wt_exclude: '자동 적용 제외', wt_custom: '위 선택으로 별도 구성',
+  wt_mode_inherit: '기본 구성', wt_mode_exclude: '제외', wt_mode_custom: '별도 구성',
+  wt_saved: '저장했습니다', wt_unavailable: '사용 불가 또는 미확인', wt_detached: 'detached HEAD',
+  wt_preview_needed: '스킬과 worktree를 선택하고 미리보기로 결과를 확인하세요.',
+  wt_created: '추가됨', wt_linked: '연결됨', wt_original: '원본 폴더',
+  wt_missing: '없음', wt_broken: '끊어진 링크', wt_conflict: '다른 원본',
+  wt_occupied: '기존 파일·폴더', wt_blocked: '링크 또는 접근 불가 디렉터리',
+  wt_source_missing: '원본 사용 불가', wt_choose: '스킬·디렉터리·worktree를 하나 이상 선택하세요.',
+  wt_applied_at: at => `마지막 자동 적용: ${new Date(at*1000).toLocaleString()}`,
     banner: '플러그인 변경은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
@@ -1569,6 +2030,8 @@ function rerender(){ polling = true; return tick(); }
 let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
+const worktreeDrafts = {};
+let worktreeOpen = false;
 // 사이드바 상태: 지금 프로젝트 선택(agent-hud-project)과 같은 자리(localStorage)에 둔다.
 // 서버 쪽 파일을 늘리지 않아도 되고, 기기별로 다른 즐겨찾기를 갖는 게 오히려 자연스럽다.
 function readJSON(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch(e){ return fallback; } }
@@ -1841,6 +2304,136 @@ async function runUpdate(upd){
   } catch(e){ updState = 'failed'; updError = String(e); }
   renderUpdate(upd);
 }
+function wtState(state){ return t()['wt_' + state] || state; }
+async function worktreeRequest(action, project, extra){
+  const response = await fetch('/api/worktrees', {method: 'POST',
+    body: JSON.stringify({action, project, ...extra})});
+  return response.json();
+}
+function renderWorktrees(container, w, project){
+  if(!w) return;
+  const wrap = document.createElement('details'); wrap.style.cssText = 'margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:8px';
+  wrap.open = worktreeOpen;
+  wrap.ontoggle = () => { worktreeOpen = wrap.open; };
+  const summary = document.createElement('summary'); summary.textContent = t().wt_title;
+  summary.style.cursor = 'pointer'; wrap.appendChild(summary);
+  const note = (text) => { const n = document.createElement('div'); n.className = 'note'; n.textContent = text; wrap.appendChild(n); return n; };
+  note(t().wt_intro);
+  note(w.enabled ? t().wt_auto_active : t().wt_auto_inactive);
+  note(t().wt_poll(w.poll_seconds));
+  note(t().wt_session);
+  note(t().wt_claude);
+  if(w.query_failed){ note(t().wt_query_failed); container.appendChild(wrap); return; }
+  if(!w.can_apply) note(t().wt_root_only);
+  const draft = worktreeDrafts[project] ||= {
+    skills: w.config ? w.config.skills.map(s=>({...s})) : w.skills.filter(s=>s.selected).map(s=>({name:s.name,source:s.source})),
+    dirs: w.config ? [...w.config.dirs] : ['.agents/skills', '.claude/skills'], targets: [], preview: null
+  };
+  const config = () => ({skills: draft.skills, dirs: draft.dirs});
+  const invalidate = () => { draft.preview = null; output.textContent = t().wt_preview_needed; apply.disabled = true; };
+  const skillTitle = document.createElement('div'); skillTitle.textContent = t().wt_skills; skillTitle.style.marginTop = '12px'; wrap.appendChild(skillTitle);
+  const skills = document.createElement('div'); skills.style.cssText = 'max-height:170px;overflow:auto;margin:6px 0';
+  // Include pinned defaults whose installation is no longer in the source index.
+  const choices = [...w.skills];
+  for(const selected of draft.skills){
+    if(!choices.some(s=>s.name === selected.name && s.source === selected.source)) choices.push(selected);
+  }
+  for(const sk of choices){
+    const label = document.createElement('label'); label.style.cssText = 'display:block;font-size:12px'; label.title = sk.source;
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.disabled = !w.can_apply;
+    cb.checked = draft.skills.some(s=>s.name === sk.name && s.source === sk.source);
+    cb.onchange = () => {
+      draft.skills = draft.skills.filter(s=>s.name !== sk.name);
+      if(cb.checked) draft.skills.push({name:sk.name,source:sk.source});
+      // Same names from different sources must remain a single explicit choice.
+      for(const other of skills.querySelectorAll('input')){
+        if(other !== cb && other.dataset.name === sk.name) other.checked = false;
+      }
+      invalidate();
+    };
+    cb.dataset.name = sk.name; label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + sk.name + ' · ' + sk.source)); skills.appendChild(label);
+  }
+  wrap.appendChild(skills);
+  for(const dir of ['.agents/skills','.claude/skills']){
+    const label = document.createElement('label'); label.style.marginRight = '12px';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = draft.dirs.includes(dir); cb.disabled = !w.can_apply;
+    cb.onchange = () => { draft.dirs = draft.dirs.filter(d=>d !== dir); if(cb.checked) draft.dirs.push(dir); invalidate(); };
+    label.appendChild(cb); label.appendChild(document.createTextNode(' '+dir)); wrap.appendChild(label);
+  }
+  note(t().wt_targets);
+  for(const row of w.rows){
+    const line = document.createElement('div'); line.style.cssText = 'padding:8px 0;border-top:1px solid var(--border);font-size:12px;overflow-wrap:anywhere';
+    const label = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox';
+    cb.disabled = !w.can_apply || !row.available; cb.checked = draft.targets.includes(row.path);
+    cb.onchange = () => { draft.targets = draft.targets.filter(p=>p !== row.path); if(cb.checked) draft.targets.push(row.path); invalidate(); };
+    label.appendChild(cb); label.appendChild(document.createTextNode(' '+row.path+' · '+(row.branch || t().wt_detached)));
+    line.appendChild(label);
+    const mode = document.createElement('select'); mode.style.marginLeft = '8px'; mode.disabled = !w.can_apply || !row.available;
+    for(const value of ['inherit','exclude','custom']){
+      const op = document.createElement('option'); op.value=value; op.textContent=t()['wt_'+value]; mode.appendChild(op);
+    }
+    mode.value = row.mode;
+    mode.onchange = async () => {
+      const selected = mode.value;
+      if(!confirm(t().wt_override_confirm)){ mode.value = row.mode; return; }
+      try{
+        const r = await worktreeRequest('override', project, {target:row.path,mode:selected,config:config()});
+        if(!r.ok) alert(r.error || t().error);
+        await rerender();
+      } catch(e){ alert(t().error+e); mode.value=row.mode; }
+    };
+    line.appendChild(mode);
+    const state = document.createElement('div'); state.className = 'dim';
+    state.textContent = row.available ? t()['wt_mode_'+row.mode] : t().wt_unavailable;
+    if(row.skills.length) state.textContent += ' · '+row.skills.map(s=>s.name+' ('+s.dir+'): '+wtState(s.state)).join(', ');
+    if(row.result){ state.textContent += ' · '+t().wt_applied_at(row.result.at); if(row.result.error) state.textContent += ' · '+row.result.error; }
+    line.appendChild(state); wrap.appendChild(line);
+  }
+  const actions = document.createElement('div'); actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin:8px 0'; wrap.appendChild(actions);
+  const button = text => { const b = document.createElement('button'); b.textContent=text; b.className='card-action'; actions.appendChild(b); return b; };
+  const preview = button(t().wt_preview); preview.disabled = !w.can_apply;
+  const apply = button(t().wt_apply); apply.disabled = !w.can_apply || !draft.preview;
+  const save = button(t().wt_auto_on); save.disabled = !w.can_apply;
+  const off = button(t().wt_auto_off); off.disabled = !w.can_apply || !w.enabled;
+  const output = document.createElement('pre'); output.style.cssText = 'white-space:pre-wrap;font:12px/1.5 inherit;overflow-wrap:anywhere'; wrap.appendChild(output);
+  function showResult(result){
+    const lines = (result.rows||[]).map(r=>r.project+'/'+r.dir+'/'+r.name+' → '+r.source+' · '+wtState(r.state));
+    if(result.error) lines.unshift(result.error);
+    output.textContent = lines.join('\n') || t().wt_saved;
+  }
+  if(draft.preview) showResult(draft.preview); else output.textContent = t().wt_preview_needed;
+  preview.onclick = async () => {
+    try{
+      if(!draft.skills.length || !draft.dirs.length || !draft.targets.length){ alert(t().wt_choose); return; }
+      draft.preview = await worktreeRequest('preview', project, {targets:draft.targets,config:config()});
+      showResult(draft.preview); apply.disabled = !draft.preview.ok;
+    } catch(e){ invalidate(); alert(t().error+e); }
+  };
+  apply.onclick = async () => {
+    if(!draft.preview || !confirm(t().wt_confirm)) return;
+    apply.disabled = true;
+    try{
+      draft.preview = await worktreeRequest('apply', project, {targets:draft.targets,config:config()});
+      showResult(draft.preview);
+    } catch(e){ invalidate(); alert(t().error+e); }
+  };
+  save.onclick = async () => {
+    if(!confirm(t().wt_auto_confirm)) return;
+    try{
+      const r = await worktreeRequest('policy', project, {enabled:true,config:config()});
+      if(!r.ok) alert(r.error || t().error); else await rerender();
+    } catch(e){ alert(t().error+e); }
+  };
+  off.onclick = async () => {
+    try{
+      const r = await worktreeRequest('policy', project, {enabled:false});
+      if(!r.ok) alert(r.error || t().error); else await rerender();
+    } catch(e){ alert(t().error+e); }
+  };
+  container.appendChild(wrap);
+}
+
 async function tick(){
   if(!polling) return;
   const r = await fetch(stateUrl()); const d = await r.json();
@@ -2002,6 +2595,7 @@ async function tick(){
       c.appendChild(an);
     } else {
       c.appendChild(h);
+      renderWorktrees(c, p.worktrees, p.project_dir);
       if(typeof p.loaded === 'number'){
         // 스킬은 이름과 설명이 세션 시작 때 전부 올라간다. 안 쓰는 것도 자리를 차지하므로,
         // 주장하지 말고 지금 이 프로젝트의 숫자를 그대로 보여준다.
@@ -2343,7 +2937,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_POST(self):
-        if self.path == "/api/toggle":
+        if self.path == "/api/worktrees":
+            try:
+                payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                if not isinstance(payload, dict):
+                    raise ValueError("bad request")
+            except (ValueError, TypeError):
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project")
+            repo = git_repository(project)
+            # A discovered checkout is usable if its repository is already known.
+            # Merely looking at it never registers it or edits its settings.
+            known = [git_repository(p) for p in known_projects()]
+            if not repo or not any(r and r["common_dir"] == repo["common_dir"] for r in known):
+                return self._send_json({"ok": False, "error": "unknown repository"}, 400)
+            action = payload.get("action")
+            config = payload.get("config")
+            if action == "preview":
+                result = preview_worktree_skills(project, payload.get("targets"), config)
+            elif action == "apply":
+                result = apply_worktree_skills(project, payload.get("targets"), config)
+            elif action == "policy" and isinstance(payload.get("enabled"), bool):
+                result = set_worktree_policy(project, config, payload["enabled"])
+            elif action == "override":
+                result = set_worktree_override(project, payload.get("target"), payload.get("mode"), config)
+            else:
+                return self._send_json({"ok": False, "error": "unknown action"}, 400)
+            return self._send_json(result)
+        elif self.path == "/api/toggle":
             length = int(self.headers.get("Content-Length", 0))
             try:
                 payload = json.loads(self.rfile.read(length) or b"{}")
@@ -2487,11 +3108,42 @@ def cli_apply(group, project_dir):
     return 0
 
 
+def cli_worktrees(args):
+    """An optional pre-launch command, sharing the dashboard's additive writer."""
+    apply = bool(args and args[0] == "apply")
+    rest = args[1:] if apply else args
+    project = os.path.abspath(rest[0] if rest else os.getcwd())
+    repo = git_repository(project)
+    if not repo or project != repo["root"]:
+        print("저장소의 worktree 루트 폴더를 선택하세요.", file=sys.stderr)
+        return 1
+    if not apply:
+        print(json.dumps(collect_worktrees(project), ensure_ascii=False, indent=2))
+        return 0
+    policy = read_json(WORKTREE_FILE).get("repos", {}).get(repo["common_dir"], {})
+    override = policy.get("overrides", {}).get(project, {})
+    if override.get("mode") == "exclude":
+        print("이 worktree는 자동 적용에서 제외돼 있습니다.", file=sys.stderr)
+        return 1
+    config = override.get("config", policy.get("config"))
+    if not config:
+        print("저장된 스킬 구성이 없습니다. 대시보드에서 먼저 선택하세요.", file=sys.stderr)
+        return 1
+    with _worktree_transaction():
+        data = read_json(WORKTREE_FILE)
+        result = _apply_worktree_skills(project, [project], config, data, trusted=True)
+        write_json(WORKTREE_FILE, data, ensure_ascii=False, indent=2)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 1
+
+
 USAGE = """agent-hud                      대시보드를 띄웁니다
 agent-hud open                 대시보드를 브라우저로 엽니다 (꺼져 있으면 띄운 뒤 엽니다)
 agent-hud groups               그룹 목록
 agent-hud apply <그룹> [폴더]   그룹을 폴더에 적용 (기본: 현재 폴더)
-agent-hud apply --off [폴더]    적용 해제"""
+agent-hud apply --off [폴더]    적용 해제
+agent-hud worktrees [폴더]      같은 저장소의 worktree와 스킬 파일 상태
+agent-hud worktrees apply [폴더] 저장된 스킬 구성 추가 (세션 시작 전 선택 사항)"""
 
 
 def main():
@@ -2499,12 +3151,14 @@ def main():
         return
     global PROJECT_DIR
     argv = sys.argv[1:]
-    if argv and argv[0] in ("groups", "apply", "-h", "--help", "help"):
+    if argv and argv[0] in ("groups", "apply", "worktrees", "-h", "--help", "help"):
         if argv[0] in ("-h", "--help", "help"):
             print(USAGE)
             sys.exit(0)
         if argv[0] == "groups":
             sys.exit(cli_groups())
+        if argv[0] == "worktrees":
+            sys.exit(cli_worktrees(argv[1:]))
         rest = argv[1:]
         if not rest:
             print(USAGE, file=sys.stderr)
@@ -2572,6 +3226,7 @@ def main():
             time.sleep(30)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     threading.Thread(target=_update_check_loop, daemon=True).start()
+    threading.Thread(target=_worktree_apply_loop, daemon=True).start()
     if not os.environ.pop("AGENT_HUD_NO_BROWSER", None):
         webbrowser.open(url, new=0, autoraise=opening)
     # keep process alive in background; parent hook detaches us
