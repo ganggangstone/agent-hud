@@ -21,7 +21,7 @@ PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 # 주소는 늘 같아야 한다. "앱으로 설치"한 Dock 아이콘과 북마크가 이 주소에 묶이므로, 포트가 밀리면
 # 그것들이 다른 프로그램을 열게 된다. 개발 도구가 흔히 쓰는 번호(3000, 8000, 8080 등)와 겹치지 않고,
 # macOS가 임시로 나눠 주는 범위(49152~)보다 아래인 번호를 쓴다.

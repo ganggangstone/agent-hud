@@ -2,6 +2,32 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.5.0
+
+**같은 저장소의 다른 작업 폴더(Git worktree)에도 스킬을 공유할 수 있다.** 전에는 worktree를 새로
+만들 때마다 스킬을 다시 공유해야 했다. **플러그인 & 스킬** 탭에서 **같은 저장소의 worktree**를 펼치면
+작업 폴더마다 스킬이 있는지 보이고, 고른 스킬을 고른 폴더에 추가할 수 있다. 이미 있는 폴더와 링크는
+바꾸지 않고 없는 것만 채운다.
+
+**새 worktree에 자동으로 적용할 수 있다.** 스킬을 고르고 **저장하고 새 worktree에 자동 적용**을 누르면,
+HUD가 떠 있는 동안 15초마다 새 worktree를 찾아 같은 스킬을 넣는다. 첫 세션을 열기 전에 바로 넣으려면
+그 폴더에서 `agent-hud worktrees apply`를 실행한다. `agent-hud worktrees`는 상태만 보여준다.
+
+스킬 파일만 공유한다. 플러그인의 훅, MCP, 설정과 그룹의 플러그인 스위치는 옮기지 않는다.
+
+**Share skills with other worktrees of the same repository.** You used to share skills again
+for every new worktree. Open **Worktrees in this repository** on the **Plugins & skills** tab
+to see which skills each worktree has, and add the ones you pick to the worktrees you pick.
+Existing folders and links are left alone; only missing ones are added.
+
+**Apply to new worktrees automatically.** Pick skills and click **Save and enable for new
+worktrees**: while HUD is running it checks for new worktrees every 15 seconds and adds the
+same skills. To add them before the first session starts, run `agent-hud worktrees apply` in
+that folder. `agent-hud worktrees` only prints the state.
+
+Only skill files are shared. Plugin hooks, MCP servers, settings and a group's plugin switches
+are not moved.
+
 ## v0.4.3
 
 **사이드바에서 프로젝트를 목록에서 뺄 수 있다.** 전에는 한 번 올라간 프로젝트를 뺄 방법이 없었다.
