@@ -190,3 +190,22 @@ Plugins are a Claude Code concept; this dashboard reads Claude Code's copies of
 them. Groups are Agent HUD's own. Skills and instruction
 files are read for every supported agent. Don't invent equivalents for tools that have none — say
 which agent a control applies to instead.
+
+## Writing
+
+Use these conventions for README text, landing pages and UI copy in both languages:
+
+- Describe what the user can do and what changes. Prefer "Apply a group to a
+  project" to claims about productivity or an effortless workflow.
+- State which agent a feature applies to. Plugin and skill ON/OFF settings apply
+  to Claude Code; linking a skill folder is a separate operation.
+- Label examples and estimates. Give the source and method for numbers, and do
+  not turn a context token estimate into a claim about money saved.
+- Use complete sentences for explanations. Avoid repeated slogan fragments,
+  rhetorical contrasts and filler such as "seamlessly" or "unlock the power of".
+- In Korean, use direct verbs such as "연결합니다", "저장합니다" and "확인합니다".
+  Explain the cause of a claim: "쓰지 않는 스킬 설명까지 불러오면 입력 토큰이
+  낭비됩니다". Keep concrete consequences when simplifying the wording.
+- Keep the English and Korean versions consistent about behavior, limits and
+  evidence. Use natural wording in each language rather than translating word
+  for word.

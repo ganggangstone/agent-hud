@@ -18,14 +18,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/demo.gif" alt="Applying the app group to a project takes it from 60 skills (about 6,000 tokens) to 6" width="880">
+  <img src="docs/images/demo.gif" alt="Example: applying the app group reduces the project’s loaded skill count from 60 to 6" width="880">
 </p>
 
-Coding agents such as Claude Code, Codex and Cursor put the name and description of every
-installed skill into the context at the start of each session, including skills that
-session never uses. On the author's machine, 60 skills came to 5,000–9,000 tokens per
-session. `claude plugin disable <plugin> -s local` turns a plugin off for one project, but only
-one plugin at a time, and nothing shows how many skills are still loaded.
+Coding agents load the names and descriptions of available skills into the context at
+the start of a session. Descriptions of skills the session never uses waste input tokens. On the developer's
+machine, the names and descriptions of 60 skills totaled 18,938 characters, an estimated
+5,000–9,000 tokens. `claude plugin disable <plugin> -s local` turns a plugin off for one
+project, but only one plugin at a time, and nothing shows how many skills are still loaded.
 
 Agent HUD shows how many skills each project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group to each project.
@@ -233,9 +233,10 @@ over a user skill, and a user skill over a project one.
 
 ### Which agents it applies to
 
-Every agent gets to read the group's skills. Switching off what isn't in the group applies
-to Claude Code only, because the other agents have no per-project setting for turning a
-skill off.
+The group's skills are linked into the project skill folders used by the supported agents.
+Agent HUD's ON/OFF switches update Claude Code settings only. It does not manage other
+agents' individual skill activation settings. Changing groups also adds or removes
+project skill links, which can change the skills other agents discover.
 
 | | In the group | Not in the group |
 |---|---|---|
@@ -357,8 +358,9 @@ writes settings files on this computer only and needs no account.
 
 ## Known limitations
 
-- **macOS only.** The installer relies on `launchd`. `server.py` has no macOS-only code,
-  so on Linux you can run it from a `systemd --user` unit instead. Windows is not
+- **macOS only.** The installer and app are built for macOS. On Linux, run `server.py`
+  directly and configure a service manager such as `systemd --user` separately.
+  macOS features such as the Finder folder picker are unavailable. Windows is not
   supported yet ([#1](../../issues/1)).
 - **Plugin changes take effect from the next session.** Claude Code reads plugin state
   when a session starts.

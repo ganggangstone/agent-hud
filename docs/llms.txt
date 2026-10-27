@@ -1,18 +1,23 @@
 # Agent HUD
 
-A local dashboard for the skills and plugins scattered across a coding agent
-setup. Free, macOS only for now, MIT license, no account.
+A local dashboard for coding agent skills, instruction files and Claude Code
+plugins. Free, macOS only for now, MIT license, no account.
 
 ## What it does
 
-Coding agents such as Claude Code, Codex and Cursor load the name and
-description of every installed skill into the model's context at the start
-of a session, whether that session uses the skill or not. Agent HUD shows
-how many skills a selected project loads, and lets you save the plugins and
+Coding agents load available skills' names and descriptions into the model's
+context at the start of a session. Descriptions of unused skills waste input tokens.
+Agent HUD shows how many skills a selected project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group per project.
 It also shows which instruction files (CLAUDE.md, AGENTS.md and others) a
 project has and how they are linked to each other, and can set a skill to
-manual-only per project. It reads and writes settings files on the machine it runs on and needs no
+manual-only per project. The switches update Claude Code settings only. Skill
+linking and group changes also add or remove project skill links used by other
+agents. Worktree sharing adds missing skill links to selected checkouts of the
+same repository without copying plugin settings, hooks or MCP configuration.
+Saved defaults can apply to new worktrees every 15 seconds while HUD runs; use
+`agent-hud worktrees apply` before launching an agent to apply them first.
+It reads and writes settings files on the machine it runs on and needs no
 account. On its own it makes one request, a GitHub Releases check once a
 day for update notices; a Homebrew install can also update itself when the
 user clicks Update now, and then Homebrew does the download.
