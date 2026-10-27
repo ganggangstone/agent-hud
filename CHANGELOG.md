@@ -15,6 +15,15 @@ into "This computer" and "This project", and a file that reads another one (a sy
 even when they are not in the scan list, and the user-level `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`
 have rows now. Which file is the source of truth is not decided.
 
+**머리글에 에이전트마다 세션 시작 때 읽히는 지침·스킬 수와 토큰을 보여준다.** 「로컬 대시보드」 자리에
+표가 들어갔다. 지침 파일은 본문 전체를 세고, 세션 시작 때 읽히는 파일(전역·프로젝트 루트·`CLAUDE.md`의
+`@` 가져오기)만 센다. 플러그인 밖 스킬의 「다른 에이전트도 쓰게 만듦」 옆 `?`를 누르면 기술 설명이 펼쳐진다.
+
+**The header shows, per agent, the instruction files and skills read at session start and their tokens.**
+It replaces the "local dashboard" tagline. Instruction files are counted in full, and only files read at
+session start count (user-level, project root, and `CLAUDE.md` imports). A `?` next to "let other agents
+use it" opens the technical explanation.
+
 **「지금 업데이트」를 누르면 토큰 세기 도구가 없을 때 같이 준비한다.** Homebrew 설치본에서 터미널 없이
 숫자를 볼 수 있다. 준비에 실패해도 업데이트는 그대로 끝난다.
 

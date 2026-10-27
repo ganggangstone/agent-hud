@@ -511,6 +511,72 @@ def _with_link_targets(rows):
     return rows + list(extra.values())
 
 
+def _imports_of(path, depth=0):
+    """path 와 그 @가져오기 대상(있는 것만, 두 단계까지). 링크는 대상 파일로 푼다."""
+    real = os.path.realpath(path)
+    if not os.path.isfile(real):
+        return []
+    out = [real]
+    link = _link_info(path)
+    if link and link["kind"] == "import" and depth < 2:
+        for t in link["targets"]:
+            if t["ok"]:
+                out += _imports_of(t["path"], depth + 1)
+    return out
+
+
+# 에이전트마다 세션을 시작할 때 늘 읽는 지침 파일. 하위 폴더의 파일은 그 폴더를 건드릴 때만
+# 읽히므로 넣지 않는다. 출처: INSTRUCTION_SOURCES 의 도구 표와 각 도구 문서(ADR 11).
+def session_instructions(project_dir):
+    """-> {에이전트: [파일 경로]} (실재하는 것만, 링크는 대상으로, 중복 없이)"""
+    P = lambda *a: os.path.join(project_dir, *a)
+    agents_md = P("AGENTS.override.md") if os.path.isfile(P("AGENTS.override.md")) else P("AGENTS.md")
+    plan = {
+        "Claude Code": [os.path.join(CLAUDE_DIR, "CLAUDE.md"), P("CLAUDE.md"), P("CLAUDE.local.md")],
+        "Codex": [os.path.join(HOME, ".codex", "AGENTS.md"), agents_md],
+        "Gemini CLI": [os.path.join(HOME, ".gemini", "GEMINI.md"), P("GEMINI.md")],
+        "Cursor": [P("AGENTS.md")],
+        "Copilot": [P(".github", "copilot-instructions.md"), P("AGENTS.md")],
+        "Antigravity": [],
+    }
+    out = {}
+    for agent, paths in plan.items():
+        seen = []
+        for p in paths:
+            for f in (_imports_of(p) if agent == "Claude Code" else ([os.path.realpath(p)] if os.path.isfile(p) else [])):
+                if f not in seen:
+                    seen.append(f)
+        out[agent] = seen
+    return out
+
+
+INSTRUCTION_READ_MAX = 400_000
+
+
+def session_load(project_dir, tk):
+    """머리글용: 에이전트마다 세션 시작 때 읽히는 지침 수·스킬 수·토큰 합(지침 본문 + 스킬 이름·설명).
+    어느 한쪽이라도 못 셌으면 tokens 는 None. 스킬 쪽 수는 _attach_tokens 가 센 tk 를 그대로 쓴다."""
+    files = session_instructions(project_dir)
+    texts = {}
+    for paths in files.values():
+        for f in paths:
+            if f not in texts:
+                try:
+                    with open(f, encoding="utf-8", errors="replace") as fh:
+                        texts[f] = fh.read(INSTRUCTION_READ_MAX)
+                except OSError:
+                    texts[f] = None
+    state, counts = count_tokens([t for t in texts.values() if t is not None]) if any(v is not None for v in texts.values()) else ("ok", {})
+    out = {}
+    for agent in SKILL_AGENTS:
+        sk = (tk.get("agents") or {}).get(agent) or {"skills": 0, "measured": 0, "tokens": 0}
+        instr = [texts[f] for f in files[agent]]
+        ok = tk.get("state") == "ok" and state == "ok" and sk["measured"] == sk["skills"] and all(t is not None and t in counts for t in instr)
+        out[agent] = {"instructions": len(instr), "skills": sk["skills"],
+                      "tokens": (sk["tokens"] or 0) + sum(counts[t] for t in instr) if ok else None}
+    return out
+
+
 def _file_row(label, path, tool="Claude Code"):
     exists = os.path.isfile(path)
     st = os.stat(path) if exists else None
@@ -1427,12 +1493,14 @@ def collect_skills(ctx):
             "skills": loose,
         })
 
+    tokens = _attach_tokens(rows)
     return {
         "title": "Skills (who can see them)",
         "rows": rows,
         "agents": SKILL_AGENTS,
         "loaded": _loaded_count(rows),
-        "tokens": _attach_tokens(rows),
+        "tokens": tokens,
+        "load": session_load(project_dir, tokens),
         "has_local": has_local,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -1812,7 +1880,11 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .hdr{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 16px;margin-bottom:20px}
 .hdr-ctl{display:flex;gap:8px;align-items:center;flex-shrink:0;white-space:nowrap}
 .seg{display:inline-flex;height:28px;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12px;font-weight:600}
-#h1sub{grid-column:1/-1;display:block;font-size:13px;line-height:1.5;max-width:720px;text-wrap:pretty;color:var(--dim)}
+#h1sub{grid-column:1/-1;display:block;font-size:13px;line-height:1.5;color:var(--dim)}
+.hl-title{margin-bottom:4px}
+.hl-row{display:grid;grid-template-columns:110px 90px 90px auto;gap:0 14px;font-variant-numeric:tabular-nums}
+.hl-agent{color:var(--text);font-weight:600}
+.hl-tok{color:var(--text);font-weight:700}
 .rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
   color:var(--dim);font-size:12px;line-height:1.6}
 .rule-note b{color:var(--text);font-weight:600}
@@ -1865,6 +1937,9 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .guide-row{display:flex;gap:8px;align-items:baseline;margin-top:3px}
 .guide-row b{flex:0 0 auto;font-weight:600;color:var(--dim)}
 .guide-row b::after{content:' ·'}
+.help{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--border);color:var(--dim);font-size:10px;font-weight:700;cursor:pointer;margin-left:4px;flex-shrink:0}
+.help:hover{color:var(--text);border-color:var(--accent)}
+.help-box{margin:2px 0 8px;font-size:11.5px}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
@@ -1984,9 +2059,10 @@ const T = {
   wt_state_note: 'Worktree status below reflects the saved configuration. Changing checkboxes only affects the preview.',
   wt_detail: 'Details', wt_skill_col: 'Skill', wt_source_detail: 'Source path',
     banner: 'Switches take effect <b>next session</b>. Everything else is immediate.',
-    headline: (n, m) => `This folder: about <b>${n.toLocaleString()} tokens</b> of skill list (${m} skills) are read when Claude Code starts, and sent again with <b>every message</b>. Instruction files are not counted yet.`,
-    headline_part: (n, m) => `This folder: at least <b>${n.toLocaleString()} tokens</b> of skill list (${m} skills, some uncounted) are read when Claude Code starts, and sent again with <b>every message</b>.`,
-    headline_off: m => `This folder: <b>${m} skills</b> are read when Claude Code starts and sent again with every message. Token count not set up yet.`,
+    headline_title: 'Read at the start of every session in this folder, and sent again with every message:',
+    headline_none: 'Nothing is read at session start in this folder.',
+    hl_instr: n => `${n} instruction file${n === 1 ? '' : 's'}`, hl_skills: n => `${n} skill${n === 1 ? '' : 's'}`,
+    hl_tok: n => `about ${n.toLocaleString()} tokens`, hl_tok_na: 'tokens not counted',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
   guide_rows: [
     ['ALWAYS', 'The AI reads the name and description every session. Costs tokens each time.'],
@@ -2020,8 +2096,9 @@ const T = {
   comp_tip: n => `Also in this plugin: ${n}. Only skills can be shared with other agents`,
   share_to: names => 'let ' + names.join(', ') + ' use it too',
   share_short: 'let other agents use it',
+  help_tip: 'How this works',
   share_done: 'every agent can use it',
-  share_all_tip: 'Puts a link to this skill in the folders those agents look in, inside this project. No copy is made and the original stays where it is.',
+  share_all_tip: 'When checked, a symlink to this skill is placed in the folders Codex, Cursor, Copilot, Gemini CLI and Antigravity look in inside this project (.agents/skills and others). No copy is made, the original stays put, and unchecking removes only the links. Claude Code reads it only while the plugin is on.',
   partly: a => `${a} can use only some of the skills in this plugin`,
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
@@ -2121,9 +2198,10 @@ const T = {
   wt_state_note: '아래 worktree 상태는 저장된 구성 기준입니다. 체크를 바꾸면 미리보기에만 반영됩니다.',
   wt_detail: '상세', wt_skill_col: '스킬', wt_source_detail: '원본 경로',
     banner: '스위치는 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
-    headline: (n, m) => `이 폴더에서 Claude Code를 열면 스킬 목록만으로 <b>약 ${n.toLocaleString()}토큰</b>(스킬 ${m}개)이 먼저 읽히고, <b>메시지를 보낼 때마다</b> 같은 양이 매번 함께 갑니다. 지침 파일은 아직 세지 않습니다.`,
-    headline_part: (n, m) => `이 폴더에서 Claude Code를 열면 스킬 목록만으로 <b>최소 ${n.toLocaleString()}토큰</b>(스킬 ${m}개, 일부 못 셈)이 먼저 읽히고, <b>메시지를 보낼 때마다</b> 같은 양이 매번 함께 갑니다.`,
-    headline_off: m => `이 폴더에서 Claude Code를 열면 <b>스킬 ${m}개</b>가 먼저 읽히고 메시지를 보낼 때마다 매번 함께 갑니다. 토큰 수는 아직 세지 않았습니다.`,
+    headline_title: '이 폴더에서 세션마다 처음에 읽히고, 메시지를 보낼 때마다 다시 함께 가는 양:',
+    headline_none: '이 폴더에서 세션 시작 때 읽히는 것이 없습니다.',
+    hl_instr: n => `지침 ${n}개`, hl_skills: n => `스킬 ${n}개`,
+    hl_tok: n => `약 ${n.toLocaleString()}토큰`, hl_tok_na: '토큰 안 셈',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
   guide_rows: [
     ['항상', '세션마다 AI가 이름과 설명을 읽습니다. 그때마다 토큰이 듭니다.'],
@@ -2156,9 +2234,10 @@ const T = {
   comp_count: (label, n) => `${label} ${n}개`,
   comp_tip: n => `이 플러그인에 같이 든 것: ${n}. 다른 에이전트에 보낼 수 있는 것은 스킬뿐입니다`,
   share_to: names => names.join('·') + '도 쓰게 하기',
-  share_short: '다른 에이전트도 쓰게',
+  share_short: '다른 에이전트도 쓰게 만듦',
+  help_tip: '어떻게 되는 건지',
   share_done: '모든 에이전트가 쓸 수 있음',
-  share_all_tip: '이 프로젝트 안에서 그 에이전트들이 찾아보는 폴더에 이 스킬의 링크를 넣습니다. 복사본은 생기지 않고 원본은 그 자리에 있습니다.',
+  share_all_tip: '체크하면 이 프로젝트 안에서 Codex·Cursor·Copilot·Gemini CLI·Antigravity가 스킬을 찾아보는 폴더(.agents/skills 등)에 이 스킬의 심볼릭 링크를 넣습니다. 복사본은 생기지 않고 원본은 그 자리에 있으며, 체크를 풀면 링크만 지웁니다. Claude Code는 플러그인이 켜져 있어야 읽습니다.',
   partly: a => `${a}는 이 플러그인의 스킬 중 일부만 쓸 수 있습니다`,
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',
@@ -2254,14 +2333,16 @@ document.getElementById('langEn').onclick = () => setLang('en');
 document.getElementById('langKo').onclick = () => setLang('ko');
 renderLangToggle();
 document.getElementById('applyBanner').innerHTML = t().banner;
-let lastTokens = null;
-// 머리글: 지금 폴더에서 Claude Code가 세션마다 읽는 스킬 목록의 양. 메시지마다 다시 보내지는 양이기도 하다.
+let lastTokens = null, lastLoad = null;
+// 머리글: 에이전트마다 세션 시작 때 읽히는 지침·스킬 수와 토큰. 메시지마다 다시 보내지는 양이기도 하다.
+// 읽는 것이 하나도 없는 에이전트는 줄을 빼고, 토큰을 못 셌으면 그 칸만 비운다.
 function renderHeadline(){
   const el = document.getElementById('h1sub');
-  const tk = lastTokens; if(!tk){ el.textContent = ''; return; }
-  const v = (tk.agents||{})['Claude Code'] || {skills: 0, measured: 0, tokens: null};
-  el.innerHTML = tk.state !== 'ok' || v.tokens === null ? t().headline_off(v.skills)
-    : v.measured === v.skills ? t().headline(v.tokens, v.skills) : t().headline_part(v.tokens, v.skills);
+  const ld = lastLoad; if(!ld){ el.textContent = ''; return; }
+  const rows = Object.entries(ld).filter(([, v]) => v.instructions + v.skills > 0);
+  if(!rows.length){ el.textContent = t().headline_none; return; }
+  el.innerHTML = `<div class="hl-title">${t().headline_title}</div>` + rows.map(([a, v]) =>
+    `<div class="hl-row"><span class="hl-agent">${shortAgent(a)}</span><span>${t().hl_instr(v.instructions)}</span><span>${t().hl_skills(v.skills)}</span><span class="${v.tokens === null ? 'dim' : 'hl-tok'}">${v.tokens === null ? t().hl_tok_na : t().hl_tok(v.tokens)}</span></div>`).join('');
 }
 
 let theme = localStorage.getItem('agent-hud-theme') || 'dark';
@@ -2504,6 +2585,7 @@ function renderSidebarList(){
   listWrap.appendChild(add);
 }
 // ?open=<플러그인> 으로 펼친 채 열 수 있다 (?tab= 과 같은 이유)
+const helpOpen = {};
 const skillsOpen = Object.fromEntries((new URLSearchParams(location.search).get('open')||'')
   .split(',').filter(Boolean).map(k => [k, true]));
 // 플러그인 밖의 스킬은 펼친 채로 시작한다. 보통 몇 개뿐이고, 접어두면 있는 줄도 모른다.
@@ -2830,7 +2912,8 @@ async function tick(){
   const r = await fetch(stateUrl()); const d = await r.json();
   const upd = d.panels.find(p => p.panel === 'update');
   renderUpdate(upd);
-  lastTokens = (d.panels.find(p => p.tokens) || {}).tokens || null;
+  const sp = d.panels.find(p => p.tokens) || {};
+  lastTokens = sp.tokens || null; lastLoad = sp.load || null;
   renderHeadline();
   if(upd) renderFeedback(upd);
   renderSidebar(d.panels.find(p => p.known_projects) || {known_projects: [], project_dir: selectedProject});
@@ -3094,6 +3177,7 @@ async function tick(){
         meta.appendChild(badges);
         const secMiss = (p.agents||[]).filter(a => (st[a] || 'none') !== 'all');
         const ids = (row.skills||[]).filter(x => x.linkable).map(x => x.id);
+        const helpBoxes = [];
         if(ids.length && isPlugin){
           const share = document.createElement('label');
           share.className = 'share' + (secMiss.length ? '' : ' share-done');
@@ -3102,10 +3186,20 @@ async function tick(){
           cb.onclick = e => { e.stopPropagation(); linkSkill(ids, cb.checked, share); };
           share.appendChild(cb);
           share.appendChild(document.createTextNode(secMiss.length ? t().share_short : t().share_done));
-          share.title = secMiss.length ? t().share_to(secMiss.map(shortAgent)) : t().share_all_tip;
+          share.title = secMiss.length ? t().share_to(secMiss.map(shortAgent)) : '';
           meta.appendChild(share);
+          // (?) 를 누르면 기술 설명이 그 줄 아래에 펼쳐진다. 늘 보일 필요는 없는 글이라 평소엔 숨긴다.
+          const help = document.createElement('span'); help.className = 'help'; help.textContent = '?';
+          help.title = t().help_tip;
+          const helpBox = document.createElement('div'); helpBox.className = 'note help-box';
+          helpBox.style.display = helpOpen[key] ? '' : 'none';   // 몇 초마다 다시 그려도 펼친 채로 남게
+          helpBox.textContent = t().share_all_tip;
+          help.onclick = e => { e.stopPropagation(); helpOpen[key] = !helpOpen[key]; helpBox.style.display = helpOpen[key] ? '' : 'none'; };
+          meta.appendChild(help);
+          helpBoxes.push(helpBox);
         }
         wrap.appendChild(meta);
+        for(const hb of helpBoxes) wrap.appendChild(hb);
 
         if(skillsOpen[key]){
           if(hasSkills){

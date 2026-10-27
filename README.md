@@ -117,6 +117,11 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
   `SKILL.md` sets `disable-model-invocation: true` shows MANUAL and can't be changed here.
 - **Reference token counts**: next to each skill, and as a total for every skill Agent HUD
   found plus a total per agent. See [Token counts](#token-counts).
+- **Header**: for the selected project, what each agent reads at the start of every session
+  and sends again with every message: how many instruction files, how many skills, and about
+  how many tokens the two add up to. Instruction files are counted in full; skills by name and
+  description. Only files read at session start count (the user-level and project-root files,
+  plus what `CLAUDE.md` imports), not `CLAUDE.md` files in subfolders.
 - **Agent instructions**: 31 kinds of instruction files in the project, such as
   `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time,
   plus the user-level `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`.

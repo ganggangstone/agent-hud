@@ -443,3 +443,9 @@ Copilot(`copilot plugin marketplace`)에도 있다. 다만 매니페스트와 �
 
 가져온 파일과 링크 대상은 목록에 없어도 행으로 보인다(`~/.claude/PRINCIPLES.md` 같은 파일이 그렇다).
 없는 대상은 행으로 만들지 않는다. 가리키는 쪽 뱃지가 이미 "없음"이라고 말하기 때문이다.
+
+머리글의 "세션마다 읽히는 양"은 에이전트별로 다음 파일만 센다. 하위 폴더의 파일은 그 폴더를 건드릴 때만
+읽히므로 뺀다. Claude Code: `~/.claude/CLAUDE.md`, 루트 `CLAUDE.md`·`CLAUDE.local.md`와 각각의 `@` 가져오기(두 단계).
+Codex: `~/.codex/AGENTS.md`(링크면 대상), 루트 `AGENTS.override.md`가 있으면 그것, 없으면 `AGENTS.md`.
+Gemini CLI: `~/.gemini/GEMINI.md`, 루트 `GEMINI.md`. Cursor: 루트 `AGENTS.md`. Copilot: `.github/copilot-instructions.md`,
+루트 `AGENTS.md`. Antigravity: 지침 파일 없음(스킬만). 출처는 `INSTRUCTION_SOURCES`의 도구 표와 같다.
