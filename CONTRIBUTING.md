@@ -32,11 +32,21 @@ launchctl kickstart -k gui/$(id -u)/com.agent-hud
 for t in tests/test_*.py; do python3 "$t" || echo "FAIL $t"; done
 ```
 
-No framework, no dependencies — each file runs on its own and asserts.
+No framework — each file runs on its own and asserts. The server and the checks use only
+the standard library, except the token-count checks: they run the real `tiktoken`
+(`o200k_base`) from a private venv. Set it up once and point the checks at it:
+
+```bash
+AGENT_HUD_HOME=/tmp/hud-tokens python3 server.py tokens setup
+export AGENT_HUD_TEST_TOKENIZER_HOME=/tmp/hud-tokens
+```
+
+Without that variable those checks print `SKIP`; in CI (`CI` is set) they fail instead, so
+a green CI always ran the real tokenizer.
 
 GitHub Actions runs the same loop on every push and pull request
 (`.github/workflows/test.yml`), so a pull request tells you whether the checks pass
-without you running them. `node` is the only thing beyond Python that the checks need,
+without you running them. It runs `tokens setup` in a temporary folder first. `node` is the only thing beyond Python that the checks need,
 for the `--check` passes over inline `<script>` blocks.
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`: it verifies that the commit
@@ -61,11 +71,17 @@ nothing for users.
   other rule and key and leaving files with nothing to remove untouched.
 - **`tests/test_skill_roots_agy.py`** — Antigravity (agy) is in the agent list and reads
   `~/.gemini/config/skills` and project `.agents/skills`, not `~/.agents/skills`.
-- **`tests/test_cli.py`** — the `groups` and `apply` subcommands, run as a
-  subprocess against a throwaway home.
+- **`tests/test_cli.py`** — the `groups`, `apply` and `tokens setup` subcommands, run as a
+  subprocess against a throwaway home (bad `tokens` input starts no server and creates
+  nothing; the venv is rebuilt when the Python changes, with the commands checked through a
+  stubbed `subprocess.run`; a real `tokens setup` runs once in the shared test tokenizer folder).
 - **`tests/test_data_dir.py`** — data files sit next to `server.py` by default
   and move with `AGENT_HUD_HOME`.
-- **`tests/test_loaded.py`** — the count of skills a project loads.
+- **`tests/test_loaded.py`** — the count of skills a project loads, and the reference
+  token counts: known `o200k_base` values for `name\ndescription`, body excluded, long
+  descriptions, disabled Claude Code plugin vs another agent, a skill in two folders
+  counted once, missing metadata, `---` inside a description, unclosed frontmatter, and "not measured" when the tokenizer or its vocabulary
+  is missing.
 - **`tests/test_skill_spec.py`** — detection of skills that break the Agent
   Skills spec.
 - **`tests/test_subprojects.py`** — subfolders that are projects of their own
@@ -122,6 +138,7 @@ agent-hud apply <group> [dir]  apply a group to a folder (default: cwd)
 agent-hud apply --off [dir]    stop using one here
 agent-hud worktrees [dir]      list related worktrees and skill file states
 agent-hud worktrees apply [dir] add saved skills before starting an agent
+agent-hud tokens setup         install the skill token counter (tiktoken) next to the tool
 ```
 
 `apply` calls the same `assign_set()` the dashboard does and needs no running

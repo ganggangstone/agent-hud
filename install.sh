@@ -15,6 +15,15 @@ if [ ! -f "$TOOL_DIR/modes.json" ]; then
   echo "Created $TOOL_DIR/modes.json from the example — edit it to match your own plugins."
 fi
 
+# Token counting is optional: if this fails, the dashboard still works and shows "not measured".
+# It installs tiktoken into a private venv inside $TOOL_DIR (nothing global) and downloads the public
+# o200k_base vocabulary once. Skill text never leaves this computer.
+if env -u AGENT_HUD_HOME "$PYTHON3" "$TOOL_DIR/server.py" tokens setup; then
+  TOKENS_STATUS="Token counting: ready."
+else
+  TOKENS_STATUS="Token counting: setup FAILED (the dashboard works without it). Retry: $PYTHON3 $TOOL_DIR/server.py tokens setup"
+fi
+
 sed -e "s#__HOME__#$HOME#g" -e "s#__PYTHON3__#$PYTHON3#g" \
   "$SRC_DIR/com.agent-hud.plist.template" > "$PLIST"
 
@@ -24,6 +33,7 @@ launchctl load "$PLIST"
 echo ""
 echo "Agent HUD installed and running (launchd service com.agent-hud)."
 echo "Dashboard: http://127.0.0.1:41717"
+echo "$TOKENS_STATUS"
 echo ""
 echo "To have each Claude Code session register itself with the dashboard, add this to"
 echo "~/.claude/settings.json under \"hooks\" -> \"SessionStart\":"

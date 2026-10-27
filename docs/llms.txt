@@ -29,6 +29,6 @@ user clicks Update now, and then Homebrew does the download.
 - Price: free
 - Platform: macOS (Linux via running `server.py` directly; Windows not supported yet)
 - License: MIT
-- Dependencies: none — a single Python file, standard library only
+- Dependencies: none for the dashboard — a single Python file, standard library only. Optional token counts install tiktoken into the tool's own folder (`agent-hud tokens setup`)
 - Account: not required
-- Network use: one GitHub Releases check a day; Homebrew downloads an update only when the user clicks Update now
+- Network use: one GitHub Releases check a day; Homebrew downloads an update only when the user clicks Update now; the optional token-count setup downloads tiktoken and one public vocabulary file once

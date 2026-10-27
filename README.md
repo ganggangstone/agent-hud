@@ -113,9 +113,50 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
 - **Plugins & skills**: every installed skill, listed by plugin, with a badge for each
   agent that can read it in the selected project. Plugins, and skills that aren't part of
   a plugin, have an ON/OFF switch for Claude Code.
+- **Reference token counts**: next to each skill, and as a total for every skill Agent HUD
+  found plus a total per agent. See [Token counts](#token-counts).
 - **Agent instructions**: 30 kinds of instruction files in the project, such as
   `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time.
   You can see at a glance that `CLAUDE.md` was updated but `AGENTS.md` wasn't.
+
+## Token counts
+
+The Plugins & skills tab counts the tokens in each skill's name and description: the text
+`name`, a line break, then `description` from `SKILL.md`, counted with the `o200k_base`
+tokenizer. The skill body is not counted. These are reference counts made on your computer,
+not any provider's own count or bill, and they do not say how many skills a session loaded.
+
+- Every skill found is counted once, including plugins that are switched off and skills
+  only Codex, Cursor, Copilot, Gemini CLI or Antigravity can see. A skill in two folders is
+  one skill.
+- The per-agent figures count the skills each agent can see with the current settings, and
+  add up the tokens of those that could be counted. Switching a plugin off, or a skill off in `skillOverrides`, removes it from Claude Code's
+  total only; another agent that reads the skill through a link keeps it.
+- A skill whose name or description is missing, can't be read, or whose `---` frontmatter is
+  not closed shows `tok n/a` and is left out of the token sum, instead of counting its folder
+  name as if it were the description. It still counts as a skill found and visible. When
+  some skills are left out, the line reads "Measured subtotal ... N of M skills, not a full
+  total" and the affected agents read "17 measured (3 of 4)"; with none counted it says
+  "Not measured" rather than 0.
+
+The dashboard itself needs nothing beyond Python. Counting uses the `tiktoken` package,
+which you install once into a private folder next to `server.py` (or in `AGENT_HUD_HOME`):
+
+```bash
+agent-hud tokens setup                    # Homebrew
+python3 server.py tokens setup            # a clone, from the clone's folder
+```
+
+This creates `tokenizer-venv/` and `tokenizer-cache/`, installs `tiktoken` from PyPI into
+that venv with the Python that runs the command, and downloads the public `o200k_base`
+vocabulary file once. Nothing global is installed and no skill text leaves your computer.
+After that, counting runs offline. Until it is set up the tab says the count is not
+measured and shows this command; it never shows an estimate. `./install.sh` runs the
+setup too and carries on if it fails. If no `tiktoken` build exists for your newest Python,
+run the command with an older one, for example `python3.13 server.py tokens setup`: if
+`tokenizer-venv/` was made by another Python version, setup rebuilds it with the Python that
+runs the command (only a folder that is already a venv is replaced; any other content stops
+setup with an error).
 
 ## Concepts
 

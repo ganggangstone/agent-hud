@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, re, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+import json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 from contextlib import contextmanager
 import fcntl
 
@@ -314,20 +314,34 @@ def _frontmatter(path):
 # 그래서 화면에서도 "안 읽힘"이 아니라 "명세 위반"이라고 부른다.
 SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 DESC_MAX = 1024
+META_READ_MAX = 1_000_000     # 닫는 ---가 안 나오는 파일에서 멈추는 상한
 
 
 def _skill_meta(path, folder):
     """SKILL.md를 한 번 읽어 (표시 이름, 설명, 명세 위반 목록)."""
     name, desc, issues = folder, "", []
+    lines, closed = [], False
     try:
         with open(path, encoding="utf-8") as f:
-            head = f.read(8000)
+            first = f.readline(META_READ_MAX)
+            if first.rstrip() != "---":
+                return name, desc, [{"code": "no_frontmatter"}]
+            size = len(first)
+            # 경계는 줄 단위다(설명 안의 `---`는 경계가 아니다). 닫는 줄을 못 보면 상한까지만 읽고 멈춘다.
+            while size < META_READ_MAX:
+                line = f.readline(META_READ_MAX - size)
+                if not line:
+                    break
+                size += len(line)
+                if line.rstrip() == "---" and (line.endswith("\n") or size < META_READ_MAX):
+                    closed = True
+                    break
+                lines.append(line.rstrip("\n"))
     except Exception:
         return name, desc, [{"code": "unreadable"}]
-    if not head.startswith("---"):
-        return name, desc, [{"code": "no_frontmatter"}]
+    if not closed:      # 닫히지 않았거나 상한에서 잘렸다: 설명이 어디까지인지 모른다
+        return name, desc, [{"code": "frontmatter_unclosed"}]
     declared = None
-    lines = head.split("---", 2)[1].splitlines()
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -1113,6 +1127,114 @@ def collect_worktrees(project):
             "config": policy.get("config"), "skills": skills, "poll_seconds": WORKTREE_POLL_SECONDS}
 
 
+# 스킬 이름+설명의 참고용 토큰 수. 서버는 표준 라이브러리만 쓰고, 세는 일은 setup이 만든
+# 별도 venv의 tiktoken에 맡긴다(`agent-hud tokens setup`). 설치하지 않았으면 숫자를 지어내지 않고
+# "측정 안 함"으로 보여준다. 세는 대상은 SKILL.md 앞머리의 name + 줄바꿈 + description 뿐이고
+# (본문 제외) 어떤 에이전트의 실제 로드량·청구액도 아니다.
+TOKEN_ENCODING = "o200k_base"
+TOKENIZER_REQUIREMENT = "tiktoken>=0.8,<1"     # 버전 범위는 여기 한 곳에만 둔다
+TOKENIZER_VENV = os.path.join(TOOL_DIR, "tokenizer-venv")
+TOKENIZER_CACHE = os.path.join(TOOL_DIR, "tokenizer-cache")
+TOKEN_CACHE_MAX = 4096
+TOKEN_FAIL_SECONDS = 15
+TOKEN_INCOMPLETE = ("unreadable", "no_frontmatter", "frontmatter_unclosed", "name_missing", "desc_missing")
+
+# venv의 파이썬에서 도는 고정 코드. stdin의 JSON 문자열 목록을 읽어 토큰 수 목록을 stdout에 낸다.
+# count 모드는 소켓 연결을 막아 어휘 파일이 없을 때 몰래 내려받지 않고 "cache"로 실패한다.
+# 특수 토큰처럼 생긴 글자(<|endoftext|> 등)도 보통 글자로 센다.
+_TOKEN_SNIPPET = r"""
+import json, os, sys
+mode, cache, name = sys.argv[1:4]
+os.environ["TIKTOKEN_CACHE_DIR"] = cache
+def fail(code):
+    print(json.dumps({"error": code})); sys.exit(3)
+try:
+    import tiktoken
+except Exception:
+    fail("import")
+if mode == "count":
+    import socket
+    def deny(*a, **k): raise OSError("offline")
+    socket.socket.connect = deny
+    socket.getaddrinfo = deny
+try:
+    enc = tiktoken.get_encoding(name)
+except Exception:
+    fail("cache" if mode == "count" else "download")
+if mode == "count":
+    texts = json.load(sys.stdin)
+    print(json.dumps({"counts": [len(enc.encode(t, disallowed_special=())) for t in texts]}))
+else:
+    print(json.dumps({"ok": True}))
+"""
+
+_token_lock = threading.Lock()
+_token_counts = {}          # 글자 그대로 -> 토큰 수. TOKEN_CACHE_MAX 넘으면 오래된 것부터 버린다
+_token_failed = (0.0, "")   # (실패한 시각, 상태). 폴링(2초)마다 프로세스를 새로 띄우지 않으려고 잠시 기억
+
+
+def _tokenizer_python():
+    py = os.path.join(TOKENIZER_VENV, "bin", "python")
+    return py if os.access(py, os.X_OK) else None
+
+
+NET_ENV = {"HOME", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "SSL_CERT_FILE", "SSL_CERT_DIR",
+           "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"}
+
+
+def _run_tokenizer(mode, texts=None, timeout=30):
+    """-> (결과 dict 또는 None, 실패 상태: setup / import / cache / download / error)."""
+    py = _tokenizer_python()
+    if not py:
+        return None, "setup"
+    # 키 같은 환경변수가 하위 프로세스로 가지 않게 PATH만 넘긴다. 어휘를 내려받는 warm은 프록시·인증서만 더한다.
+    keep = ["PATH"] + ([] if mode == "count" else [k for k in os.environ if k.upper() in NET_ENV])
+    env = {k: os.environ[k] for k in keep if k in os.environ}
+    try:
+        p = subprocess.run([py, "-I", "-c", _TOKEN_SNIPPET, mode, TOKENIZER_CACHE, TOKEN_ENCODING],
+                           input=json.dumps(texts or []), capture_output=True, text=True,
+                           env=env, timeout=timeout)
+        out = json.loads(p.stdout or "{}")
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None, "error"
+    if p.returncode != 0 or not isinstance(out, dict):
+        return None, out.get("error", "error") if isinstance(out, dict) else "error"
+    return out, ""
+
+
+def count_tokens(texts):
+    """-> (상태, {글자: 토큰 수}). 상태가 "ok"가 아니면 수는 비어 있다. 한 번에 모아서 센다."""
+    global _token_failed
+    texts = set(texts)
+    with _token_lock:
+        got = {t: _token_counts[t] for t in texts if t in _token_counts}
+        missing = [t for t in texts if t not in got]
+        if missing:
+            when, state = _token_failed
+            if state and time.time() - when < TOKEN_FAIL_SECONDS:
+                return state, {}
+            out, state = _run_tokenizer("count", missing)
+            if out is None or len(out.get("counts", [])) != len(missing):
+                _token_failed = (time.time(), state or "error")
+                return _token_failed[1], {}
+            _token_failed = (0.0, "")
+            for t, n in zip(missing, out["counts"]):
+                got[t] = _token_counts[t] = n
+            while len(_token_counts) > TOKEN_CACHE_MAX:
+                _token_counts.pop(next(iter(_token_counts)))
+        elif not _tokenizer_python():
+            return "setup", {}
+        return "ok", got
+
+
+def token_setup_command():
+    """이 서버가 쓰는 데이터 폴더에 맞는, 사용자가 그대로 칠 setup 명령."""
+    if brew_prefix():
+        return "agent-hud tokens setup"
+    cmd = f"python3 {shlex.quote(os.path.abspath(__file__))} tokens setup"
+    return f"AGENT_HUD_HOME={shlex.quote(TOOL_DIR)} {cmd}" if os.environ.get("AGENT_HUD_HOME") else cmd
+
+
 def _loaded_count(rows):
     """이 프로젝트에서 Claude Code가 실제로 읽는 스킬 수.
 
@@ -1121,16 +1243,39 @@ def _loaded_count(rows):
     꺼진 플러그인의 스킬은 빠진다. permissions.deny로 차단한 스킬은 목록에 남으므로
     빼지 않는다(센티널 실측, ADR 10).
     """
-    n = 0
-    for row in rows:
-        if row["enabled"] is False:          # 꺼진 플러그인
-            continue
-        for sk in row["skills"]:
-            if sk.get("enabled") is False:     # skillOverrides로 끈 플러그인 밖 스킬
-                continue
-            if "Claude Code" in (sk.get("agents") or []):
-                n += 1
-    return n
+    return sum(1 for row in rows for sk in row["skills"]
+               if not _claude_off(row, sk) and "Claude Code" in (sk.get("agents") or []))
+
+
+def _claude_off(row, sk):
+    """Claude Code만 거는 스위치: 꺼진 플러그인, skillOverrides로 끈 스킬. 다른 에이전트는 상관없다."""
+    return row["enabled"] is False or sk.get("enabled") is False
+
+
+def _attach_tokens(rows):
+    """모든 스킬에 sk["tokens"](없으면 None)를 달고 요약을 돌려준다. 에이전트별 수는 지금 설정에서
+    그 에이전트가 볼 수 있는 스킬이고(못 센 것도 든다), 세션에서 실제로 올라간 양이 아니다. 같은 SKILL.md는 한 번만 센다."""
+    skills = [(row, sk) for row in rows for sk in row["skills"]]
+    text = {id(sk): None if {i["code"] for i in sk.get("issues", [])} & set(TOKEN_INCOMPLETE)
+            else sk["name"] + "\n" + sk["desc"] for _, sk in skills}
+    state, counts = count_tokens([t for t in text.values() if t is not None])
+    seen = {}
+    for row, sk in skills:
+        sk["tokens"] = counts.get(text[id(sk)])
+        e = seen.setdefault(os.path.realpath(os.path.join(sk["path"], "SKILL.md")),
+                            {"tokens": sk["tokens"], "agents": set()})
+        e["agents"] |= {a for a in sk["agents"] if not (a == "Claude Code" and _claude_off(row, sk))}
+    measured = [e for e in seen.values() if e["tokens"] is not None]
+    # skills는 볼 수 있는 스킬 전부(못 센 것 포함), measured는 그중 센 것, tokens는 센 것만의 합이다.
+    per_agent = {}
+    for a in SKILL_AGENTS:
+        have = [e for e in seen.values() if a in e["agents"]]
+        got = [e for e in have if e["tokens"] is not None]
+        per_agent[a] = {"skills": len(have), "measured": len(got),
+                        "tokens": sum(e["tokens"] for e in got) if state == "ok" else None}
+    return {"encoding": TOKEN_ENCODING, "state": state, "setup": token_setup_command(),
+            "skills": len(seen), "measured": len(measured),
+            "total": sum(e["tokens"] for e in measured) if state == "ok" else None, "agents": per_agent}
 
 
 def _section_state(skills):
@@ -1222,6 +1367,7 @@ def collect_skills(ctx):
         "rows": rows,
         "agents": SKILL_AGENTS,
         "loaded": _loaded_count(rows),
+        "tokens": _attach_tokens(rows),
         "has_local": has_local,
         "project_dir": project_dir,
         "known_projects": known_projects(),
@@ -1312,8 +1458,6 @@ def _write_local(project_dir, data):
 # 빠지는 것을 Claude Code로 직접 확인했다(ADR 10, tests/manual/skill_visibility.sh). 플러그인
 # 스킬에는 듣지 않아서 플러그인은 여전히 통째로 끈다.
 SKILL_HIDDEN = ("off", "user-invocable-only")
-
-
 def skill_overrides(project_dir):
     """-> (실제로 적용되는 값, 공유 settings.json의 값). 로컬이 공유를 이긴다(직접 확인)."""
     shared = read_json(os.path.join(project_dir, ".claude", "settings.json")).get("skillOverrides")
@@ -1645,7 +1789,6 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 .agenttag.partial{color:var(--dim);text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
 .loadline{font-size:13px;color:var(--text);background:var(--off-tint);border:1px solid var(--border);
   border-radius:6px;padding:8px 11px;margin:2px 0 10px;cursor:help;line-height:1.6;font-variant-numeric:tabular-nums}
-.loadline b{font-weight:700}
 .warn{margin-left:8px;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;
   background:var(--off-tint);color:var(--text);cursor:help;white-space:nowrap;vertical-align:middle}
 .comp{color:var(--dim);font-size:11px;white-space:nowrap;cursor:help;font-variant-numeric:tabular-nums;
@@ -1741,6 +1884,8 @@ const T = {
   wt_occupied: 'Existing file or folder', wt_blocked: 'Linked or inaccessible directory',
   wt_source_missing: 'Source unavailable', wt_choose: 'Choose at least one skill, directory and worktree.',
   wt_applied_at: at => `Last automatic application: ${new Date(at*1000).toLocaleString()}`,
+  wt_state_note: 'Worktree status below reflects the saved configuration. Changing checkboxes only affects the preview.',
+  wt_detail: 'Details', wt_skill_col: 'Skill', wt_source_detail: 'Source path',
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
@@ -1792,12 +1937,29 @@ const T = {
   forget_confirm: p => `Remove this folder from the list?\n\n${p}\n\nThe folder and its settings stay as they are. It comes back when you run an agent session there.`,
   install_app: 'Install app',
   install_manual: 'This browser can’t install it automatically.<br><b>Chrome, Edge:</b> the install icon in the address bar.<br><b>Safari (macOS Sonoma+):</b> File → Add to Dock.',
-  loaded: (n, tok) => `This project loads <b>${n} skills</b> (about <b>${tok.toLocaleString()} tokens</b> every session)`,
-  loaded_tip: 'A skill\u2019s name and description are loaded at startup for every available skill, whether you use it or not. The spec puts that at about 100 tokens each; the real figure depends on how long the descriptions are.',
+  tok_head: (enc, total, n) => `Reference token count (${enc}, name + description only): ${total.toLocaleString()} across ${n} discovered skills`,
+  tok_head_part: (enc, total, m, n) => `Measured subtotal (${enc}, name + description only): ${total.toLocaleString()} in ${m} of ${n} discovered skills, not a full total`,
+  tok_head_none: n => `Not measured: none of the ${n} discovered skills could be counted`,
+  tok_agent_full: (tokens, n) => `${tokens.toLocaleString()} tokens (${n} skill${n === 1 ? '' : 's'})`,
+  tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()} tokens measured (${m} of ${n})`,
+  tok_agent_none: n => `not measured (0 of ${n})`,
+  tok_unmeasured: n => `Not counted: ${n} (name or description missing or unreadable, or frontmatter not closed)`,
+  tok_agents: 'Skills each agent can read in the current configuration (not live session usage):',
+  tok_off: n => `${n} skills found · reference token count not measured`,
+  tok_hint: {
+    setup: 'Token counting is not set up yet. Run this once in a terminal:',
+    import: 'The token counter is incomplete. Run setup again:',
+    cache: 'The tokenizer vocabulary is not downloaded yet. Run setup:',
+    download: 'The tokenizer vocabulary could not be downloaded. Check your network and run setup again:',
+    error: 'Counting did not finish this time and will retry shortly. To reinstall the counter, use this command:'},
+  tok_tip: 'Counts the text "name, a line break, description" of each discovered SKILL.md with the o200k_base tokenizer, run on this computer. The skill body is not counted. It is a reference count, not any provider’s own count or bill, and does not mean every session loads these skills.',
+  tok_skill: n => `${n.toLocaleString()} tok`,
+  tok_skill_na: 'tok n/a', tok_skill_na_tip: 'The name or description is missing or unreadable, or the frontmatter is not closed with ---, so this skill is not counted.',
   spec_issue: 'spec',
   issue: {
     unreadable: () => 'SKILL.md could not be read',
     no_frontmatter: () => 'No YAML frontmatter',
+    frontmatter_unclosed: () => 'YAML frontmatter is not closed with ---',
     name_missing: () => 'name is missing',
     name_format: i => `name "${i.name}" — lowercase letters, digits and single hyphens only, max 64`,
     name_mismatch: i => `name "${i.name}" does not match its folder "${i.folder}"`,
@@ -1854,6 +2016,8 @@ const T = {
   wt_occupied: '기존 파일·폴더', wt_blocked: '링크 또는 접근 불가 디렉터리',
   wt_source_missing: '원본 사용 불가', wt_choose: '스킬·디렉터리·worktree를 하나 이상 선택하세요.',
   wt_applied_at: at => `마지막 자동 적용: ${new Date(at*1000).toLocaleString()}`,
+  wt_state_note: '아래 worktree 상태는 저장된 구성 기준입니다. 체크를 바꾸면 미리보기에만 반영됩니다.',
+  wt_detail: '상세', wt_skill_col: '스킬', wt_source_detail: '원본 경로',
     banner: '플러그인 변경은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
@@ -1905,12 +2069,29 @@ const T = {
   forget_confirm: p => `이 폴더를 목록에서 뺄까요?\n\n${p}\n\n폴더와 그 안의 설정은 그대로 둡니다. 그 폴더에서 에이전트 세션을 열면 다시 나타납니다.`,
   install_app: '앱으로 설치',
   install_manual: '이 브라우저는 자동 설치가 안 됩니다.<br><b>Chrome·Edge:</b> 주소창의 설치 아이콘.<br><b>Safari(macOS 소노마 이상):</b> 파일 → Dock에 추가.',
-  loaded: (n, tok) => `이 프로젝트는 스킬 <b>${n}개</b>를 로드합니다 (세션마다 약 <b>${tok.toLocaleString()}토큰</b>)`,
-  loaded_tip: '스킬은 쓰든 안 쓰든 이름과 설명이 세션 시작 때 전부 올라갑니다. 명세는 그 양을 스킬 하나당 약 100토큰으로 적고 있고, 실제 값은 설명 길이에 따라 다릅니다.',
+  tok_head: (enc, total, n) => `참고용 토큰 수 (${enc}, 이름+설명만): 찾은 스킬 ${n}개 합계 ${total.toLocaleString()}`,
+  tok_head_part: (enc, total, m, n) => `센 스킬만의 토큰 수 (${enc}, 이름+설명만): 찾은 스킬 ${n}개 중 ${m}개에서 ${total.toLocaleString()} · 전체 합계가 아닙니다`,
+  tok_head_none: n => `찾은 스킬 ${n}개를 하나도 세지 못했습니다 (이름·설명이 없거나 읽지 못함)`,
+  tok_agent_full: (tokens, n) => `${tokens.toLocaleString()}토큰 (${n}개)`,
+  tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()}토큰 · ${n}개 중 ${m}개만 측정`,
+  tok_agent_none: n => `미측정 (${n}개 중 0개)`,
+  tok_unmeasured: n => `스킬 ${n}개는 이름·설명이 없거나 읽지 못해(또는 머리말이 닫히지 않아) 세지 않았습니다`,
+  tok_agents: '현재 설정에서 에이전트별로 읽을 수 있는 스킬:',
+  tok_off: n => `찾은 스킬 ${n}개 · 참고용 토큰 수는 아직 측정하지 않았습니다`,
+  tok_hint: {
+    setup: '토큰 수 세기가 아직 준비되지 않았습니다. 터미널에서 한 번 실행하세요:',
+    import: '토큰 수 세기 도구가 덜 설치됐습니다. setup을 다시 실행하세요:',
+    cache: '토크나이저 어휘 파일이 아직 없습니다. setup을 실행하세요:',
+    download: '토크나이저 어휘 파일을 받지 못했습니다. 네트워크를 확인하고 setup을 다시 실행하세요:',
+    error: '이번에는 세지 못했고 곧 다시 시도합니다. 도구를 다시 설치하려면:'},
+  tok_tip: '찾은 SKILL.md마다 "이름, 줄바꿈, 설명" 글자를 이 컴퓨터에서 o200k_base 토크나이저로 센 값입니다. 스킬 본문은 세지 않습니다. 참고용 숫자이고 어느 제공자의 실제 계산이나 청구액이 아니며, 세션마다 이 스킬이 전부 읽힌다는 뜻도 아닙니다.',
+  tok_skill: n => `${n.toLocaleString()}토큰`,
+  tok_skill_na: '토큰 미측정', tok_skill_na_tip: '이름이나 설명이 없거나 읽지 못했거나 머리말이 ---로 닫히지 않아 이 스킬은 세지 않았습니다.',
   spec_issue: '명세 위반',
   issue: {
     unreadable: () => 'SKILL.md를 읽지 못했습니다',
     no_frontmatter: () => 'YAML frontmatter가 없습니다',
+    frontmatter_unclosed: () => 'YAML frontmatter가 ---로 닫히지 않았습니다',
     name_missing: () => 'name이 없습니다',
     name_format: i => `name "${i.name}" — 소문자·숫자·하이픈 하나씩만, 64자 이내`,
     name_mismatch: i => `name "${i.name}", 폴더 이름 "${i.folder}" — 서로 다릅니다`,
@@ -1945,6 +2126,7 @@ const T = {
 };
 let lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
+
 function renderLangToggle(){
   document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
@@ -2003,6 +2185,39 @@ document.getElementById('installBtn').onclick = async (e) => {
 };
 document.addEventListener('click', (e) => { if(!e.target.closest('#installWrap')) closeInstallPop(); });
 const shortAgent = a => a.replace(' CLI','');
+// 스킬 한 줄의 토큰 뱃지. 숫자가 없는데 측정이 켜져 있으면 이름·설명을 못 읽은 스킬이다.
+function tokTag(s, tk){
+  if(!tk || tk.state !== 'ok') return null;
+  const tag = document.createElement('span'); tag.className = 'tag'; tag.style.marginLeft = '8px';
+  if(typeof s.tokens === 'number'){ tag.textContent = t().tok_skill(s.tokens); }
+  else { tag.textContent = t().tok_skill_na; tag.title = t().tok_skill_na_tip; }
+  return tag;
+}
+// 참고용 토큰 수 요약. 못 셌을 때는 0이나 어림값 대신 "측정 안 함"과 setup 명령을 보여준다.
+function renderTokens(c, tk, agents){
+  if(!tk) return;
+  const box = document.createElement('div'); box.className = 'loadline'; box.title = t().tok_tip;
+  const line = document.createElement('div'); box.appendChild(line);
+  const note = txt => { const n = document.createElement('div'); n.className = 'note'; n.textContent = txt; box.appendChild(n); return n; };
+  if(tk.state === 'ok'){
+    // 전부 센 값만 "합계"라 부른다. 일부만 셌으면 센 것의 합이라고 밝히고, 하나도 못 셌으면 숫자를 내지 않는다.
+    line.textContent = tk.measured === tk.skills ? t().tok_head(tk.encoding, tk.total, tk.skills)
+      : tk.measured === 0 ? t().tok_head_none(tk.skills)
+      : t().tok_head_part(tk.encoding, tk.total, tk.measured, tk.skills);
+    if(tk.measured > 0 && tk.measured < tk.skills) note(t().tok_unmeasured(tk.skills - tk.measured));
+    note(t().tok_agents + ' ' + (agents||[]).map(a => {
+      const v = (tk.agents||{})[a] || {skills: 0, measured: 0, tokens: 0};
+      return shortAgent(a) + ' ' + (v.measured === v.skills ? t().tok_agent_full(v.tokens, v.skills)
+        : v.measured === 0 ? t().tok_agent_none(v.skills) : t().tok_agent_part(v.tokens, v.measured, v.skills));
+    }).join(' · '));
+  } else {
+    line.textContent = t().tok_off(tk.skills);
+    note((t().tok_hint[tk.state] || t().tok_hint.error));
+    const cmd = document.createElement('code'); cmd.textContent = tk.setup; cmd.style.userSelect = 'all';
+    box.appendChild(cmd);
+  }
+  c.appendChild(box);
+}
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
 const TABS = ['Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
@@ -2031,6 +2246,7 @@ let selectedProject = localStorage.getItem('agent-hud-project') || '';
 let currentProjectDir = '';
 const contentCache = {};
 const worktreeDrafts = {};
+const worktreeRowOpen = {};
 let worktreeOpen = false;
 // 사이드바 상태: 지금 프로젝트 선택(agent-hud-project)과 같은 자리(localStorage)에 둔다.
 // 서버 쪽 파일을 늘리지 않아도 되고, 기기별로 다른 즐겨찾기를 갖는 게 오히려 자연스럽다.
@@ -2305,6 +2521,38 @@ async function runUpdate(upd){
   renderUpdate(upd);
 }
 function wtState(state){ return t()['wt_' + state] || state; }
+const WT_WARN = ['conflict', 'broken', 'occupied', 'blocked', 'source_missing'];
+// 폴더별 상태 개수: ".agents/skills: 연결됨 2, 없음 1 · .claude/skills: ..."
+function wtSummary(skills){
+  const by = {};
+  for(const s of skills){ const d = by[s.dir] ||= {}; d[s.state] = (d[s.state] || 0) + 1; }
+  return Object.entries(by).map(([dir, c]) =>
+    dir + ': ' + Object.entries(c).map(([st, n]) => wtState(st) + ' ' + n).join(', ')).join(' · ');
+}
+// 스킬 한 행, 대상 폴더별 상태 열. 펼침 여부는 프로젝트+워크트리별로 폴링 재렌더 뒤에도 유지한다.
+function wtDetail(row, project){
+  const key = project + '\n' + row.path;
+  const d = document.createElement('details'); d.className = 'wt-detail';
+  d.open = !!worktreeRowOpen[key]; d.ontoggle = () => { worktreeRowOpen[key] = d.open; };
+  const s = document.createElement('summary'); s.textContent = t().wt_detail; d.appendChild(s);
+  const dirs = [...new Set(row.skills.map(x=>x.dir))];
+  const table = document.createElement('table'); table.style.cssText = 'border-collapse:collapse;margin:4px 0';
+  const tr = (cells, head) => {
+    const r = document.createElement('tr');
+    for(const c of cells){
+      const td = document.createElement(head ? 'th' : 'td'); td.textContent = c; td.style.cssText = 'padding:2px 10px 2px 0';
+      if(head){ td.scope = 'col'; td.style.textAlign = 'left'; }
+      r.appendChild(td);
+    }
+    table.appendChild(r);
+  };
+  tr([t().wt_skill_col, ...dirs], true);
+  for(const name of [...new Set(row.skills.map(x=>x.name))]){
+    tr([name, ...dirs.map(dir => { const x = row.skills.find(k=>k.name === name && k.dir === dir); return x ? wtState(x.state) : '-'; })]);
+  }
+  d.appendChild(table);
+  return d;
+}
 async function worktreeRequest(action, project, extra){
   const response = await fetch('/api/worktrees', {method: 'POST',
     body: JSON.stringify({action, project, ...extra})});
@@ -2327,7 +2575,7 @@ function renderWorktrees(container, w, project){
   if(!w.can_apply) note(t().wt_root_only);
   const draft = worktreeDrafts[project] ||= {
     skills: w.config ? w.config.skills.map(s=>({...s})) : w.skills.filter(s=>s.selected).map(s=>({name:s.name,source:s.source})),
-    dirs: w.config ? [...w.config.dirs] : ['.agents/skills', '.claude/skills'], targets: [], preview: null
+    dirs: w.config ? [...w.config.dirs] : ['.agents/skills', '.claude/skills'], targets: [], preview: null, srcOpen: {}
   };
   const config = () => ({skills: draft.skills, dirs: draft.dirs});
   const invalidate = () => { draft.preview = null; output.textContent = t().wt_preview_needed; apply.disabled = true; };
@@ -2338,21 +2586,39 @@ function renderWorktrees(container, w, project){
   for(const selected of draft.skills){
     if(!choices.some(s=>s.name === selected.name && s.source === selected.source)) choices.push(selected);
   }
+  // One row per name. Same names from different sources stay a single explicit choice via the select.
+  const sourcesByName = new Map();
   for(const sk of choices){
-    const label = document.createElement('label'); label.style.cssText = 'display:block;font-size:12px'; label.title = sk.source;
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.disabled = !w.can_apply;
-    cb.checked = draft.skills.some(s=>s.name === sk.name && s.source === sk.source);
+    if(!sourcesByName.has(sk.name)) sourcesByName.set(sk.name, []);
+    sourcesByName.get(sk.name).push(sk.source);
+  }
+  for(const [name, sources] of sourcesByName){
+    const item = document.createElement('div'); item.className = 'wt-skill'; item.dataset.name = name; item.style.cssText = 'font-size:12px;padding:2px 0';
+    const pinned = draft.skills.find(s=>s.name === name);
+    let source = pinned ? pinned.source : sources[0];
+    const label = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.disabled = !w.can_apply; cb.checked = !!pinned;
     cb.onchange = () => {
-      draft.skills = draft.skills.filter(s=>s.name !== sk.name);
-      if(cb.checked) draft.skills.push({name:sk.name,source:sk.source});
-      // Same names from different sources must remain a single explicit choice.
-      for(const other of skills.querySelectorAll('input')){
-        if(other !== cb && other.dataset.name === sk.name) other.checked = false;
-      }
+      draft.skills = draft.skills.filter(s=>s.name !== name);
+      if(cb.checked) draft.skills.push({name,source});
       invalidate();
     };
-    cb.dataset.name = sk.name; label.appendChild(cb);
-    label.appendChild(document.createTextNode(' ' + sk.name + ' · ' + sk.source)); skills.appendChild(label);
+    label.appendChild(cb); label.appendChild(document.createTextNode(' ' + name)); item.appendChild(label);
+    if(sources.length > 1){
+      const pick = document.createElement('select'); pick.style.cssText = 'margin-left:8px;max-width:60%'; pick.disabled = !w.can_apply;
+      for(const s of sources){ const op = document.createElement('option'); op.value = s; op.textContent = s; pick.appendChild(op); }
+      pick.value = source;
+      pick.onchange = () => {
+        source = pick.value;
+        if(cb.checked){ draft.skills = draft.skills.map(s=>s.name === name ? {name,source} : s); invalidate(); }
+      };
+      item.appendChild(pick);
+    }
+    const more = document.createElement('details'); more.style.cssText = 'margin-left:20px';
+    more.open = !!draft.srcOpen[name]; more.ontoggle = () => { draft.srcOpen[name] = more.open; };
+    const ms = document.createElement('summary'); ms.textContent = t().wt_source_detail; more.appendChild(ms);
+    for(const s of sources){ const p = document.createElement('div'); p.className = 'dim'; p.textContent = s; more.appendChild(p); }
+    item.appendChild(more); skills.appendChild(item);
   }
   wrap.appendChild(skills);
   for(const dir of ['.agents/skills','.claude/skills']){
@@ -2362,8 +2628,9 @@ function renderWorktrees(container, w, project){
     label.appendChild(cb); label.appendChild(document.createTextNode(' '+dir)); wrap.appendChild(label);
   }
   note(t().wt_targets);
+  note(t().wt_state_note);
   for(const row of w.rows){
-    const line = document.createElement('div'); line.style.cssText = 'padding:8px 0;border-top:1px solid var(--border);font-size:12px;overflow-wrap:anywhere';
+    const line = document.createElement('div'); line.className = 'wt-row'; line.style.cssText = 'padding:8px 0;border-top:1px solid var(--border);font-size:12px;overflow-wrap:anywhere';
     const label = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox';
     cb.disabled = !w.can_apply || !row.available; cb.checked = draft.targets.includes(row.path);
     cb.onchange = () => { draft.targets = draft.targets.filter(p=>p !== row.path); if(cb.checked) draft.targets.push(row.path); invalidate(); };
@@ -2386,9 +2653,18 @@ function renderWorktrees(container, w, project){
     line.appendChild(mode);
     const state = document.createElement('div'); state.className = 'dim';
     state.textContent = row.available ? t()['wt_mode_'+row.mode] : t().wt_unavailable;
-    if(row.skills.length) state.textContent += ' · '+row.skills.map(s=>s.name+' ('+s.dir+'): '+wtState(s.state)).join(', ');
+    if(row.skills.length) state.textContent += ' · '+wtSummary(row.skills);
     if(row.result){ state.textContent += ' · '+t().wt_applied_at(row.result.at); if(row.result.error) state.textContent += ' · '+row.result.error; }
-    line.appendChild(state); wrap.appendChild(line);
+    line.appendChild(state);
+    // Children are appended after the text is final: a later textContent write would wipe them.
+    const warns = row.skills.filter(s=>WT_WARN.includes(s.state));
+    if(warns.length){
+      const warn = document.createElement('div'); warn.className = 'wt-warn'; warn.style.color = 'var(--danger, #e5534b)';
+      warn.textContent = warns.map(s=>s.name+' ('+s.dir+'): '+wtState(s.state)).join(', ');
+      line.appendChild(warn);
+    }
+    if(row.skills.length) line.appendChild(wtDetail(row, project));
+    wrap.appendChild(line);
   }
   const actions = document.createElement('div'); actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin:8px 0'; wrap.appendChild(actions);
   const button = text => { const b = document.createElement('button'); b.textContent=text; b.className='card-action'; actions.appendChild(b); return b; };
@@ -2596,14 +2872,7 @@ async function tick(){
     } else {
       c.appendChild(h);
       renderWorktrees(c, p.worktrees, p.project_dir);
-      if(typeof p.loaded === 'number'){
-        // 스킬은 이름과 설명이 세션 시작 때 전부 올라간다. 안 쓰는 것도 자리를 차지하므로,
-        // 주장하지 말고 지금 이 프로젝트의 숫자를 그대로 보여준다.
-        const l = document.createElement('div'); l.className = 'loadline';
-        l.title = t().loaded_tip;
-        l.innerHTML = t().loaded(p.loaded, p.loaded * 100);
-        c.appendChild(l);
-      }
+      renderTokens(c, p.tokens, p.agents);
       if(p.agents){
         const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;
@@ -2726,6 +2995,8 @@ async function tick(){
               const stext = document.createElement('div'); stext.className = 'skill-text';
               const sname = document.createElement('div'); sname.className = 'skill-name';
               sname.textContent = s.name;
+              const ttag = tokTag(s, p.tokens);
+              if(ttag) sname.appendChild(ttag);
               if((s.issues||[]).length){
                 // 명세 위반이지 로드 실패가 아니다. 표현을 그렇게 유지할 것.
                 const w = document.createElement('span'); w.className = 'warn';
@@ -3108,6 +3379,80 @@ def cli_apply(group, project_dir):
     return 0
 
 
+SETUP_VENV_SECONDS = 120
+SETUP_PIP_SECONDS = 600
+
+
+def _step(label, cmd, timeout):
+    print(f"{label}...", flush=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        why = f"no answer after {timeout}s" if isinstance(e, subprocess.TimeoutExpired) else str(e)
+        print(f"agent-hud: tokenizer setup failed at: {label} ({why})", file=sys.stderr)
+        return False
+    if p.returncode != 0:
+        tail = (p.stderr or p.stdout).strip().splitlines()[-5:]
+        print("agent-hud: tokenizer setup failed at: " + label, file=sys.stderr)
+        print("\n".join(tail), file=sys.stderr)
+        return False
+    return True
+
+
+def _venv_version():
+    """tokenizer venv의 파이썬 (주, 부) 버전. 못 알아내면 None."""
+    py = _tokenizer_python()
+    if not py:
+        return None
+    try:
+        p = subprocess.run([py, "-I", "-c", "import sys; print(*sys.version_info[:2])"],
+                           capture_output=True, text=True, timeout=30)
+        major, minor = p.stdout.split()
+        return int(major), int(minor)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def cli_tokens(args):
+    if args != ["setup"]:
+        print(USAGE, file=sys.stderr)
+        return 2
+    print(f"Tokenizer setup with {sys.executable} (Python {sys.version.split()[0]})")
+    print(f"  venv:  {TOKENIZER_VENV}\n  cache: {TOKENIZER_CACHE}")
+    os.makedirs(TOKENIZER_CACHE, exist_ok=True)
+    is_venv = os.path.isfile(os.path.join(TOKENIZER_VENV, "pyvenv.cfg"))
+    if os.path.lexists(TOKENIZER_VENV) and not is_venv and (not os.path.isdir(TOKENIZER_VENV) or os.listdir(TOKENIZER_VENV)):
+        # --clear 로 지우는 것은 venv 표시(pyvenv.cfg)가 있는 이 폴더뿐이다. 그 밖의 것은 건드리지 않는다.
+        print(f"agent-hud: {TOKENIZER_VENV} exists but is not a tokenizer venv. Move or remove it, then run setup again.",
+              file=sys.stderr)
+        return 1
+    # 다른 파이썬으로 다시 돌렸으면(예: 3.15용 완성품이 없어 python3.13으로) venv도 그 파이썬으로 다시 만든다
+    if not (is_venv and _venv_version() == tuple(sys.version_info[:2])):
+        if not _step("Recreating the venv for this Python" if is_venv else "Creating the venv",
+                     [sys.executable, "-m", "venv"] + (["--clear"] if is_venv else []) + [TOKENIZER_VENV],
+                     SETUP_VENV_SECONDS):
+            return 1
+    # --only-binary: 이 파이썬용 완성품이 없으면 컴파일을 시작하지 말고 바로 알려준다
+    if not _step("Installing " + TOKENIZER_REQUIREMENT,
+                 [_tokenizer_python() or os.path.join(TOKENIZER_VENV, "bin", "python"), "-m", "pip", "install",
+                  "--disable-pip-version-check", "--quiet", "--only-binary=:all:", TOKENIZER_REQUIREMENT],
+                 SETUP_PIP_SECONDS):
+        print("If no prebuilt tiktoken exists for this Python, run setup with an older python3.x "
+              "(for example python3.13).", file=sys.stderr)
+        return 1
+    print(f"Downloading the {TOKEN_ENCODING} vocabulary (one time, public file)...", flush=True)
+    out, err = _run_tokenizer("warm", timeout=300)
+    if out is None:
+        print(f"agent-hud: tokenizer setup failed ({err}). Check your network and run it again.", file=sys.stderr)
+        return 1
+    out, err = _run_tokenizer("count", ["hello world"])
+    if out is None or out.get("counts") != [2]:
+        print(f"agent-hud: tokenizer check failed ({err or 'unexpected result'}).", file=sys.stderr)
+        return 1
+    print(f'Ready: {TOKEN_ENCODING}, "hello world" = 2 tokens. Counting runs offline from now on.')
+    return 0
+
+
 def cli_worktrees(args):
     """An optional pre-launch command, sharing the dashboard's additive writer."""
     apply = bool(args and args[0] == "apply")
@@ -3143,7 +3488,8 @@ agent-hud groups               그룹 목록
 agent-hud apply <그룹> [폴더]   그룹을 폴더에 적용 (기본: 현재 폴더)
 agent-hud apply --off [폴더]    적용 해제
 agent-hud worktrees [폴더]      같은 저장소의 worktree와 스킬 파일 상태
-agent-hud worktrees apply [폴더] 저장된 스킬 구성 추가 (세션 시작 전 선택 사항)"""
+agent-hud worktrees apply [폴더] 저장된 스킬 구성 추가 (세션 시작 전 선택 사항)
+agent-hud tokens setup         스킬 토큰 수를 세는 도구(tiktoken)를 이 도구 폴더 안에 설치"""
 
 
 def main():
@@ -3151,7 +3497,7 @@ def main():
         return
     global PROJECT_DIR
     argv = sys.argv[1:]
-    if argv and argv[0] in ("groups", "apply", "worktrees", "-h", "--help", "help"):
+    if argv and argv[0] in ("groups", "apply", "worktrees", "tokens", "-h", "--help", "help"):
         if argv[0] in ("-h", "--help", "help"):
             print(USAGE)
             sys.exit(0)
@@ -3159,6 +3505,8 @@ def main():
             sys.exit(cli_groups())
         if argv[0] == "worktrees":
             sys.exit(cli_worktrees(argv[1:]))
+        if argv[0] == "tokens":
+            sys.exit(cli_tokens(argv[1:]))
         rest = argv[1:]
         if not rest:
             print(USAGE, file=sys.stderr)

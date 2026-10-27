@@ -2,6 +2,22 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## 다음 버전 / Unreleased
+
+**스킬마다 이름+설명의 참고용 토큰 수를 센다.** 전에는 로드하는 스킬 수에 100을 곱한 어림값이었다.
+`agent-hud tokens setup`을 한 번 실행하면 `o200k_base`로 찾은 모든 스킬(다른 에이전트만 보는 것,
+꺼진 플러그인의 것 포함)의 `name` + 줄바꿈 + `description`을 이 컴퓨터에서 센다. 스킬 본문은 세지 않고,
+에이전트별 합계는 지금 설정에서 볼 수 있는 스킬의 합이며 실제 세션 사용량이나 청구액이 아니다.
+준비하기 전에는 어림값 대신 "측정하지 않았다"와 명령을 보여준다. 8,000자를 넘는 설명도 끝까지 읽고, 설명 안의 `---`는 경계로 보지 않으며 닫히지 않은 머리말은 못 읽은 것으로 둔다. 일부만 센 값은 "전체 합계가 아닙니다"로 구분하고, 다른 파이썬으로 `tokens setup`을 다시 돌리면 venv를 그 파이썬으로 다시 만든다.
+
+**Each skill gets a reference token count for its name and description.** It used to be the number of
+loaded skills times 100. Run `agent-hud tokens setup` once and every skill found, including ones only
+other agents see and ones in switched-off plugins, is counted on this computer with `o200k_base`: `name`,
+a line break, `description`. The skill body is not counted, per-agent totals are the skills each agent can
+see with the current settings, and none of it is actual session usage or billing. Until set up, the page
+says it is not measured and shows the command instead of an estimate. Descriptions longer than 8,000
+characters are read to the end, `---` inside a description is not a delimiter, and unclosed frontmatter counts as unreadable. A partial count is labelled as a subtotal rather than a total, and rerunning `tokens setup` with another Python rebuilds the venv for it.
+
 ## v0.4.3
 
 **사이드바에서 프로젝트를 목록에서 뺄 수 있다.** 전에는 한 번 올라간 프로젝트를 뺄 방법이 없었다.

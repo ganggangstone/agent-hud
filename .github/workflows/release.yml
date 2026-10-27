@@ -44,7 +44,14 @@ jobs:
             exit 1
           fi
 
+      # 토큰 수 검사는 진짜 tiktoken(o200k_base)으로 돈다. 설치와 어휘 내려받기는 여기서 한 번만 하고,
+      # 검사들은 같은 폴더를 AGENT_HUD_TEST_TOKENIZER_HOME 으로 받아 쓴다.
+      - name: 토큰 수 도구 준비
+        run: AGENT_HUD_HOME="$RUNNER_TEMP/hud-tokens" python3 server.py tokens setup
+
       - name: 전체 검사
+        env:
+          AGENT_HUD_TEST_TOKENIZER_HOME: ${{ runner.temp }}/hud-tokens
         run: |
           fail=0
           for t in tests/test_*.py; do
