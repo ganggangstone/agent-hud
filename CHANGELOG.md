@@ -4,14 +4,14 @@
 
 ## 다음 버전 / Unreleased
 
-**지침 파일이 서로 어떻게 이어져 있는지 보여준다.** 에이전트 지침 탭의 행마다 심볼릭 링크면 어느
-파일과 같은 파일인지, `CLAUDE.md`·`CLAUDE.local.md`에 `@경로` 줄이 있으면 어느 파일을 가져오는지,
-둘 다 아니면 "따로 관리"라고 표시한다. 가져오거나 링크한 파일은 목록에 없어도 행으로 보이고,
+**지침 파일이 서로 어떻게 이어져 있는지 보여준다.** 에이전트 지침 탭이 「이 컴퓨터 전체」와 「이 프로젝트」로
+나뉘고, 다른 파일을 읽는 파일(심볼릭 링크, `CLAUDE.md`·`CLAUDE.local.md`의 `@경로` 줄)은 그 파일 아래에
+들여 쓰며 실제 `@경로`·링크 화살표를 이름 옆에 보여준다. 가져오거나 링크한 파일은 목록에 없어도 행으로 보이고,
 사용자 전역의 `~/.codex/AGENTS.md`와 `~/.gemini/GEMINI.md` 행이 생겼다. 어느 쪽이 원본인지는 정하지 않는다.
 
-**Each instruction file shows how it is connected to the others.** On the Agent instructions tab a
-symlink says which file it is the same as, a `CLAUDE.md` or `CLAUDE.local.md` with `@path` lines says
-which files it imports, and anything else is "managed separately". Imported and linked files get a row
+**Each instruction file shows how it is connected to the others.** The Agent instructions tab is split
+into "This computer" and "This project", and a file that reads another one (a symlink, or a `CLAUDE.md` /
+`CLAUDE.local.md` with `@path` lines) is nested under it with the actual `@path` or arrow shown. Imported and linked files get a row
 even when they are not in the scan list, and the user-level `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`
 have rows now. Which file is the source of truth is not decided.
 

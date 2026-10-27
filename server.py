@@ -1443,13 +1443,15 @@ def collect_skills(ctx):
 def collect_instructions(ctx):
     project_dir = default_project_dir(ctx)
     rows = [
-        _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
-        _file_row("Global AGENTS.md", os.path.join(HOME, ".codex", "AGENTS.md"), "Codex"),
-        _file_row("Global GEMINI.md", os.path.join(HOME, ".gemini", "GEMINI.md"), "Gemini CLI"),
-        _file_row("Project CLAUDE.md", os.path.join(project_dir, "CLAUDE.md")),
+        _file_row(os.path.join(CLAUDE_DIR, "CLAUDE.md"), os.path.join(CLAUDE_DIR, "CLAUDE.md")),
+        _file_row(os.path.join(HOME, ".codex", "AGENTS.md"), os.path.join(HOME, ".codex", "AGENTS.md"), "Codex"),
+        _file_row(os.path.join(HOME, ".gemini", "GEMINI.md"), os.path.join(HOME, ".gemini", "GEMINI.md"), "Gemini CLI"),
+        _file_row("CLAUDE.md", os.path.join(project_dir, "CLAUDE.md")),
     ]
     sub_rows, truncated = _instruction_rows(project_dir)
     rows = _with_link_targets(rows + sub_rows)
+    for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
+        r["scope"] = "project" if r["path"].startswith(project_dir.rstrip(os.sep) + os.sep) else "global"
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -1807,12 +1809,15 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"SF Pro 
   .main{padding:16px}
 }
 h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1;color:var(--text)}
-#h1sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--dim);opacity:.7;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.hdr{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 16px;margin-bottom:20px}
+.hdr-ctl{display:flex;gap:8px;align-items:center;flex-shrink:0;white-space:nowrap}
+.seg{display:inline-flex;height:28px;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12px;font-weight:600}
+#h1sub{grid-column:1/-1;display:block;font-size:13px;line-height:1.5;max-width:720px;text-wrap:pretty;color:var(--dim)}
 .rule-note{border-left:2px solid var(--border);padding:2px 0 2px 10px;margin-bottom:14px;
   color:var(--dim);font-size:12px;line-height:1.6}
 .rule-note b{color:var(--text);font-weight:600}
-#h1sub:lang(ko){letter-spacing:0;text-transform:none;font-family:inherit;font-size:11.5px}
+#h1sub:lang(ko){font-family:inherit}
+#h1sub b{color:var(--text);font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));grid-auto-flow:dense;gap:12px}
 .card{background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:14px}
 .card.wide{grid-column:1/-1}
@@ -1843,7 +1848,7 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .sw-off.switch:hover{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .switch:active{transform:scale(.96)}
 .switch.busy{opacity:.4;cursor:wait}
-.lang-opt{padding:6px 12px;cursor:pointer;color:var(--dim);transition:background .12s,color .12s;font-size:12px}
+.lang-opt{display:inline-flex;align-items:center;padding:0 11px;cursor:pointer;color:var(--dim);transition:background .12s,color .12s;font-size:12px}
 .lang-opt:hover{color:var(--text)}
 .lang-opt.active{background:var(--accent);color:var(--bg)}
 .quiet-toggle .lang-opt.active{background:var(--off-tint);color:var(--text)}
@@ -1854,10 +1859,12 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
 .sw-manual{background:transparent;color:var(--dim);border:1px dashed var(--dim)}
-.guide{margin:0 0 14px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.6}
-.guide-head{color:var(--dim);font-weight:600}
-.guide-row{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
-.sw-guide{background:var(--off-tint);color:var(--text);border:1px solid var(--border);flex:0 0 auto;margin-top:2px}
+.guide{margin:0 0 18px;padding:0 2px;font-size:11px;line-height:1.5;color:var(--dim);opacity:.85}
+.loadline.loadline-off{background:transparent;border-color:transparent;padding-left:0;padding-right:0}
+.loadline-off .note{margin-top:2px}
+.guide-row{display:flex;gap:8px;align-items:baseline;margin-top:3px}
+.guide-row b{flex:0 0 auto;font-weight:600;color:var(--dim)}
+.guide-row b::after{content:' ·'}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
@@ -1901,8 +1908,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
   padding:1px 4px;font-size:11px;font-family:inherit;cursor:pointer}
 #period:hover{color:var(--text)}
 #installWrap{position:relative}
-#installBtn{background:transparent;color:var(--dim);border:1px solid var(--border);
-  border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;letter-spacing:.03em;
+#installBtn{background:transparent;color:var(--dim);border:1px solid var(--border);height:28px;
+  border-radius:8px;padding:0 11px;font-size:12px;font-weight:600;white-space:nowrap;
   font-family:inherit;cursor:pointer}
 #installBtn:hover{color:var(--text);border-color:var(--accent)}
 #installPop{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:10;width:230px;
@@ -1913,7 +1920,7 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <div class="page">
 <aside class="sidebar" id="sidebar"></aside>
 <main class="main">
-<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+<div class="hdr">
   <span>
     <span style="display:flex;align-items:center;gap:8px">
       <svg width="22" height="22" viewBox="0 0 96 96" aria-hidden="true" style="flex-shrink:0">
@@ -1924,23 +1931,23 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
       </svg>
       <h1>Agent HUD</h1>
     </span>
-    <span id="h1sub"></span>
   </span>
-  <span style="display:flex;gap:8px;align-items:center">
+  <span class="hdr-ctl">
     <span id="installWrap">
       <button id="installBtn"></button>
       <div id="installPop"></div>
     </span>
-    <span id="langToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
+    <span id="langToggle" class="seg">
       <span id="langEn" class="lang-opt">EN</span><span id="langKo" class="lang-opt">한국어</span>
     </span>
-    <span id="themeToggle" class="quiet-toggle" style="display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:11px;font-weight:700;letter-spacing:.03em">
+    <span id="themeToggle" class="seg quiet-toggle">
       <span id="themeLight" class="lang-opt">☀</span><span id="themeDark" class="lang-opt">☾</span>
     </span>
   </span>
+  <span id="h1sub"></span>
 </div>
 <div class="note" id="updateBanner" style="margin-bottom:12px;display:none"></div>
-<div id="tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:12px"></div>
+<div id="tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px"></div>
 <div id="applyBanner" class="rule-note"></div>
 <div class="grid" id="app"></div>
 <div style="max-width:920px;margin-top:16px"><a id="fbLink" class="card-action" href="#" target="_blank" rel="noopener"></a></div>
@@ -1976,46 +1983,41 @@ const T = {
   wt_applied_at: at => `Last automatic application: ${new Date(at*1000).toLocaleString()}`,
   wt_state_note: 'Worktree status below reflects the saved configuration. Changing checkboxes only affects the preview.',
   wt_detail: 'Details', wt_skill_col: 'Skill', wt_source_detail: 'Source path',
-    banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
-    tagline: 'local dashboard',
+    banner: 'Switches take effect <b>next session</b>. Everything else is immediate.',
+    headline: (n, m) => `This folder: about <b>${n.toLocaleString()} tokens</b> of skill list (${m} skills) are read when Claude Code starts, and sent again with <b>every message</b>. Instruction files are not counted yet.`,
+    headline_part: (n, m) => `This folder: at least <b>${n.toLocaleString()} tokens</b> of skill list (${m} skills, some uncounted) are read when Claude Code starts, and sent again with <b>every message</b>.`,
+    headline_off: m => `This folder: <b>${m} skills</b> are read when Claude Code starts and sent again with every message. Token count not set up yet.`,
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
-  skills_note: 'Everything on this tab applies to the selected project only. Changes take effect from the next session.',
-  guide_title: 'What the switches mean',
   guide_rows: [
-    ['ALWAYS', 'At the start of every session the AI reads this skill\'s name and description, and that costs tokens every time. Nothing is written to settings.'],
-    ['ONLY WHEN YOU TYPE /name', 'The AI does not know the skill exists until you type /name in the chat. Those tokens are saved on every session. Writes "user-invocable-only" to skillOverrides in this project\'s .claude/settings.local.json, the same effect as disable-model-invocation: true inside the skill, without touching the skill.'],
-    ['EXCLUDED', 'The AI cannot use the skill in this project. Writes "off" to the same place.'],
+    ['ALWAYS', 'The AI reads the name and description every session. Costs tokens each time.'],
+    ['ONLY WHEN YOU TYPE /name', 'The AI does not know it exists until you type /name. Saves those tokens. (.claude/settings.local.json → skillOverrides: "user-invocable-only", same as disable-model-invocation: true in the skill, without editing it)'],
+    ['EXCLUDED', 'The AI cannot use it in this project. (skillOverrides: "off")'],
   ],
-  guide_plugin: 'A plugin only has ALWAYS and EXCLUDED, for all of its skills at once. These switches are for Claude Code; the badges show which other agents can see each skill.',
   badge_on_tip: a => `${a} can use this skill in this project`,
   badge_off_tip: a => `${a} cannot find this skill in this project. Use "let other agents use it" to add it`,
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
-  loose_skills: 'Skills installed on their own (not part of a plugin)',
-    set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
+  loose_skills: 'Skills installed without a plugin',
     set_apply: 'Apply to this project', set_applied: 'Applied to this project',
-    set_apply_tip: 'Applies to this project only. Other projects are untouched.',
-    assign_confirm: (g, p, pl, sk) => `Apply group "${g}" to this project?\n\n${p}\n\n${sk} skills are linked here.\nPlugins on: ${pl}\nEvery other plugin, and every skill not in the group, is turned off, in this project only.`,
-    unassign_confirm: (g, p) => `Stop using "${g}" here?\n\n${p}\n\nIts skill links are removed. Plugins and skills stay on or off as they are.`,
+    assign_confirm: (g, p, pl, sk) => `Apply "${g}" to this project?\n${p}\n\nALWAYS: ${pl}\n${sk} skill${sk===1?'':'s'} linked in\nEverything else: EXCLUDED (in this project only)`,
+    unassign_confirm: (g, p) => `Stop applying "${g}" here?\n${p}\n\nOnly the skill links are removed. ALWAYS / EXCLUDED stay as they are.`,
     kind_plugin: 'plugin', kind_skill: 'skill',
     add_member_ph: '+ add a plugin or skill…',
-    member_plugin_tip: 'On in this project',
+    member_plugin_tip: 'ALWAYS in this project',
     member_skill_tip: 'Linked into this project',
     assign_failed: 'Could not apply that group: ',
     on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
-    new_group: '+ create a new group', new_group_tip: 'Plugins and skills you switch on together. For example one set for coding, one for video work',
+    new_group: '+ create a new group', new_group_tip: 'e.g. one for coding, one for video',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
-    groups_legend: 'The plugins and skills you use together. Applying one sets up that project and leaves the others alone.',
+    no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
-  agents_note: '.claude/agents/*.md · Cursor and Copilot read the same folder',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
     monitors: 'monitors', bin: 'binaries', settings: 'settings'},
   comp_count: (label, n) => `${n} ${label}`,
-  comp_portable_tip: n => `This plugin ships ${n}. The checkbox moves skills only`,
-  comp_stays_tip: n => `This plugin ships ${n}. They work wherever the plugin is on; the checkbox moves skills only`,
+  comp_tip: n => `Also in this plugin: ${n}. Only skills can be shared with other agents`,
   share_to: names => 'let ' + names.join(', ') + ' use it too',
   share_short: 'let other agents use it',
   share_done: 'every agent can use it',
@@ -2063,9 +2065,8 @@ const T = {
     desc_long: i => `description is ${i.len} characters (limit 1024)`,
   },
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
-  link_same: n => `same file as ${n}`, link_import: n => `imports ${n}`,
-  link_missing: n => `points to ${n} (missing)`, link_none: 'managed separately',
-  link_via: n => `read through ${n}`,
+  scope_global: 'This computer (every project)', scope_project: 'This project',
+  agents_head: 'Subagents',
     no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
@@ -2077,7 +2078,7 @@ const T = {
     skill_manual_md_tip: 'This skill\'s own SKILL.md says disable-model-invocation: true, so it works this way in every project. Change that file to change it',
     skill_toggle_failed: 'Could not switch that skill: ',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
-    group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
+    group_tag: g => 'group: ' + g,
     from: 'from: ',
     read_full_tip: 'Read the full description',
     no_skills_found: 'No skills',
@@ -2119,46 +2120,41 @@ const T = {
   wt_applied_at: at => `마지막 자동 적용: ${new Date(at*1000).toLocaleString()}`,
   wt_state_note: '아래 worktree 상태는 저장된 구성 기준입니다. 체크를 바꾸면 미리보기에만 반영됩니다.',
   wt_detail: '상세', wt_skill_col: '스킬', wt_source_detail: '원본 경로',
-    banner: '플러그인 변경은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
-    tagline: '로컬 대시보드',
+    banner: '스위치는 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
+    headline: (n, m) => `이 폴더에서 Claude Code를 열면 스킬 목록만으로 <b>약 ${n.toLocaleString()}토큰</b>(스킬 ${m}개)이 먼저 읽히고, <b>메시지를 보낼 때마다</b> 같은 양이 매번 함께 갑니다. 지침 파일은 아직 세지 않습니다.`,
+    headline_part: (n, m) => `이 폴더에서 Claude Code를 열면 스킬 목록만으로 <b>최소 ${n.toLocaleString()}토큰</b>(스킬 ${m}개, 일부 못 셈)이 먼저 읽히고, <b>메시지를 보낼 때마다</b> 같은 양이 매번 함께 갑니다.`,
+    headline_off: m => `이 폴더에서 Claude Code를 열면 <b>스킬 ${m}개</b>가 먼저 읽히고 메시지를 보낼 때마다 매번 함께 갑니다. 토큰 수는 아직 세지 않았습니다.`,
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
-  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다. 바뀐 것은 다음 세션부터 적용됩니다.',
-  guide_title: '스위치의 뜻',
   guide_rows: [
-    ['항상', '세션을 시작할 때마다 AI가 이 스킬의 이름과 설명을 읽습니다. 그때마다 토큰이 듭니다. 설정에는 아무것도 쓰지 않습니다.'],
-    ['/이름 칠 때만 사용', '채팅에 /이름 을 치기 전까지 AI는 이 스킬이 있는 줄 모릅니다. 세션마다 들던 토큰이 그만큼 줄어듭니다. 이 프로젝트의 .claude/settings.local.json 안 skillOverrides에 "user-invocable-only"를 씁니다. 스킬 파일 안에 disable-model-invocation: true를 적은 것과 같은 효과이고 스킬 파일은 건드리지 않습니다.'],
-    ['제외', '이 프로젝트에서는 AI가 이 스킬을 못 씁니다. 같은 자리에 "off"를 씁니다.'],
+    ['항상', '세션마다 AI가 이름과 설명을 읽습니다. 그때마다 토큰이 듭니다.'],
+    ['/이름 칠 때만 사용', '/이름 을 치기 전까지 AI는 이 스킬을 모릅니다. 그 토큰이 절약됩니다. (.claude/settings.local.json → skillOverrides: "user-invocable-only". 스킬 파일의 disable-model-invocation: true와 같은 효과, 파일은 안 건드림)'],
+    ['제외', '이 프로젝트에서 AI가 못 씁니다. (skillOverrides: "off")'],
   ],
-  guide_plugin: '플러그인은 항상·제외 둘뿐이고, 안에 든 스킬이 한꺼번에 바뀝니다. 이 스위치는 Claude Code용이고, 다른 에이전트가 그 스킬을 볼 수 있는지는 뱃지가 보여줍니다.',
   badge_on_tip: a => `${a}가 이 프로젝트에서 이 스킬을 쓸 수 있습니다`,
   badge_off_tip: a => `${a}는 이 프로젝트에서 이 스킬을 못 찾습니다. "다른 에이전트도 쓰게"를 누르면 생깁니다`,
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
-  loose_skills: '따로 설치한 스킬 (플러그인에 안 들어 있는 것)',
-    set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
+  loose_skills: '플러그인 없이 설치한 스킬',
     set_apply: '이 프로젝트에 적용', set_applied: '이 프로젝트에 적용됨',
-    set_apply_tip: '이 프로젝트에만 적용됩니다. 다른 프로젝트는 그대로입니다.',
-    assign_confirm: (g, p, pl, sk) => `"${g}" 그룹을 이 프로젝트에 적용할까요?\n\n${p}\n\n스킬 ${sk}개가 여기 걸립니다.\n켜지는 플러그인: ${pl}\n나머지 플러그인과 그룹에 없는 스킬은 꺼집니다. 이 프로젝트에서만요.`,
-    unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n\n${p}\n\n스킬 링크만 지웁니다. 플러그인과 스킬이 켜지고 꺼진 상태는 그대로 둡니다.`,
+    assign_confirm: (g, p, pl, sk) => `"${g}"를 이 프로젝트에 적용할까요?\n${p}\n\n항상: ${pl}\n스킬 ${sk}개 연결\n그 밖의 플러그인과 스킬: 제외 (이 프로젝트에서만)`,
+    unassign_confirm: (g, p) => `"${g}" 적용을 풀까요?\n${p}\n\n연결한 스킬만 지웁니다. 항상·제외 상태는 그대로입니다.`,
     kind_plugin: '플러그인', kind_skill: '스킬',
     add_member_ph: '+ 플러그인 또는 스킬 추가…',
-    member_plugin_tip: '이 프로젝트에서 켜짐',
+    member_plugin_tip: '이 프로젝트에서 항상',
     member_skill_tip: '이 프로젝트에 걸려 있음',
     assign_failed: '그룹을 적용하지 못했습니다: ',
     on: '항상', off: '제외', manual: '/이름 칠 때만 사용',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
-    new_group: '+ 새 그룹 만들기', new_group_tip: '함께 쓰는 플러그인과 스킬을 묶어둡니다. 예를 들어 개발용, 영상제작용',
+    new_group: '+ 새 그룹 만들기', new_group_tip: '예: 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
-    groups_legend: '함께 쓰는 플러그인과 스킬을 묶어둔 것입니다. 프로젝트에 적용하면 그 프로젝트만 바뀌고 나머지는 그대로입니다.',
+    no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
-  agents_note: '.claude/agents/*.md · Cursor와 Copilot도 같은 폴더를 읽습니다',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
     monitors: '모니터', bin: '실행파일', settings: '기본설정'},
   comp_count: (label, n) => `${label} ${n}개`,
-  comp_portable_tip: n => `이 플러그인에 들어 있는 것: ${n}. 체크박스는 스킬만 옮깁니다`,
-  comp_stays_tip: n => `이 플러그인에 들어 있는 것: ${n}. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
+  comp_tip: n => `이 플러그인에 같이 든 것: ${n}. 다른 에이전트에 보낼 수 있는 것은 스킬뿐입니다`,
   share_to: names => names.join('·') + '도 쓰게 하기',
   share_short: '다른 에이전트도 쓰게',
   share_done: '모든 에이전트가 쓸 수 있음',
@@ -2206,9 +2202,8 @@ const T = {
     desc_long: i => `description이 ${i.len}자입니다 (상한 1024)`,
   },
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
-  link_same: n => `${n}와 같은 파일`, link_import: n => `${n}를 가져옴`,
-  link_missing: n => `${n}를 가리키지만 없음`, link_none: '따로 관리',
-  link_via: n => `${n}를 거쳐 읽힘`,
+  scope_global: '이 컴퓨터 전체 (모든 프로젝트)', scope_project: '이 프로젝트',
+  agents_head: '서브에이전트',
     no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
@@ -2220,7 +2215,7 @@ const T = {
     skill_manual_md_tip: '이 스킬의 SKILL.md에 disable-model-invocation: true가 적혀 있어 모든 프로젝트에서 이렇게 동작합니다. 바꾸려면 그 파일을 고칩니다',
     skill_toggle_failed: '스킬을 켜고 끄지 못했습니다: ',
     skills_count: n => '스킬 ' + n + '개',
-    group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
+    group_tag: g => '그룹: ' + g,
     from: '출처: ',
     read_full_tip: '설명 전체 보기',
     no_skills_found: '스킬이 없습니다',
@@ -2238,16 +2233,6 @@ const T = {
 };
 let lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
-// 연결 상태 뱃지. 어느 쪽이 원본인지는 말하지 않고 이어진 사실만 적는다.
-function linkLabel(link){
-  const base = p => p.split('/').pop();
-  if(!link) return { text: t().link_none, title: '' };
-  if(link.kind === 'symlink'){
-    return { text: (link.ok ? t().link_same : t().link_missing)(base(link.target)), title: link.target };
-  }
-  const names = link.targets.map(x => base(x.path) + (x.ok ? '' : ' ✕')).join(', ');
-  return { text: t().link_import(names), title: link.targets.map(x => x.path).join('\n') };
-}
 function renderLangToggle(){
   document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
@@ -2260,7 +2245,7 @@ function setLang(l){
   localStorage.setItem('agent-hud-lang', lang);
   renderLangToggle();
   document.getElementById('applyBanner').innerHTML = t().banner;
-  document.getElementById('h1sub').textContent = t().tagline;
+  renderHeadline();
   renderPeriod();
   renderTabs();
   tick();
@@ -2269,7 +2254,15 @@ document.getElementById('langEn').onclick = () => setLang('en');
 document.getElementById('langKo').onclick = () => setLang('ko');
 renderLangToggle();
 document.getElementById('applyBanner').innerHTML = t().banner;
-document.getElementById('h1sub').textContent = t().tagline;
+let lastTokens = null;
+// 머리글: 지금 폴더에서 Claude Code가 세션마다 읽는 스킬 목록의 양. 메시지마다 다시 보내지는 양이기도 하다.
+function renderHeadline(){
+  const el = document.getElementById('h1sub');
+  const tk = lastTokens; if(!tk){ el.textContent = ''; return; }
+  const v = (tk.agents||{})['Claude Code'] || {skills: 0, measured: 0, tokens: null};
+  el.innerHTML = tk.state !== 'ok' || v.tokens === null ? t().headline_off(v.skills)
+    : v.measured === v.skills ? t().headline(v.tokens, v.skills) : t().headline_part(v.tokens, v.skills);
+}
 
 let theme = localStorage.getItem('agent-hud-theme') || 'dark';
 function renderTheme(){
@@ -2332,6 +2325,7 @@ function renderTokens(c, tk, agents){
         : v.measured === 0 ? t().tok_agent_none(v.skills) : t().tok_agent_part(v.tokens, v.measured, v.skills));
     }).join(' · '));
   } else {
+    box.className += ' loadline-off';
     line.textContent = t().tok_off(tk.skills);
     note((t().tok_hint[tk.state] || t().tok_hint.error));
     const cmd = document.createElement('code'); cmd.textContent = tk.setup; cmd.style.userSelect = 'all';
@@ -2836,6 +2830,8 @@ async function tick(){
   const r = await fetch(stateUrl()); const d = await r.json();
   const upd = d.panels.find(p => p.panel === 'update');
   renderUpdate(upd);
+  lastTokens = (d.panels.find(p => p.tokens) || {}).tokens || null;
+  renderHeadline();
   if(upd) renderFeedback(upd);
   renderSidebar(d.panels.find(p => p.known_projects) || {known_projects: [], project_dir: selectedProject});
   const app = document.getElementById('app');
@@ -2848,10 +2844,9 @@ async function tick(){
     if(p.project_dir) currentProjectDir = p.project_dir;
     if(p.title !== activeTab) continue;
     const c = document.createElement('div'); c.className='card wide';
-    const h = document.createElement('h2'); h.textContent = TITLE_MAP[p.title] ? t()[TITLE_MAP[p.title]] : p.title;
+    // 패널 제목은 탭이 이미 보여 주므로 본문에는 다시 쓰지 않는다.
     if(p.title === 'Groups'){
-      const headerRow = document.createElement('div'); headerRow.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
-      h.style.margin='0';
+      const headerRow = document.createElement('div'); headerRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px';
       const newBtn = document.createElement('span'); newBtn.className='card-action';
       newBtn.textContent = t().new_group;
       newBtn.title = t().new_group_tip;
@@ -2861,11 +2856,13 @@ async function tick(){
         const first = prompt(t().new_group_first_prompt + (p.all_plugins||[]).join('\n'));
         if(first) editGroup('add', name.trim(), first.trim(), 'plugin');
       };
-      headerRow.appendChild(h); headerRow.appendChild(newBtn);
+      headerRow.appendChild(newBtn);
       c.appendChild(headerRow);
-      const legend = document.createElement('div'); legend.className='note'; legend.style.marginBottom='14px';
-      legend.textContent = t().groups_legend;
-      c.appendChild(legend);
+      if(!p.groups.length){
+        const e = document.createElement('div'); e.className = 'empty';
+        e.innerHTML = `<span>🗂</span><span>${t().no_groups}</span>`;
+        c.appendChild(e);
+      }
       for(const g of p.groups){
         const wrap = document.createElement('div'); wrap.className = 'section';
         const el = document.createElement('div'); el.className='row sec-head';
@@ -2876,15 +2873,11 @@ async function tick(){
         left.appendChild(gname);
         const plugins = g.members.filter(m => m.kind === 'plugin');
         const skills = g.members.filter(m => m.kind === 'skill');
-        const cnt = document.createElement('span'); cnt.className='tag';
-        cnt.textContent = t().set_count(plugins.length, skills.length);
-        left.appendChild(cnt);
 
         const right = document.createElement('span'); right.className = 'sec-right';
         const apply = document.createElement('span');
         apply.className = 'btn' + (g.assigned ? ' btn-on' : '');
         apply.textContent = g.assigned ? t().set_applied : t().set_apply;
-        apply.title = t().set_apply_tip;
         apply.onclick = () => {
           if(g.assigned){
             if(confirm(t().unassign_confirm(g.name, p.project_dir))) assignSet('', apply);
@@ -2944,18 +2937,29 @@ async function tick(){
       }
 
     } else if(p.files){
-      c.appendChild(h);
-      for(const f of p.files){
+      // 같은 내용을 읽는 파일은 원본 아래에 들여 쓴다. 들여쓰기가 "이 파일은 저 파일을 읽는다"를
+      // 말하므로 문장 뱃지는 없고, 파일 안에 실제로 적힌 `@경로`나 링크 화살표만 그대로 보여 준다.
+      const byPath = new Map(p.files.map(f => [f.path, f]));
+      const targetsOf = f => !f.link ? [] : f.link.kind === 'symlink' ? [f.link.target] : f.link.targets.map(x => x.path);
+      const children = new Map();
+      for(const f of p.files) for(const tp of targetsOf(f)) if(byPath.has(tp)) (children.get(tp) || children.set(tp, []).get(tp)).push(f);
+      const nested = new Set([...children.values()].flat().map(f => f.path));
+      const base = q => q.split('/').pop();
+      const home = q => q.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
+      const drawFile = (f, depth) => {
         const el = document.createElement('div'); el.className = 'row' + (f.exists ? ' clickable' : '');
+        el.style.paddingLeft = (depth * 22) + 'px';
         const left = document.createElement('span');
         const caret = document.createElement('span');
         caret.textContent = f.exists ? '▸ ' : '';
         left.appendChild(caret);
-        const shown = f.name.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
-        left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${shown}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}`);
-        if(f.via) left.insertAdjacentHTML('beforeend', `<span class="tooltag">${t().link_via(f.via.join(', '))}</span>`);
-        const lk = linkLabel(f.link);
-        if(lk) left.insertAdjacentHTML('beforeend', `<span class="tooltag" title="${lk.title}">${lk.text}</span>`);
+        left.insertAdjacentHTML('beforeend', `${depth ? '<span class="dim">↳ </span>' : ''}<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${home(f.name)}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}`);
+        // 파일에 적힌 연결을 글자 그대로: 링크는 → 대상, 가져오기는 @대상. 대상이 없으면 흐리게 지운다.
+        if(f.link){
+          const refs = f.link.kind === 'symlink' ? [{text: '→ ' + base(f.link.target), ok: f.link.ok, path: f.link.target}]
+                                                   : f.link.targets.map(x => ({text: '@' + base(x.path), ok: x.ok, path: x.path}));
+          for(const r of refs) left.insertAdjacentHTML('beforeend', ` <span class="dim mono" title="${home(r.path)}"${r.ok ? '' : ' style="text-decoration:line-through"'}>${r.text}</span>`);
+        }
         const sizeSpan = document.createElement('span'); sizeSpan.className = 'dim';
         sizeSpan.textContent = f.exists ? f.size + 'B · ' + fmtTime(f.mtime) : t().not_found;
         el.appendChild(left); el.appendChild(sizeSpan);
@@ -2963,6 +2967,14 @@ async function tick(){
         const box = document.createElement('div'); box.className = 'content';
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
+        if(depth < 4) for(const ch of children.get(f.path) || []) drawFile(ch, depth + 1);
+      };
+      for(const [scope, label] of [['global', t().scope_global], ['project', t().scope_project]]){
+        const top = p.files.filter(f => f.scope === scope && !nested.has(f.path));
+        if(!top.length) continue;
+        const sh = document.createElement('div'); sh.className = 'row sec-head'; sh.innerHTML = `<b>${label}</b>`;
+        c.appendChild(sh);
+        for(const f of top) drawFile(f, 0);
       }
       if(p.truncated){
         const w = document.createElement('div'); w.className = 'note';
@@ -2970,6 +2982,9 @@ async function tick(){
         w.textContent = '⚠ ' + t().scan_truncated;
         c.appendChild(w);
       }
+      const ah = document.createElement('div'); ah.className = 'row sec-head';
+      ah.innerHTML = `<b>${t().agents_head}</b><span class="dim mono">.claude/agents/</span><span class="tooltag">Claude Code</span><span class="tooltag">Cursor</span><span class="tooltag">Copilot</span>`;
+      c.appendChild(ah);
       for(const a of (p.agents||[])){
         const el = document.createElement('div'); el.className = 'row clickable';
         const left = document.createElement('span');
@@ -2989,24 +3004,13 @@ async function tick(){
         note.innerHTML = `<span>${t().no_subagents}</span>`;
         c.appendChild(note);
       }
-      // 목록 아래 캡션. 위에 두면 목록보다 먼저 읽혀서 "그래서 뭘 하라는 건지"가 된다.
-      const an = document.createElement('div'); an.className='note';
-      an.style.cssText = 'margin-top:4px;font-size:11px;opacity:.75';
-      an.textContent = t().agents_note;
-      c.appendChild(an);
     } else {
-      c.appendChild(h);
-      renderWorktrees(c, p.worktrees, p.project_dir);
+      // 위계: 상태 한 줄(토큰) → 스위치 뜻 세 줄(흐리게) → 본문 목록 → worktree(접힘, 맨 아래)
       renderTokens(c, p.tokens, p.agents);
       if(p.agents){
-        const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
-        n.textContent = t().skills_note;
-        c.appendChild(n);
         // 스위치 세 단계가 무엇을 하는지. 처음 보는 사람이 라벨만 보고는 알 수 없어서 목록 위에 둔다.
         const g = document.createElement('div'); g.className = 'guide';
-        g.innerHTML = `<div class="guide-head">${t().guide_title}</div>` +
-          t().guide_rows.map(([k, v]) => `<div class="guide-row"><span class="switch sw-guide">${k}</span><span>${v}</span></div>`).join('') +
-          `<div class="note">${t().guide_plugin}</div>`;
+        g.innerHTML = t().guide_rows.map(([k, v]) => `<div class="guide-row"><b>${k}</b><span>${v}</span></div>`).join('');
         c.appendChild(g);
       }
       if(!p.rows.length){
@@ -3041,8 +3045,8 @@ async function tick(){
         const right = document.createElement('span'); right.className = 'sec-right';
         for(const g of (row.modes||[])){
           const gtag = document.createElement('span');
-          gtag.className = 'tag'; gtag.textContent = t().group_tag(g);
-          gtag.title = t().group_tag_tip;
+          gtag.className = 'tag clickable'; gtag.textContent = t().group_tag(g);
+          gtag.onclick = e => { e.stopPropagation(); activeTab = 'Groups'; localStorage.setItem('agent-hud-tab', activeTab); renderTabs(); rerender(); };
           right.appendChild(gtag);
         }
         el.appendChild(left); el.appendChild(right);
@@ -3071,7 +3075,7 @@ async function tick(){
           tag.className = 'comp' + (comp.portable ? '' : ' stays');
           const label = t().comp[comp.name] || comp.name;
           tag.textContent = t().comp_count(label, comp.n || 1);
-          tag.title = (comp.portable ? t().comp_portable_tip : t().comp_stays_tip)(label);
+          tag.title = t().comp_tip(label);
           badges.appendChild(tag);
         }
         const st = row.section_state || {};
@@ -3202,6 +3206,7 @@ async function tick(){
         }
         c.appendChild(wrap);
       }
+      renderWorktrees(c, p.worktrees, p.project_dir);
     }
     app.appendChild(c);
   }

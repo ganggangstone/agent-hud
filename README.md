@@ -120,10 +120,9 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
 - **Agent instructions**: 31 kinds of instruction files in the project, such as
   `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time,
   plus the user-level `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`.
-  Each file shows how it is connected to the others: a symlink says which file it is the
-  same as, a `CLAUDE.md` with `@path` lines says which files it imports, and anything else
-  is "managed separately", meaning it can drift. Imported and linked files appear as rows
-  too. Agent HUD does not decide which file is the source of truth; one way to set that up
+  Files that read another file are nested under it, with the actual `@path` line or symlink
+  arrow shown next to the name, so you can see at a glance which files share one source and
+  which stand alone and can drift. Agent HUD does not decide which file is the source of truth; one way to set that up
   is in [How do you keep instruction files in sync?](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966).
 
 ## Token counts

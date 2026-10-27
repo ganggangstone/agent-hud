@@ -95,10 +95,10 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
   [토큰 수](#토큰-수)를 본다.
 - **에이전트 지침**: 프로젝트 안의 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/` 같은
   지침 파일 31종과 사용자 전역의 `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
-  `~/.gemini/GEMINI.md`를 찾아 크기와 수정 시각을 보여준다. 파일마다 다른 파일과 어떻게
-  이어져 있는지도 보인다. 심볼릭 링크면 어느 파일과 같은 파일인지, `CLAUDE.md`에 `@경로`
-  줄이 있으면 어느 파일을 가져오는지, 둘 다 아니면 "따로 관리"라서 갈라질 수 있다는 뜻이다.
-  가져오거나 링크한 파일도 행으로 보인다. 어느 파일이 원본인지는 Agent HUD가 정하지 않는다.
+  `~/.gemini/GEMINI.md`를 찾아 크기와 수정 시각을 보여준다. 다른 파일을 읽는 파일은 그 파일
+  아래에 들여 쓰고, 파일에 실제로 적힌 `@경로` 줄이나 링크 화살표를 이름 옆에 그대로 보여준다.
+  그래서 어느 파일들이 한 원본을 같이 쓰고 어느 파일이 혼자라서 갈라질 수 있는지가 한눈에 보인다.
+  어느 파일이 원본인지는 Agent HUD가 정하지 않는다.
   한 가지 정리 방법은 [지침 파일을 어떻게 동기화할까](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966)에 있다.
 
 ## 토큰 수
