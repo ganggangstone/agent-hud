@@ -53,10 +53,18 @@
 |---|---|
 | 플러그인 on/off | `<프로젝트>/.claude/settings.local.json`의 `enabledPlugins` |
 | 스킬을 다른 에이전트에 적용 | `<프로젝트>/.claude/skills/`, `<프로젝트>/.agents/skills/`에 심볼릭 링크 |
-| 플러그인 밖 스킬 on/off | `<프로젝트>/.claude/settings.local.json`의 `skillOverrides` |
+| 플러그인 밖 스킬 on/수동/off | `<프로젝트>/.claude/settings.local.json`의 `skillOverrides` |
 
 `settings.local.json`은 Claude Code가 만드는 개인용 설정 파일이라 커밋되지 않는다. 그래서
 프로젝트마다 다르게 둬도 팀 저장소에는 섞이지 않는다.
+
+> 스킬의 "수동 전용"(사용자가 `/이름`으로 부를 때만 읽힘)은 `SKILL.md` 머리말의
+> `disable-model-invocation: true`로도 되지만, 그 파일은 사용자 전역이거나 플러그인 것이라
+> 이 규칙에 걸리고 플러그인 업데이트가 덮어쓴다. 대신 `skillOverrides`의 네 값
+> (`on` · `name-only` · `user-invocable-only` · `off`, code.claude.com/docs/en/skills) 중
+> `user-invocable-only`를 쓴다. 두 값이 다 있을 때 어느 쪽이 이기는지는 문서에 없어서,
+> 머리말이 `true`인 스킬은 스위치를 두지 않고 사실만 표시한다. `name-only`는 스위치에 넣지
+> 않았다. 플러그인 스킬에는 `skillOverrides`가 듣지 않는다고 문서에 적혀 있어 그대로 플러그인째 켜고 끈다.
 
 > 처음에는 플러그인 on/off를 `claude plugin enable|disable` CLI로 했다.
 > "공식 명령이 있으면 그걸 쓴다"는 판단이었는데, **그 명령은 옵션 없이 쓰면 사용자 전역 설정에 쓴다.**
@@ -414,3 +422,22 @@ Copilot(`copilot plugin marketplace`)에도 있다. 다만 매니페스트와 �
 먼저 만들었다. 이 도구의 파일에만 쓰고, 에이전트가 설치돼
 있지 않아도 되고, 목록에서 빼면 끝난다. 훅은 원하면 직접 넣는 선택 사항으로 둔다.
 
+---
+
+## 11. 지침 파일의 연결 상태를 보여주되 원본은 정하지 않는다
+
+| 대안 | 장점 | 단점 | 판정 |
+|---|---|---|---|
+| **파일마다 "같은 파일 / 가져옴 / 따로 관리"만 표시** ✅ | 사실만 적어 어느 구성에도 맞다 | 갈라졌는지는 사용자가 판단한다 | **채택** |
+| 본문 diff | 갈라진 줄이 바로 보인다 | 어느 두 파일을 비교할지를 도구가 정해야 하고, `@`로 합쳐 읽는 구성에서는 다른 게 정상이다 | 기각 |
+| 특정 구성(AGENTS.md 원본 + `@AGENTS.md`)을 기준으로 검사 | 안내가 분명하다 | 한 사람의 관례를 오픈소스 도구가 강요하게 된다 | 기각 |
+
+`@경로` 가져오기는 Claude Code만 따른다. Codex와 Antigravity는 그 줄을 글자로만 본다
+(AGENTS.md·CLAUDE.md·CLAUDE.local.md·GEMINI.md에 서로 다른 단어를 넣고 각 도구에 물어 확인한
+기록: medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966).
+그래서 `@`는 `CLAUDE.md`·`CLAUDE.local.md`에서만 풀고, 다른 도구 파일의 `@`는 표시하지 않는다.
+세 도구가 모두 따르는 연결은 심볼릭 링크뿐이다. Codex는 `AGENTS.override.md`가 있으면 `AGENTS.md`를
+무시하므로 검사 목록에 넣었다.
+
+가져온 파일과 링크 대상은 목록에 없어도 행으로 보인다(`~/.claude/PRINCIPLES.md` 같은 파일이 그렇다).
+없는 대상은 행으로 만들지 않는다. 가리키는 쪽 뱃지가 이미 "없음"이라고 말하기 때문이다.

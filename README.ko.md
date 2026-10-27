@@ -88,12 +88,18 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
   플러그인 밖 스킬은 Claude Code에서 꺼진다. 다른 프로젝트는 그대로 둔다.
 - **플러그인 & 스킬**: 설치된 스킬을 플러그인별로 보여준다. 선택한 프로젝트에서 그
   스킬을 읽을 수 있는 에이전트마다 뱃지가 붙는다. 플러그인과 플러그인 밖 스킬에는
-  Claude Code용 켜짐/꺼짐 스위치가 있다.
+  Claude Code용 스위치가 있다. 플러그인 밖 스킬의 스위치는 켜짐 · 수동(`/이름`으로 부를
+  때만 읽힌다) · 꺼짐 세 단계다. `SKILL.md`에 `disable-model-invocation: true`가 있는 스킬은
+  수동으로 표시만 되고 여기서는 못 바꾼다.
 - **참고용 토큰 수**: 스킬마다, 찾은 모든 스킬의 합계, 에이전트별 합계를 보여준다.
   [토큰 수](#토큰-수)를 본다.
 - **에이전트 지침**: 프로젝트 안의 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/` 같은
-  지침 파일 30종을 찾아 크기와 수정 시각을 보여준다. `CLAUDE.md`는 고쳤는데
-  `AGENTS.md`는 그대로인 경우가 바로 보인다.
+  지침 파일 31종과 사용자 전역의 `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
+  `~/.gemini/GEMINI.md`를 찾아 크기와 수정 시각을 보여준다. 파일마다 다른 파일과 어떻게
+  이어져 있는지도 보인다. 심볼릭 링크면 어느 파일과 같은 파일인지, `CLAUDE.md`에 `@경로`
+  줄이 있으면 어느 파일을 가져오는지, 둘 다 아니면 "따로 관리"라서 갈라질 수 있다는 뜻이다.
+  가져오거나 링크한 파일도 행으로 보인다. 어느 파일이 원본인지는 Agent HUD가 정하지 않는다.
+  한 가지 정리 방법은 [지침 파일을 어떻게 동기화할까](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966)에 있다.
 
 ## 토큰 수
 
@@ -148,9 +154,11 @@ Cursor와 Copilot은 둘 다 읽는다. Agent HUD는 스킬을 복사하지 않�
 어느 폴더를 보는 에이전트든 같은 스킬을 읽는다. 연결을 따라 읽는지는 Claude Code·Codex·
 Gemini CLI·Copilot·Antigravity에서 확인했고, Cursor는 아직 확인하지 않았다.
 
-플러그인에 들지 않은 스킬은 `~/.claude/skills/`에 있든 프로젝트 안에 있든 프로젝트마다 끌 수
-있다. Agent HUD가 프로젝트의 `.claude/settings.local.json`에 `skillOverrides`를 쓰고, 이
-설정은 Claude Code만 읽는다.
+플러그인에 들지 않은 스킬은 `~/.claude/skills/`에 있든 프로젝트 안에 있든 프로젝트마다 끄거나
+수동 전용으로 둘 수 있다. Agent HUD가 프로젝트의 `.claude/settings.local.json`에
+`skillOverrides`(`off` 또는 `user-invocable-only`)를 쓰고, 이 설정은 Claude Code만 읽는다.
+수동 전용은 `/` 메뉴에는 남고 부르기 전까지 모델의 컨텍스트에는 안 올라간다. 스킬의 머리말에
+`disable-model-invocation: true`를 쓴 것과 같은 효과를 스킬 파일을 고치지 않고 낸다.
 
 플러그인에 든 스킬은 그 플러그인이 켜져 있을 때 Claude Code만 읽는다. 플러그인 & 스킬
 탭의 체크박스를 누르면 프로젝트의 스킬 폴더에 연결되어, 다른 에이전트도 읽고 Claude Code는

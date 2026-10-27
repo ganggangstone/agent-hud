@@ -4,6 +4,26 @@
 
 ## 다음 버전 / Unreleased
 
+**지침 파일이 서로 어떻게 이어져 있는지 보여준다.** 에이전트 지침 탭의 행마다 심볼릭 링크면 어느
+파일과 같은 파일인지, `CLAUDE.md`·`CLAUDE.local.md`에 `@경로` 줄이 있으면 어느 파일을 가져오는지,
+둘 다 아니면 "따로 관리"라고 표시한다. 가져오거나 링크한 파일은 목록에 없어도 행으로 보이고,
+사용자 전역의 `~/.codex/AGENTS.md`와 `~/.gemini/GEMINI.md` 행이 생겼다. 어느 쪽이 원본인지는 정하지 않는다.
+
+**Each instruction file shows how it is connected to the others.** On the Agent instructions tab a
+symlink says which file it is the same as, a `CLAUDE.md` or `CLAUDE.local.md` with `@path` lines says
+which files it imports, and anything else is "managed separately". Imported and linked files get a row
+even when they are not in the scan list, and the user-level `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`
+have rows now. Which file is the source of truth is not decided.
+
+**플러그인 밖 스킬을 프로젝트마다 수동 전용으로 둘 수 있다.** 스위치가 켜짐 · 수동 · 꺼짐 세 단계가
+됐다. 수동은 `skillOverrides`에 `user-invocable-only`를 써서 `/이름`으로 부를 때만 읽히게 한다.
+`SKILL.md`에 `disable-model-invocation: true`가 있는 스킬은 수동으로 표시만 한다.
+
+**A skill outside a plugin can be manual-only per project.** The switch now has three positions, ON,
+MANUAL and OFF. MANUAL writes `user-invocable-only` to `skillOverrides`, so the skill loads only when
+you type `/name`. A skill whose `SKILL.md` sets `disable-model-invocation: true` is shown as MANUAL and
+left alone.
+
 **스킬마다 이름+설명의 참고용 토큰 수를 센다.** 전에는 로드하는 스킬 수에 100을 곱한 어림값이었다.
 `agent-hud tokens setup`을 한 번 실행하면 `o200k_base`로 찾은 모든 스킬(다른 에이전트만 보는 것,
 꺼진 플러그인의 것 포함)의 `name` + 줄바꿈 + `description`을 이 컴퓨터에서 센다. 스킬 본문은 세지 않고,

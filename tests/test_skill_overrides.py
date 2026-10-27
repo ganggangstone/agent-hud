@@ -78,6 +78,24 @@ def main():
         assert state(proj)[0] == 2
         os.remove(shared)
 
+        # 수동 전용(user-invocable-only): Claude에게는 숨기고 / 메뉴에는 남는다. 수에서 빠지고 값이 보인다
+        ok, err = hud.set_skill_overrides({"g-on": "user-invocable-only"}, proj)
+        assert ok, err
+        assert local(proj).get("g-on") == "user-invocable-only", local(proj)
+        n, loose = state(proj)
+        assert n == 2 and loose["g-on"]["override"] == "user-invocable-only" and not loose["g-on"]["enabled"], loose["g-on"]
+        assert loose["p-local"]["override"] == "on"
+        hud.set_skill_overrides({"g-on": "on"}, proj)
+        assert "g-on" not in local(proj), local(proj)
+        ok, err = hud.set_skill_overrides({"g-on": "weird"}, proj)
+        assert not ok, "모르는 값을 썼다"
+
+        # SKILL.md 머리말의 disable-model-invocation: true 는 그대로 보여 준다(파일은 안 건드린다)
+        open(os.path.join(home, ".claude", "skills", "g-off", "SKILL.md"), "w").write(
+            "---\nname: g-off\ndisable-model-invocation: true\ndescription: x\n---\n")
+        assert state(proj)[1]["g-off"]["manual_only"] is True
+        assert state(proj)[1]["g-on"]["manual_only"] is False
+
         # 모르는 이름은 쓰지 않는다
         ok, err = hud.set_skill_overrides({"nope": False}, proj)
         assert not ok and "nope" in err, (ok, err)

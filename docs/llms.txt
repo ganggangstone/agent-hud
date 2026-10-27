@@ -10,7 +10,9 @@ description of every installed skill into the model's context at the start
 of a session, whether that session uses the skill or not. Agent HUD shows
 how many skills a selected project loads, and lets you save the plugins and
 skills you use together as a group and apply a different group per project.
-It reads and writes settings files on the machine it runs on and needs no
+It also shows which instruction files (CLAUDE.md, AGENTS.md and others) a
+project has and how they are linked to each other, and can set a skill to
+manual-only per project. It reads and writes settings files on the machine it runs on and needs no
 account. On its own it makes one request, a GitHub Releases check once a
 day for update notices; a Homebrew install can also update itself when the
 user clicks Update now, and then Homebrew does the download.

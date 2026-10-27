@@ -112,12 +112,19 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
   Code. Other projects are not changed.
 - **Plugins & skills**: every installed skill, listed by plugin, with a badge for each
   agent that can read it in the selected project. Plugins, and skills that aren't part of
-  a plugin, have an ON/OFF switch for Claude Code.
+  a plugin, have a switch for Claude Code. For skills outside a plugin it has three
+  positions: ON, MANUAL (hidden from Claude until you type `/name`) and OFF. A skill whose
+  `SKILL.md` sets `disable-model-invocation: true` shows MANUAL and can't be changed here.
 - **Reference token counts**: next to each skill, and as a total for every skill Agent HUD
   found plus a total per agent. See [Token counts](#token-counts).
-- **Agent instructions**: 30 kinds of instruction files in the project, such as
-  `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time.
-  You can see at a glance that `CLAUDE.md` was updated but `AGENTS.md` wasn't.
+- **Agent instructions**: 31 kinds of instruction files in the project, such as
+  `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time,
+  plus the user-level `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`.
+  Each file shows how it is connected to the others: a symlink says which file it is the
+  same as, a `CLAUDE.md` with `@path` lines says which files it imports, and anything else
+  is "managed separately", meaning it can drift. Imported and linked files appear as rows
+  too. Agent HUD does not decide which file is the source of truth; one way to set that up
+  is in [How do you keep instruction files in sync?](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966).
 
 ## Token counts
 
@@ -178,8 +185,11 @@ Following the link was checked with Claude Code, Codex, Gemini CLI, Copilot and 
 not yet with Cursor.
 
 A skill that isn't part of a plugin, whether in `~/.claude/skills/` or in the project, can
-be switched off per project. Agent HUD writes `skillOverrides` into the project's
-`.claude/settings.local.json`, which only Claude Code reads.
+be switched off, or set to manual-only, per project. Agent HUD writes `skillOverrides`
+(`off` or `user-invocable-only`) into the project's `.claude/settings.local.json`, which
+only Claude Code reads. Manual-only keeps the skill in the `/` menu but out of the model's
+context until you call it, the same effect as `disable-model-invocation: true` in the
+skill's frontmatter, without editing the skill.
 
 A skill inside a plugin is read only by Claude Code, while that plugin is on. The checkbox
 on the Plugins & skills tab links it into the project's skill folders, so the other agents

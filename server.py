@@ -417,6 +417,7 @@ READABLE_PATHS = set()  # populated by collect_instructions, checked by /api/con
 INSTRUCTION_SOURCES = [
     ("CLAUDE.local.md", "Claude Code"),
     ("AGENTS.md", "Codex · Cursor · Zed +"),
+    ("AGENTS.override.md", "Codex (replaces AGENTS.md)"),
     ("AGENT.md", "Amp (legacy)"),
     (".clinerules", "Cline"),
     (".cursorrules", "Cursor (legacy)"),
@@ -449,6 +450,58 @@ INSTRUCTION_SOURCES = [
 RULE_EXTS = (".md", ".mdc", ".txt", ".yaml", ".yml")
 
 
+# `@경로` 가져오기는 Claude Code만 따른다 (Codex·Antigravity는 글자로만 본다, ADR 참고).
+# 그래서 이 이름의 파일에서만 해석한다. 다른 도구끼리 같은 내용을 쓰는 방법은 심볼릭 링크뿐이다.
+_IMPORT_FILES = {"CLAUDE.md", "CLAUDE.local.md"}
+
+
+def _link_info(path):
+    """파일이 다른 파일과 어떻게 이어져 있는지. 심볼릭 링크 → 대상, @가져오기 → 대상 목록,
+    둘 다 아니면 None(독립 파일). 어느 쪽이 원본인지는 판단하지 않는다."""
+    if os.path.islink(path):
+        target = os.readlink(path)
+        if not os.path.isabs(target):
+            target = os.path.normpath(os.path.join(os.path.dirname(path), target))
+        return {"kind": "symlink", "target": target, "ok": os.path.isfile(target)}
+    if os.path.basename(path) not in _IMPORT_FILES or not os.path.isfile(path):
+        return None
+    targets = []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = re.match(r"@(\S+)", line)
+                if not m:
+                    continue
+                t = os.path.expanduser(m.group(1))
+                if not os.path.isabs(t):
+                    t = os.path.normpath(os.path.join(os.path.dirname(path), t))
+                targets.append({"path": t, "ok": os.path.isfile(t)})
+    except OSError:
+        return None
+    return {"kind": "import", "targets": targets} if targets else None
+
+
+def _with_link_targets(rows):
+    """링크·@가 가리키는 파일 중 아직 행이 없는 것을 뒤에 행으로 더한다. 어느 행을 거쳐
+    닿았는지는 via에 적는다. 없는 대상은 행으로 만들지 않는다(가리키는 쪽 뱃지가 이미 말한다)."""
+    seen = {r["path"] for r in rows}
+    extra = {}
+    for r in rows:
+        link = r.get("link")
+        if not link:
+            continue
+        targets = [link["target"]] if link["kind"] == "symlink" else [t["path"] for t in link["targets"]]
+        for t in targets:
+            if t in seen or not os.path.isfile(t):
+                continue
+            row = extra.get(t)
+            if row is None:
+                row = extra[t] = _file_row(t, t, "")
+                row["via"] = []
+            row["via"].append(r["name"])
+    return rows + list(extra.values())
+
+
 def _file_row(label, path, tool="Claude Code"):
     exists = os.path.isfile(path)
     st = os.stat(path) if exists else None
@@ -461,6 +514,7 @@ def _file_row(label, path, tool="Claude Code"):
         "mtime": int(st.st_mtime) if st else 0,
         "path": path,
         "tool": tool,
+        "link": _link_info(path),
     }
 
 
@@ -1352,7 +1406,9 @@ def collect_skills(ctx):
         sk = decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
                        "path": os.path.dirname(hit["path"])}, [])
         if "Claude Code" in sk["agents"]:
-            sk["enabled"] = overrides.get(name) not in SKILL_HIDDEN
+            sk["override"] = overrides.get(name) if overrides.get(name) in SKILL_OVERRIDE_VALUES else "on"
+            sk["enabled"] = sk["override"] not in SKILL_HIDDEN
+            sk["manual_only"] = _manual_only(hit["path"])
         loose.append(sk)
     if loose:
         rows.append({
@@ -1379,10 +1435,12 @@ def collect_instructions(ctx):
     project_dir = default_project_dir(ctx)
     rows = [
         _file_row("Global CLAUDE.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
+        _file_row("Global AGENTS.md", os.path.join(HOME, ".codex", "AGENTS.md"), "Codex"),
+        _file_row("Global GEMINI.md", os.path.join(HOME, ".gemini", "GEMINI.md"), "Gemini CLI"),
         _file_row("Project CLAUDE.md", os.path.join(project_dir, "CLAUDE.md")),
     ]
     sub_rows, truncated = _instruction_rows(project_dir)
-    rows += sub_rows
+    rows = _with_link_targets(rows + sub_rows)
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -1458,6 +1516,20 @@ def _write_local(project_dir, data):
 # 빠지는 것을 Claude Code로 직접 확인했다(ADR 10, tests/manual/skill_visibility.sh). 플러그인
 # 스킬에는 듣지 않아서 플러그인은 여전히 통째로 끈다.
 SKILL_HIDDEN = ("off", "user-invocable-only")
+SKILL_OVERRIDE_VALUES = ("on", "name-only", "user-invocable-only", "off")
+
+
+def _manual_only(skill_md):
+    """SKILL.md 머리말의 disable-model-invocation: true. 사용자가 /이름 으로 부를 때만 읽히는 스킬이다."""
+    try:
+        with open(skill_md, encoding="utf-8") as f:
+            head = f.read(META_READ_MAX)
+    except OSError:
+        return False
+    body = head.split("\n---", 1)[0]
+    return re.search(r"^disable-model-invocation:\s*true\s*$", body, re.M) is not None
+
+
 def skill_overrides(project_dir):
     """-> (실제로 적용되는 값, 공유 settings.json의 값). 로컬이 공유를 이긴다(직접 확인)."""
     shared = read_json(os.path.join(project_dir, ".claude", "settings.json")).get("skillOverrides")
@@ -1482,19 +1554,23 @@ def loose_claude_skills(project_dir):
 
 
 def set_skill_overrides(changes, project_dir):
-    """{스킬 이름: bool}을 이 프로젝트의 settings.local.json에 쓴다. 켤 때는 키를 지우고,
-    공유 설정이 끄고 있을 때만 "on"을 써서 이긴다."""
+    """{스킬 이름: bool 또는 skillOverrides 값}을 이 프로젝트의 settings.local.json에 쓴다.
+    켤 때는 키를 지우고, 공유 설정이 끄고 있을 때만 "on"을 써서 이긴다."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
+    changes = {n: ("on" if v else "off") if isinstance(v, bool) else v for n, v in changes.items()}
+    bad = [n for n, v in changes.items() if v not in SKILL_OVERRIDE_VALUES]
+    if bad:
+        return False, "unknown value for: " + ", ".join(bad[:3])
     unknown = [n for n in changes if n not in loose_claude_skills(project_dir)]
     if unknown:
         return False, "unknown skill: " + ", ".join(unknown[:3])
     shared = skill_overrides(project_dir)[1]
     data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
     ov = data.get("skillOverrides") if isinstance(data.get("skillOverrides"), dict) else {}
-    for name, on in changes.items():
-        if not on:
-            ov[name] = "off"
+    for name, value in changes.items():
+        if value != "on":
+            ov[name] = value
         elif shared.get(name) in SKILL_HIDDEN:
             ov[name] = "on"
         else:
@@ -1768,6 +1844,7 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .tab-opt.active{background:var(--accent);color:var(--bg)}
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
+.sw-manual{background:transparent;color:var(--dim);border:1px dashed var(--dim)}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
@@ -1967,13 +2044,18 @@ const T = {
     desc_long: i => `description is ${i.len} characters (limit 1024)`,
   },
   scan_truncated: 'This project is large, so the scan stopped early. Some instruction files further down may be missing.',
+  link_same: n => `same file as ${n}`, link_import: n => `imports ${n}`,
+  link_missing: n => `points to ${n} (missing)`, link_none: 'managed separately',
+  link_via: n => `read through ${n}`,
     no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
     plugin_on_tip: 'On in this project. Click to turn it off (next session)',
     plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
-    skill_on_tip: 'On for Claude Code in this project. Click to turn it off (next session)',
+    skill_on_tip: 'On for Claude Code in this project. Click to make it manual-only (next session)',
     skill_off_tip: 'Off for Claude Code in this project. Click to turn it on (next session)',
+    manual: 'MANUAL', skill_manual_tip: 'Hidden from Claude Code in this project; only runs when you type /name. Click to turn it off (next session)',
+    skill_manual_md_tip: 'SKILL.md sets disable-model-invocation: true, so it is manual everywhere. Edit the file to change it',
     skill_toggle_failed: 'Could not switch that skill: ',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
@@ -2099,13 +2181,18 @@ const T = {
     desc_long: i => `description이 ${i.len}자입니다 (상한 1024)`,
   },
   scan_truncated: '프로젝트가 커서 탐색을 중간에 멈췄습니다. 더 아래에 있는 지침 파일은 빠졌을 수 있습니다.',
+  link_same: n => `${n}와 같은 파일`, link_import: n => `${n}를 가져옴`,
+  link_missing: n => `${n}를 가리키지만 없음`, link_none: '따로 관리',
+  link_via: n => `${n}를 거쳐 읽힘`,
     no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
     plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
     plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
-    skill_on_tip: '이 프로젝트의 Claude Code에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
+    skill_on_tip: '이 프로젝트의 Claude Code에서 켜져 있습니다. 누르면 수동 전용이 됩니다 (다음 세션부터)',
     skill_off_tip: '이 프로젝트의 Claude Code에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
+    manual: '수동', skill_manual_tip: '이 프로젝트의 Claude Code에게는 숨기고 /이름 으로 부를 때만 읽힙니다. 누르면 꺼집니다 (다음 세션부터)',
+    skill_manual_md_tip: 'SKILL.md에 disable-model-invocation: true가 있어 어디서나 수동입니다. 바꾸려면 그 파일을 고칩니다',
     skill_toggle_failed: '스킬을 켜고 끄지 못했습니다: ',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
@@ -2126,7 +2213,16 @@ const T = {
 };
 let lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem('agent-hud-lang') || 'en';
 function t(){ return T[lang]; }
-
+// 연결 상태 뱃지. 어느 쪽이 원본인지는 말하지 않고 이어진 사실만 적는다.
+function linkLabel(link){
+  const base = p => p.split('/').pop();
+  if(!link) return { text: t().link_none, title: '' };
+  if(link.kind === 'symlink'){
+    return { text: (link.ok ? t().link_same : t().link_missing)(base(link.target)), title: link.target };
+  }
+  const names = link.targets.map(x => base(x.path) + (x.ok ? '' : ' ✕')).join(', ');
+  return { text: t().link_import(names), title: link.targets.map(x => x.path).join('\n') };
+}
 function renderLangToggle(){
   document.documentElement.lang = lang;
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
@@ -2420,10 +2516,10 @@ async function toggle(name, enable, dotEl){
   polling = true;
   await tick();
 }
-async function toggleSkill(name, enable, el){
+async function toggleSkill(name, value, el){
   polling = false; el.classList.add('busy');
   try{
-    const r = await fetch('/api/skilltoggle', {method:'POST', body: JSON.stringify({name, enable, project: currentProjectDir})});
+    const r = await fetch('/api/skilltoggle', {method:'POST', body: JSON.stringify({name, value, project: currentProjectDir})});
     const d = await r.json();
     if(!d.ok) alert(t().skill_toggle_failed + (d.error || t().error));
   } catch(e){ alert(t().skill_toggle_failed + e); }
@@ -2830,7 +2926,11 @@ async function tick(){
         const caret = document.createElement('span');
         caret.textContent = f.exists ? '▸ ' : '';
         left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${f.name}<span class="tooltag">${f.tool}</span>`);
+        const shown = f.name.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
+        left.insertAdjacentHTML('beforeend', `<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${shown}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}`);
+        if(f.via) left.insertAdjacentHTML('beforeend', `<span class="tooltag">${t().link_via(f.via.join(', '))}</span>`);
+        const lk = linkLabel(f.link);
+        if(lk) left.insertAdjacentHTML('beforeend', `<span class="tooltag" title="${lk.title}">${lk.text}</span>`);
         const sizeSpan = document.createElement('span'); sizeSpan.className = 'dim';
         sizeSpan.textContent = f.exists ? f.size + 'B · ' + fmtTime(f.mtime) : t().not_found;
         el.appendChild(left); el.appendChild(sizeSpan);
@@ -2985,10 +3085,19 @@ async function tick(){
               if(!isPlugin && s.enabled !== undefined){
                 // 플러그인 밖 스킬만 스위치가 있다. 플러그인 스킬은 플러그인째 켜고 끈다.
                 const ssw = document.createElement('span');
-                ssw.className = 'switch ' + (s.enabled ? 'sw-on' : 'sw-off');
-                ssw.textContent = s.enabled ? t().on : t().off;
-                ssw.title = s.enabled ? t().skill_on_tip : t().skill_off_tip;
-                ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, !s.enabled, ssw); };
+                if(s.manual_only){
+                  // 머리말이 정한 것이라 프로젝트 설정으로는 못 바꾼다. 사실만 보여 준다.
+                  ssw.className = 'switch sw-manual'; ssw.style.cursor = 'default';
+                  ssw.textContent = t().manual; ssw.title = t().skill_manual_md_tip;
+                } else {
+                  // 켜짐 → 수동 → 꺼짐 → 켜짐. name-only 는 쓰는 사람이 드물어 스위치에 안 넣었다.
+                  const st = s.override === 'user-invocable-only' ? 'manual' : (s.enabled ? 'on' : 'off');
+                  const next = { on: 'user-invocable-only', manual: 'off', off: 'on' }[st];
+                  ssw.className = 'switch sw-' + st;
+                  ssw.textContent = t()[st];
+                  ssw.title = { on: t().skill_on_tip, manual: t().skill_manual_tip, off: t().skill_off_tip }[st];
+                  ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, next, ssw); };
+                }
                 srow.appendChild(ssw);
               }
 
@@ -3255,7 +3364,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             project = payload.get("project", "") or PROJECT_DIR
             if project not in known_projects():
                 return self._send_json({"ok": False, "error": "unknown project"}, 400)
-            ok, err = set_skill_overrides({payload.get("name", ""): bool(payload.get("enable"))}, project)
+            value = payload.get("value") if "value" in payload else bool(payload.get("enable"))
+            ok, err = set_skill_overrides({payload.get("name", ""): value}, project)
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/group":
             length = int(self.headers.get("Content-Length", 0))
