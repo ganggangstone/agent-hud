@@ -216,6 +216,15 @@ def restart_into(prefix):
     PID가 그대로라 서비스가 끊기지 않는다. 열려 있는 탭이 알아서 새로고침하므로 새 탭은 열지 않는다."""
     time.sleep(1)  # 응답이 브라우저에 닿을 시간
     exe = os.path.join(prefix, "bin", "agent-hud")
+    # 토큰 세기 도구가 아직 없으면 여기서 같이 준비한다. 사용자가 누른 업데이트라 네트워크를
+    # 이미 쓰는 중이고, 새 설치본의 명령을 부르므로 그쪽 파이썬·데이터 폴더를 그대로 따른다.
+    # 실패해도 업데이트는 끝난 것이니 다시 뜨는 것은 막지 않는다.
+    if not _tokenizer_python():
+        try:
+            subprocess.run([exe, "tokens", "setup"], capture_output=True, text=True,
+                           timeout=SETUP_VENV_SECONDS + SETUP_PIP_SECONDS + 300)
+        except Exception:
+            pass
     os.environ["AGENT_HUD_NO_BROWSER"] = "1"
     os.execv(exe, [exe])
 
@@ -1845,6 +1854,10 @@ h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.03em;line-height:1.1
 .sw-on{background:var(--on-tint);color:var(--on);border:1px solid color-mix(in srgb,var(--on) 35%,transparent)}
 .sw-off{background:var(--off-tint);color:var(--off);border:1px solid var(--border)}
 .sw-manual{background:transparent;color:var(--dim);border:1px dashed var(--dim)}
+.guide{margin:0 0 14px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.6}
+.guide-head{color:var(--dim);font-weight:600}
+.guide-row{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
+.sw-guide{background:var(--off-tint);color:var(--text);border:1px solid var(--border);flex:0 0 auto;margin-top:2px}
 .note{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.65;text-wrap:pretty}
 .clickable{cursor:pointer}
 .row.clickable:hover{background:var(--off-tint)}
@@ -1937,8 +1950,8 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
 <script>
 const T = {
   en: {
-  wt_title: 'Worktrees in this repository',
-  wt_intro: 'Share selected skills without changing plugins, hooks, agents or settings. Existing folders and links are kept.',
+  wt_title: 'Other checkouts of this repository (worktrees)',
+  wt_intro: 'A worktree is the same repository checked out into another folder, usually for working on a second branch at the same time. Skills added here do not carry over by themselves. Pick the skills to share; plugins, hooks, agents and settings are left alone, and existing folders and links are kept.',
   wt_root_only: 'Select the repository checkout root to apply skills. Subfolder configurations stay local to that folder.',
   wt_query_failed: 'Could not read the Git worktree list.',
   wt_skills: 'Skills to share', wt_targets: 'Choose worktrees',
@@ -1966,12 +1979,19 @@ const T = {
     banner: 'Plugin changes take effect <b>next session</b>. Everything else is immediate.',
     tagline: 'local dashboard',
     title_groups: 'Groups', title_instructions: 'Agent instructions', title_skills: 'Plugins & skills',
-  skills_note: 'Everything on this tab applies to the selected project only.',
-  badge_on_tip: a => `${a} can use this skill`,
-  badge_off_tip: a => `${a} cannot see this skill here`,
+  skills_note: 'Everything on this tab applies to the selected project only. Changes take effect from the next session.',
+  guide_title: 'What the switches mean',
+  guide_rows: [
+    ['ALWAYS', 'At the start of every session the AI reads this skill\'s name and description, and that costs tokens every time. Nothing is written to settings.'],
+    ['ONLY WHEN YOU TYPE /name', 'The AI does not know the skill exists until you type /name in the chat. Those tokens are saved on every session. Writes "user-invocable-only" to skillOverrides in this project\'s .claude/settings.local.json, the same effect as disable-model-invocation: true inside the skill, without touching the skill.'],
+    ['EXCLUDED', 'The AI cannot use the skill in this project. Writes "off" to the same place.'],
+  ],
+  guide_plugin: 'A plugin only has ALWAYS and EXCLUDED, for all of its skills at once. These switches are for Claude Code; the badges show which other agents can see each skill.',
+  badge_on_tip: a => `${a} can use this skill in this project`,
+  badge_off_tip: a => `${a} cannot find this skill in this project. Use "let other agents use it" to add it`,
   no_skills: 'No skills found in any known folder.',
   link_failed: 'Could not share that skill: ',
-  loose_skills: 'Skills not from a plugin',
+  loose_skills: 'Skills installed on their own (not part of a plugin)',
     set_count: (pl, sk) => `${pl} plugin${pl===1?'':'s'} · ${sk} skill${sk===1?'':'s'}`,
     set_apply: 'Apply to this project', set_applied: 'Applied to this project',
     set_apply_tip: 'Applies to this project only. Other projects are untouched.',
@@ -1982,7 +2002,7 @@ const T = {
     member_plugin_tip: 'On in this project',
     member_skill_tip: 'Linked into this project',
     assign_failed: 'Could not apply that group: ',
-    on: 'ON', off: 'OFF',
+    on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
     new_group: '+ create a new group', new_group_tip: 'Plugins and skills you switch on together. For example one set for coding, one for video work',
@@ -1996,12 +2016,11 @@ const T = {
   comp_count: (label, n) => `${n} ${label}`,
   comp_portable_tip: n => `This plugin ships ${n}. The checkbox moves skills only`,
   comp_stays_tip: n => `This plugin ships ${n}. They work wherever the plugin is on; the checkbox moves skills only`,
-  share_to: names => 'apply to ' + names.join(', '),
-  share_short: 'apply to others',
-  share_done: 'applied everywhere',
-  share_all_tip: 'Applies this skill to those agents in this project. Links it into the folders it is missing from; the original never moves.',
-  partly: a => `${a} can use only some of these skills`,
-  inherited_note: 'Nothing set for this project yet, using defaults',
+  share_to: names => 'let ' + names.join(', ') + ' use it too',
+  share_short: 'let other agents use it',
+  share_done: 'every agent can use it',
+  share_all_tip: 'Puts a link to this skill in the folders those agents look in, inside this project. No copy is made and the original stays where it is.',
+  partly: a => `${a} can use only some of the skills in this plugin`,
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
   add_project_failed: 'Could not add that folder: ',
@@ -2014,25 +2033,25 @@ const T = {
   forget_confirm: p => `Remove this folder from the list?\n\n${p}\n\nThe folder and its settings stay as they are. It comes back when you run an agent session there.`,
   install_app: 'Install app',
   install_manual: 'This browser can’t install it automatically.<br><b>Chrome, Edge:</b> the install icon in the address bar.<br><b>Safari (macOS Sonoma+):</b> File → Add to Dock.',
-  tok_head: (enc, total, n) => `Reference token count (${enc}, name + description only): ${total.toLocaleString()} across ${n} discovered skills`,
-  tok_head_part: (enc, total, m, n) => `Measured subtotal (${enc}, name + description only): ${total.toLocaleString()} in ${m} of ${n} discovered skills, not a full total`,
-  tok_head_none: n => `Not measured: none of the ${n} discovered skills could be counted`,
+  tok_head: (enc, total, n) => `About ${total.toLocaleString()} tokens of skill names and descriptions go into every session (${n} skills found, counted with ${enc})`,
+  tok_head_part: (enc, total, m, n) => `About ${total.toLocaleString()} tokens from ${m} of the ${n} skills found (counted with ${enc}); the rest could not be counted, so this is less than the real total`,
+  tok_head_none: n => `${n} skills found, but none of them could be counted`,
   tok_agent_full: (tokens, n) => `${tokens.toLocaleString()} tokens (${n} skill${n === 1 ? '' : 's'})`,
   tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()} tokens measured (${m} of ${n})`,
   tok_agent_none: n => `not measured (0 of ${n})`,
-  tok_unmeasured: n => `Not counted: ${n} (name or description missing or unreadable, or frontmatter not closed)`,
-  tok_agents: 'Skills each agent can read in the current configuration (not live session usage):',
-  tok_off: n => `${n} skills found · reference token count not measured`,
+  tok_unmeasured: n => `${n} not counted: the name or description is missing, or the file could not be read`,
+  tok_agents: 'What each agent would read with the current switches (not what a running session actually loaded):',
+  tok_off: n => `${n} skills found · token counting is not set up yet`,
   tok_hint: {
     setup: 'Token counting is not set up yet. Run this once in a terminal:',
     import: 'The token counter is incomplete. Run setup again:',
     cache: 'The tokenizer vocabulary is not downloaded yet. Run setup:',
     download: 'The tokenizer vocabulary could not be downloaded. Check your network and run setup again:',
     error: 'Counting did not finish this time and will retry shortly. To reinstall the counter, use this command:'},
-  tok_tip: 'Counts the text "name, a line break, description" of each discovered SKILL.md with the o200k_base tokenizer, run on this computer. The skill body is not counted. It is a reference count, not any provider’s own count or bill, and does not mean every session loads these skills.',
+  tok_tip: 'An estimate of how much of the AI\'s memory the skill list takes at the start of a session. Only each skill\'s name and description are counted, not its contents, using the o200k_base tokenizer on this computer. It is not a bill or a provider\'s own number.',
   tok_skill: n => `${n.toLocaleString()} tok`,
-  tok_skill_na: 'tok n/a', tok_skill_na_tip: 'The name or description is missing or unreadable, or the frontmatter is not closed with ---, so this skill is not counted.',
-  spec_issue: 'spec',
+  tok_skill_na: 'tok n/a', tok_skill_na_tip: 'This skill\'s name or description is missing or could not be read, so it is not counted.',
+  spec_issue: 'format',
   issue: {
     unreadable: () => 'SKILL.md could not be read',
     no_frontmatter: () => 'No YAML frontmatter',
@@ -2050,12 +2069,12 @@ const T = {
     no_subagents: 'No subagents',
     loading: 'loading…', error: 'error: ',
     toggle_failed: 'Could not switch that plugin: ', group_update_failed: 'Could not change the group: ',
-    plugin_on_tip: 'On in this project. Click to turn it off (next session)',
-    plugin_off_tip: 'Off in this project. Click to turn it on (next session)',
-    skill_on_tip: 'On for Claude Code in this project. Click to make it manual-only (next session)',
-    skill_off_tip: 'Off for Claude Code in this project. Click to turn it on (next session)',
-    manual: 'MANUAL', skill_manual_tip: 'Hidden from Claude Code in this project; only runs when you type /name. Click to turn it off (next session)',
-    skill_manual_md_tip: 'SKILL.md sets disable-model-invocation: true, so it is manual everywhere. Edit the file to change it',
+    plugin_on_tip: 'The AI reads every skill in this plugin at the start of each session in this project. Click to exclude the plugin (from the next session)',
+    plugin_off_tip: 'The AI cannot use this plugin in this project. Click to turn it back on (from the next session)',
+    skill_on_tip: 'The AI reads this skill\'s name and description at the start of every session in this project. Click so it loads only when you type /name (from the next session)',
+    skill_off_tip: 'The AI cannot use this skill in this project. Click to turn it back on (from the next session)',
+    skill_manual_tip: 'The AI does not know this skill exists until you type /name in the chat. Click to exclude it (from the next session)',
+    skill_manual_md_tip: 'This skill\'s own SKILL.md says disable-model-invocation: true, so it works this way in every project. Change that file to change it',
     skill_toggle_failed: 'Could not switch that skill: ',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g, group_tag_tip: 'Manage groups in the Groups tab',
@@ -2067,15 +2086,15 @@ const T = {
     period_tip: 'How often this page re-reads the files',
     switching: 'switching…',
     update_available: (v, latest, repo) => `↑ A new version is out: v${latest} (you're on v${v}) · <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">what's new</a>`,
-    update_now: 'Update now', update_running: 'Updating… this can take a minute or two. The page reloads when it is done.',
+    update_now: 'Update now', update_running: 'Updating… this can take a few minutes; token counting is set up at the same time if it is missing. The page reloads when it is done.',
     update_failed: e => `Could not update: ${e}. You can also ask your AI agent: copy the sentence below.`,
     update_copy: 'Copy a request for your AI agent', update_copied: 'Copied. Paste it into Claude Code or whichever agent you use.',
     update_prompt: (latest, repo) => `Update agent-hud to v${latest}. Follow the "Updating" steps in https://github.com/${repo}#updating`,
     feedback_open: 'send feedback ↗',
   },
   ko: {
-  wt_title: '같은 저장소의 worktree',
-  wt_intro: '선택한 스킬만 공유합니다. 기존 폴더·링크와 플러그인·훅·에이전트·설정은 유지됩니다.',
+  wt_title: '같은 저장소를 받아 둔 다른 폴더 (worktree)',
+  wt_intro: 'worktree는 같은 저장소를 다른 브랜치로 동시에 작업하려고 다른 폴더에 한 번 더 받아 둔 것입니다. 이 폴더에 넣은 스킬은 그쪽으로 저절로 따라가지 않습니다. 공유할 스킬만 고르면 되고, 플러그인·훅·에이전트·설정은 건드리지 않으며 기존 폴더와 링크는 그대로 둡니다.',
   wt_root_only: '스킬을 적용하려면 저장소의 worktree 루트를 선택하세요. 하위 폴더의 구성은 그 폴더에만 적용됩니다.',
   wt_query_failed: 'Git worktree 목록을 읽지 못했습니다.',
   wt_skills: '공유할 스킬', wt_targets: 'worktree 선택',
@@ -2103,12 +2122,19 @@ const T = {
     banner: '플러그인 변경은 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
     tagline: '로컬 대시보드',
     title_groups: '그룹', title_instructions: '에이전트 지침', title_skills: '플러그인 & 스킬',
-  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다.',
-  badge_on_tip: a => `${a}가 이 스킬을 씁니다`,
-  badge_off_tip: a => `${a}는 여기서 이 스킬을 못 봅니다`,
+  skills_note: '이 탭의 조작은 선택한 프로젝트에만 적용됩니다. 바뀐 것은 다음 세션부터 적용됩니다.',
+  guide_title: '스위치의 뜻',
+  guide_rows: [
+    ['항상', '세션을 시작할 때마다 AI가 이 스킬의 이름과 설명을 읽습니다. 그때마다 토큰이 듭니다. 설정에는 아무것도 쓰지 않습니다.'],
+    ['/이름 칠 때만 사용', '채팅에 /이름 을 치기 전까지 AI는 이 스킬이 있는 줄 모릅니다. 세션마다 들던 토큰이 그만큼 줄어듭니다. 이 프로젝트의 .claude/settings.local.json 안 skillOverrides에 "user-invocable-only"를 씁니다. 스킬 파일 안에 disable-model-invocation: true를 적은 것과 같은 효과이고 스킬 파일은 건드리지 않습니다.'],
+    ['제외', '이 프로젝트에서는 AI가 이 스킬을 못 씁니다. 같은 자리에 "off"를 씁니다.'],
+  ],
+  guide_plugin: '플러그인은 항상·제외 둘뿐이고, 안에 든 스킬이 한꺼번에 바뀝니다. 이 스위치는 Claude Code용이고, 다른 에이전트가 그 스킬을 볼 수 있는지는 뱃지가 보여줍니다.',
+  badge_on_tip: a => `${a}가 이 프로젝트에서 이 스킬을 쓸 수 있습니다`,
+  badge_off_tip: a => `${a}는 이 프로젝트에서 이 스킬을 못 찾습니다. "다른 에이전트도 쓰게"를 누르면 생깁니다`,
   no_skills: '어느 폴더에서도 스킬을 못 찾았습니다.',
   link_failed: '스킬을 넣지 못했습니다: ',
-  loose_skills: '플러그인 밖의 스킬',
+  loose_skills: '따로 설치한 스킬 (플러그인에 안 들어 있는 것)',
     set_count: (pl, sk) => `플러그인 ${pl} · 스킬 ${sk}`,
     set_apply: '이 프로젝트에 적용', set_applied: '이 프로젝트에 적용됨',
     set_apply_tip: '이 프로젝트에만 적용됩니다. 다른 프로젝트는 그대로입니다.',
@@ -2119,7 +2145,7 @@ const T = {
     member_plugin_tip: '이 프로젝트에서 켜짐',
     member_skill_tip: '이 프로젝트에 걸려 있음',
     assign_failed: '그룹을 적용하지 못했습니다: ',
-    on: '켜짐', off: '꺼짐',
+    on: '항상', off: '제외', manual: '/이름 칠 때만 사용',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
     new_group: '+ 새 그룹 만들기', new_group_tip: '함께 쓰는 플러그인과 스킬을 묶어둡니다. 예를 들어 개발용, 영상제작용',
@@ -2133,12 +2159,11 @@ const T = {
   comp_count: (label, n) => `${label} ${n}개`,
   comp_portable_tip: n => `이 플러그인에 들어 있는 것: ${n}. 체크박스는 스킬만 옮깁니다`,
   comp_stays_tip: n => `이 플러그인에 들어 있는 것: ${n}. 플러그인을 켠 에이전트에서만 동작하고, 체크박스는 스킬만 옮깁니다`,
-  share_to: names => names.join('·') + '에도 적용하기',
-  share_short: '다른 에이전트에도 적용',
-  share_done: '전부 적용됨',
-  share_all_tip: '이 프로젝트에서 그 에이전트들에도 이 스킬을 적용합니다. 빠져 있는 폴더에만 링크를 채우고, 원본은 움직이지 않습니다.',
-  partly: a => `${a}가 쓰는 것은 이 중 일부 스킬입니다`,
-  inherited_note: '아직 이 프로젝트에 정한 것이 없어 기본값을 씁니다',
+  share_to: names => names.join('·') + '도 쓰게 하기',
+  share_short: '다른 에이전트도 쓰게',
+  share_done: '모든 에이전트가 쓸 수 있음',
+  share_all_tip: '이 프로젝트 안에서 그 에이전트들이 찾아보는 폴더에 이 스킬의 링크를 넣습니다. 복사본은 생기지 않고 원본은 그 자리에 있습니다.',
+  partly: a => `${a}는 이 플러그인의 스킬 중 일부만 쓸 수 있습니다`,
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',
   add_project_failed: '폴더를 추가하지 못했습니다: ',
@@ -2151,25 +2176,25 @@ const T = {
   forget_confirm: p => `이 폴더를 목록에서 뺄까요?\n\n${p}\n\n폴더와 그 안의 설정은 그대로 둡니다. 그 폴더에서 에이전트 세션을 열면 다시 나타납니다.`,
   install_app: '앱으로 설치',
   install_manual: '이 브라우저는 자동 설치가 안 됩니다.<br><b>Chrome·Edge:</b> 주소창의 설치 아이콘.<br><b>Safari(macOS 소노마 이상):</b> 파일 → Dock에 추가.',
-  tok_head: (enc, total, n) => `참고용 토큰 수 (${enc}, 이름+설명만): 찾은 스킬 ${n}개 합계 ${total.toLocaleString()}`,
-  tok_head_part: (enc, total, m, n) => `센 스킬만의 토큰 수 (${enc}, 이름+설명만): 찾은 스킬 ${n}개 중 ${m}개에서 ${total.toLocaleString()} · 전체 합계가 아닙니다`,
-  tok_head_none: n => `찾은 스킬 ${n}개를 하나도 세지 못했습니다 (이름·설명이 없거나 읽지 못함)`,
+  tok_head: (enc, total, n) => `스킬 이름과 설명이 세션마다 약 ${total.toLocaleString()}토큰을 차지합니다 (찾은 스킬 ${n}개, ${enc}로 셈)`,
+  tok_head_part: (enc, total, m, n) => `찾은 스킬 ${n}개 중 ${m}개만 세어 약 ${total.toLocaleString()}토큰입니다 (${enc}로 셈). 나머지는 못 세서 실제 합계보다 적습니다`,
+  tok_head_none: n => `스킬 ${n}개를 찾았지만 하나도 세지 못했습니다`,
   tok_agent_full: (tokens, n) => `${tokens.toLocaleString()}토큰 (${n}개)`,
   tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()}토큰 · ${n}개 중 ${m}개만 측정`,
   tok_agent_none: n => `미측정 (${n}개 중 0개)`,
-  tok_unmeasured: n => `스킬 ${n}개는 이름·설명이 없거나 읽지 못해(또는 머리말이 닫히지 않아) 세지 않았습니다`,
-  tok_agents: '현재 설정에서 에이전트별로 읽을 수 있는 스킬:',
-  tok_off: n => `찾은 스킬 ${n}개 · 참고용 토큰 수는 아직 측정하지 않았습니다`,
+  tok_unmeasured: n => `${n}개는 이름이나 설명이 없거나 파일을 읽지 못해 세지 않았습니다`,
+  tok_agents: '지금 스위치대로라면 에이전트마다 읽게 되는 스킬 (실제 세션이 읽은 양은 아닙니다):',
+  tok_off: n => `찾은 스킬 ${n}개 · 토큰 세기는 아직 준비되지 않았습니다`,
   tok_hint: {
     setup: '토큰 수 세기가 아직 준비되지 않았습니다. 터미널에서 한 번 실행하세요:',
     import: '토큰 수 세기 도구가 덜 설치됐습니다. setup을 다시 실행하세요:',
     cache: '토크나이저 어휘 파일이 아직 없습니다. setup을 실행하세요:',
     download: '토크나이저 어휘 파일을 받지 못했습니다. 네트워크를 확인하고 setup을 다시 실행하세요:',
     error: '이번에는 세지 못했고 곧 다시 시도합니다. 도구를 다시 설치하려면:'},
-  tok_tip: '찾은 SKILL.md마다 "이름, 줄바꿈, 설명" 글자를 이 컴퓨터에서 o200k_base 토크나이저로 센 값입니다. 스킬 본문은 세지 않습니다. 참고용 숫자이고 어느 제공자의 실제 계산이나 청구액이 아니며, 세션마다 이 스킬이 전부 읽힌다는 뜻도 아닙니다.',
+  tok_tip: '세션을 시작할 때 스킬 목록이 AI의 기억 공간을 얼마나 차지하는지 어림한 값입니다. 스킬마다 이름과 설명만 세고 본문은 세지 않으며, 이 컴퓨터에서 o200k_base 토크나이저로 셉니다. 청구액이나 제공자가 센 숫자는 아닙니다.',
   tok_skill: n => `${n.toLocaleString()}토큰`,
-  tok_skill_na: '토큰 미측정', tok_skill_na_tip: '이름이나 설명이 없거나 읽지 못했거나 머리말이 ---로 닫히지 않아 이 스킬은 세지 않았습니다.',
-  spec_issue: '명세 위반',
+  tok_skill_na: '못 셈', tok_skill_na_tip: '이 스킬은 이름이나 설명이 없거나 파일을 읽지 못해 세지 않았습니다.',
+  spec_issue: '형식 문제',
   issue: {
     unreadable: () => 'SKILL.md를 읽지 못했습니다',
     no_frontmatter: () => 'YAML frontmatter가 없습니다',
@@ -2187,12 +2212,12 @@ const T = {
     no_subagents: '서브에이전트 없음',
     loading: '불러오는 중…', error: '오류: ',
     toggle_failed: '켜고 끄지 못했습니다: ', group_update_failed: '그룹을 바꾸지 못했습니다: ',
-    plugin_on_tip: '이 프로젝트에서 켜져 있습니다. 누르면 꺼집니다 (다음 세션부터)',
-    plugin_off_tip: '이 프로젝트에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
-    skill_on_tip: '이 프로젝트의 Claude Code에서 켜져 있습니다. 누르면 수동 전용이 됩니다 (다음 세션부터)',
-    skill_off_tip: '이 프로젝트의 Claude Code에서 꺼져 있습니다. 누르면 켜집니다 (다음 세션부터)',
-    manual: '수동', skill_manual_tip: '이 프로젝트의 Claude Code에게는 숨기고 /이름 으로 부를 때만 읽힙니다. 누르면 꺼집니다 (다음 세션부터)',
-    skill_manual_md_tip: 'SKILL.md에 disable-model-invocation: true가 있어 어디서나 수동입니다. 바꾸려면 그 파일을 고칩니다',
+    plugin_on_tip: '이 프로젝트에서는 세션을 시작할 때마다 AI가 이 플러그인의 스킬을 전부 읽습니다. 누르면 제외됩니다 (다음 세션부터)',
+    plugin_off_tip: '이 프로젝트에서는 AI가 이 플러그인을 못 씁니다. 누르면 다시 켜집니다 (다음 세션부터)',
+    skill_on_tip: '이 프로젝트에서는 세션을 시작할 때마다 AI가 이 스킬의 이름과 설명을 읽습니다. 누르면 /이름 칠 때만 읽게 됩니다 (다음 세션부터)',
+    skill_off_tip: '이 프로젝트에서는 AI가 이 스킬을 못 씁니다. 누르면 다시 켜집니다 (다음 세션부터)',
+    skill_manual_tip: '채팅에 /이름 을 치기 전까지 AI는 이 스킬이 있는 줄 모릅니다. 누르면 제외됩니다 (다음 세션부터)',
+    skill_manual_md_tip: '이 스킬의 SKILL.md에 disable-model-invocation: true가 적혀 있어 모든 프로젝트에서 이렇게 동작합니다. 바꾸려면 그 파일을 고칩니다',
     skill_toggle_failed: '스킬을 켜고 끄지 못했습니다: ',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g, group_tag_tip: '그룹 탭에서 관리합니다',
@@ -2204,7 +2229,7 @@ const T = {
     period_tip: '이 화면이 파일을 얼마나 자주 다시 읽을지',
     switching: '바꾸는 중…',
     update_available: (v, latest, repo) => `↑ 새 버전이 나왔습니다: v${latest} (지금은 v${v}) · <a href="https://github.com/${repo}/releases/latest" target="_blank" rel="noopener">바뀐 점</a>`,
-    update_now: '지금 업데이트', update_running: '업데이트하는 중입니다. 1~2분 걸릴 수 있고, 끝나면 화면이 새로고침됩니다.',
+    update_now: '지금 업데이트', update_running: '업데이트하는 중입니다. 토큰 세기가 아직 없으면 같이 준비하므로 몇 분 걸릴 수 있고, 끝나면 화면이 새로고침됩니다.',
     update_failed: e => `업데이트하지 못했습니다: ${e}. AI 에이전트에게 맡기려면 아래 문장을 복사해 붙여넣으세요.`,
     update_copy: 'AI에게 보낼 문장 복사', update_copied: '복사했습니다. Claude Code나 쓰는 AI 에이전트 창에 붙여넣으세요.',
     update_prompt: (latest, repo) => `agent-hud를 최신 버전(v${latest})으로 업데이트해줘. https://github.com/${repo}#updating 의 "Updating" 절차를 따라줘.`,
@@ -2316,9 +2341,9 @@ function renderTokens(c, tk, agents){
 }
 const fmtTime = ts => new Date(ts*1000).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}) + ' ' + new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 const TITLE_MAP = { Groups: 'title_groups', 'Instructions & agents (read-only)': 'title_instructions', 'Skills (who can see them)': 'title_skills' };
-const TABS = ['Groups', 'Skills (who can see them)', 'Instructions & agents (read-only)'];
+const TABS = ['Skills (who can see them)', 'Instructions & agents (read-only)', 'Groups'];
 // ?tab= 이 있으면 그걸 쓴다. 특정 탭을 링크로 걸거나 캡처할 때 필요하다.
-let activeTab = new URLSearchParams(location.search).get('tab') || localStorage.getItem('agent-hud-tab') || 'Groups';
+let activeTab = new URLSearchParams(location.search).get('tab') || localStorage.getItem('agent-hud-tab') || TABS[0];
 // 탭 이름이 바뀌면 저장된 값이 어느 패널과도 안 맞아 빈 화면이 된다.
 if(!TABS.includes(activeTab)) activeTab = TABS[0];
 function renderTabs(){
@@ -2977,12 +3002,12 @@ async function tick(){
         const n = document.createElement('div'); n.className = 'note'; n.style.marginBottom = '12px';
         n.textContent = t().skills_note;
         c.appendChild(n);
-      }
-      if(p.has_local === false){
-        const d = document.createElement('div'); d.className='note';
-        d.style.cssText = 'margin:-4px 0 10px;font-size:11px;opacity:.8';
-        d.textContent = t().inherited_note;
-        c.appendChild(d);
+        // 스위치 세 단계가 무엇을 하는지. 처음 보는 사람이 라벨만 보고는 알 수 없어서 목록 위에 둔다.
+        const g = document.createElement('div'); g.className = 'guide';
+        g.innerHTML = `<div class="guide-head">${t().guide_title}</div>` +
+          t().guide_rows.map(([k, v]) => `<div class="guide-row"><span class="switch sw-guide">${k}</span><span>${v}</span></div>`).join('') +
+          `<div class="note">${t().guide_plugin}</div>`;
+        c.appendChild(g);
       }
       if(!p.rows.length){
         const e = document.createElement('div'); e.className = 'empty';

@@ -127,30 +127,30 @@ const part = {...full, measured: 7, agents: {'Claude Code': {skills: 4, measured
 const draw = (tk, agents = AGENTS) => { const c = new El('div'); renderTokens(c, tk, agents); return c.children[0]; };
 // 1. 전부 센 경우: 이름+설명 기준임을 밝히고, 에이전트별 수를 보여준다. "부분 합계"라는 말은 없다
 let box = draw(full);
-assert(box.textContent.includes('o200k_base') && box.textContent.includes('name + description only'), box.textContent);
-assert(box.textContent.includes('1,234 across 8 discovered skills'), box.textContent);
+assert(box.textContent.includes('o200k_base') && box.textContent.includes('names and descriptions'), box.textContent);
+assert(box.textContent.includes('About 1,234 tokens of skill names') && box.textContent.includes('8 skills found'), box.textContent);
 assert(box.textContent.includes('Claude Code 17 tokens (4 skills)') && box.textContent.includes('Gemini 19 tokens (3 skills)') && box.textContent.includes('Codex 0 tokens (0 skills)'), box.textContent);
-assert(!box.textContent.includes('subtotal') && !box.textContent.includes('Not counted'), box.textContent);
-assert(box.textContent.includes('not live session usage'), box.textContent);
-assert(box.title.includes('reference count') && box.title.includes('not any provider'), box.title);
+assert(!box.textContent.includes('could not be counted') && !box.textContent.includes('not counted'), box.textContent);
+assert(box.textContent.includes('not what a running session'), box.textContent);
+assert(box.title.includes('estimate') && box.title.includes('not a bill'), box.title);
 // 1b. 일부만 센 경우: 전체 합계가 아니라 센 것의 합이라고 전체와 에이전트마다 밝힌다
 box = draw(part);
-assert(box.textContent.includes('Measured subtotal') && box.textContent.includes('1,234 in 7 of 8 discovered skills') && box.textContent.includes('not a full total'), box.textContent);
-assert(!box.textContent.includes('across 8'), box.textContent);
-assert(box.textContent.includes('Not counted: 1'), box.textContent);
+assert(box.textContent.includes('About 1,234 tokens from 7 of the 8 skills found') && box.textContent.includes('less than the real total'), box.textContent);
+assert(!box.textContent.includes('8 skills found, counted'), box.textContent);
+assert(box.textContent.includes('1 not counted'), box.textContent);
 assert(box.textContent.includes('Claude Code 17 tokens measured (3 of 4)'), box.textContent);
 assert(box.textContent.includes('Gemini not measured (0 of 3)') && !/Gemini 0/.test(box.textContent), box.textContent);
 assert(box.textContent.includes('Codex 5 tokens (1 skill)'), box.textContent);
 // 1c. 볼 수 있는 스킬이 있는데 하나도 못 셌으면 0이 아니라 "측정 안 함". 정말 0개일 때만 0
 box = draw({...full, skills: 1, measured: 0, total: 0, agents: {'Claude Code': {skills: 1, measured: 0, tokens: 0}, 'Gemini CLI': {skills: 0, measured: 0, tokens: 0}, 'Codex': {skills: 0, measured: 0, tokens: 0}}});
-assert(box.textContent.includes('none of the 1 discovered skills could be counted'), box.textContent);
-assert(!/across|subtotal|Claude Code 0 tokens/.test(box.textContent) && box.textContent.includes('Claude Code not measured (0 of 1)') && box.textContent.includes('Gemini 0 tokens (0 skills)'), box.textContent);
+assert(box.textContent.includes('1 skills found, but none of them could be counted'), box.textContent);
+assert(!/tokens of skill names|from \d+ of the|Claude Code 0 tokens/.test(box.textContent) && box.textContent.includes('Claude Code not measured (0 of 1)') && box.textContent.includes('Gemini 0 tokens (0 skills)'), box.textContent);
 box = draw({...full, skills: 0, measured: 0, total: 0, agents: {}});
-assert(box.textContent.includes('0 across 0 discovered skills'), box.textContent);
+assert(box.textContent.includes('About 0 tokens') && box.textContent.includes('0 skills found'), box.textContent);
 // 2. 측정 안 함: 숫자를 지어내지 않고 setup 명령을 그대로 보여준다
 for(const state of ['setup', 'import', 'cache', 'download', 'error', 'weird']){
   box = draw({...ok, state, total: null, setup: 'agent-hud tokens setup'});
-  assert(box.textContent.includes('not measured') && !/\b0 tokens|1,234|17/.test(box.textContent), box.textContent);
+  assert(box.textContent.includes('not set up yet') && !/\b0 tokens|1,234|17/.test(box.textContent), box.textContent);
   assert.strictEqual(box.find(e => e.tag === 'code')[0].textContent, 'agent-hud tokens setup');
 }
 assert.strictEqual(draw(null), undefined);
@@ -161,12 +161,12 @@ assert.strictEqual(tokTag({tokens: null}, {state: 'setup'}), null);
 assert.strictEqual(tokTag({tokens: 5}, null), null);
 // 4. ko에서도 키 누락 없이 그려진다
 lang = 'ko';
-assert(draw(ok).textContent.includes('이름+설명만'));
+assert(draw(ok).textContent.includes('토큰을 차지합니다'));
 box = draw(part);
-assert(box.textContent.includes('전체 합계가 아닙니다') && box.textContent.includes('8개 중 7개') && !box.textContent.includes('합계 1,234'), box.textContent);
+assert(box.textContent.includes('실제 합계보다 적습니다') && box.textContent.includes('8개 중 7개') && !box.textContent.includes('1,234토큰을 차지'), box.textContent);
 assert(box.textContent.includes('Claude Code 17토큰 · 4개 중 3개만 측정') && box.textContent.includes('Gemini 미측정 (3개 중 0개)'), box.textContent);
 box = draw({...full, skills: 1, measured: 0, total: 0, agents: {'Claude Code': {skills: 1, measured: 0, tokens: 0}}});
-assert(box.textContent.includes('찾은 스킬 1개를 하나도 세지 못했습니다') && !box.textContent.includes('합계'), box.textContent);
+assert(box.textContent.includes('스킬 1개를 찾았지만 하나도 세지 못했습니다') && !box.textContent.includes('차지합니다'), box.textContent);
 for(const state of ['setup', 'import', 'cache', 'download', 'error']) draw({...ok, state, total: null});
 assert(tokTag({tokens: 3}, ok).textContent.includes('3'));
 """

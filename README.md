@@ -159,7 +159,8 @@ that venv with the Python that runs the command, and downloads the public `o200k
 vocabulary file once. Nothing global is installed and no skill text leaves your computer.
 After that, counting runs offline. Until it is set up the tab says the count is not
 measured and shows this command; it never shows an estimate. `./install.sh` runs the
-setup too and carries on if it fails. If no `tiktoken` build exists for your newest Python,
+setup too and carries on if it fails, and so does the dashboard's Update now button on a
+Homebrew install when the counter is missing. If no `tiktoken` build exists for your newest Python,
 run the command with an older one, for example `python3.13 server.py tokens setup`: if
 `tokenizer-venv/` was made by another Python version, setup rebuilds it with the Python that
 runs the command (only a folder that is already a venv is replaced; any other content stops

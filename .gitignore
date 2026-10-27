@@ -3,6 +3,7 @@ modes.json
 project-sets.json
 worktree-skills.json
 worktree-skills.json.lock
+.update_check.json
 tokenizer-venv/
 tokenizer-cache/
 launchd.out.log

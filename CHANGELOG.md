@@ -15,6 +15,12 @@ which files it imports, and anything else is "managed separately". Imported and 
 even when they are not in the scan list, and the user-level `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`
 have rows now. Which file is the source of truth is not decided.
 
+**「지금 업데이트」를 누르면 토큰 세기 도구가 없을 때 같이 준비한다.** Homebrew 설치본에서 터미널 없이
+숫자를 볼 수 있다. 준비에 실패해도 업데이트는 그대로 끝난다.
+
+**Update now also sets up token counting when it is missing.** A Homebrew install can see the numbers
+without a terminal. If the setup fails the update still completes.
+
 **플러그인 밖 스킬을 프로젝트마다 수동 전용으로 둘 수 있다.** 스위치가 켜짐 · 수동 · 꺼짐 세 단계가
 됐다. 수동은 `skillOverrides`에 `user-invocable-only`를 써서 `/이름`으로 부를 때만 읽히게 한다.
 `SKILL.md`에 `disable-model-invocation: true`가 있는 스킬은 수동으로 표시만 한다.
