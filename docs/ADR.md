@@ -269,10 +269,23 @@ worktree에만 실행하고, 이미 있던 checkout과 대상에만 있는 스�
 그래서 두 폴더에 같은 스킬을 연결해 두면 여섯 도구가 모두 그 폴더를 본다. 링크를 따라 읽는지는
 아래에서 다섯 도구로 확인했고, Cursor는 확인하지 못했다.
 
-프로젝트별로 스킬을 켜고 끄는 설정은 도구마다 다르거나 아예 없다. Codex는 사용자 전역 설정만
-있고, Cursor와 Copilot은 없고, Gemini CLI는 슬래시 커맨드로 작업 폴더 단위로 켜고 끌 수 있다. 모든
-도구가 똑같이 하는 일은 스킬 폴더를 훑는 것 하나라서, **스킬을 프로젝트 스킬 폴더에 넣고 빼는
-방식만 모든 도구에서 통한다.**
+프로젝트별로 스킬 하나를 켜고 끄는 설정은 도구마다 다르거나 아예 없다(2026-10-27 각 도구 공식 문서로 다시 확인).
+
+| 도구 | 스킬 하나를 끄는 설정 | 범위 | "부를 때만" 설정 |
+|---|---|---|---|
+| Claude Code | `skillOverrides` (settings.json) | 프로젝트 가능 | `user-invocable-only` 값, 또는 머리말 `disable-model-invocation: true` |
+| Codex | `~/.codex/config.toml`의 `[[skills.config]] path=… enabled=false` | 사용자 전역만. 프로젝트 `.codex/config.toml`은 읽히지만(깨뜨리면 파싱 오류) 거기 둔 `skills.config`는 듣지 않았다(codex-cli 0.164.0, 신뢰한 프로젝트, `codex debug prompt-input`으로 2026-10-27 직접 확인) | 스킬 폴더 안 `agents/openai.yaml`의 `policy.allow_implicit_invocation: false` (파일을 고쳐야 함) |
+| Cursor | 없음 | – | 머리말 `disable-model-invocation: true` (파일을 고쳐야 함) |
+| Copilot (VS Code) | 없음. 머리말 `disable-model-invocation: true` + `user-invocable: false`를 같이 두면 "disabled" | 파일 단위 | 머리말 `disable-model-invocation: true` |
+| Gemini CLI | `/skills disable <이름> --scope workspace` | 작업 폴더 가능. 어느 파일의 어느 키에 쓰는지는 문서에 없음. 이 맥의 후속 CLI `agy`에서는 `/skills`가 목록만 보여 주고 끄는 하위 명령이 없다(2026-10-27 직접 확인) | 없음 |
+| Antigravity | 없음 | – | 없음 |
+
+출처: learn.chatgpt.com/docs/build-skills와 codex/config-file/config-reference, cursor.com/docs/context/skills,
+code.visualstudio.com/docs/agent-customization/agent-skills(2026-10-21판), geminicli.com/docs/cli/skills와
+reference/commands, antigravity.google/docs/skills. 그래서 Agent HUD의 스위치는 Claude Code에만 있고, 모든
+도구가 똑같이 하는 일은 스킬 폴더를 훑는 것 하나라서 **스킬을 프로젝트 스킬 폴더에 넣고 빼는 방식만 모든
+도구에서 통한다.** Gemini CLI의 작업 폴더 설정과 Codex의 프로젝트 `config.toml`은 실제로 어디에 무엇을 쓰는지
+직접 돌려 봤다. Codex는 프로젝트 설정에서 안 듣고, `agy`에는 끄는 명령이 없어 둘 다 지금은 스위치를 달 수 없다.
 
 **도구마다 따로 코드를 두지 않는다.** 도구별로 다른 것은 경로 문자열 하나뿐이므로 표 한 줄이면 된다
 (`SKILL_ROOTS_PROJECT`). 도구마다 코드를 따로 두면 그 사본들이 나중에 서로 달라진다.
