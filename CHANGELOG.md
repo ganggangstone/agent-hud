@@ -2,6 +2,16 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.1
+
+**설명 문구를 줄이고 풀어 썼다.** 스킬 탭에서 에이전트별 스킬 토큰 문장을 지웠다(머리글 표가 같은 내용을 보여준다).
+그룹 탭 맨 위에 그룹이 무엇인지 한 줄 캡션을 넣었다. 「스위치는 다음 세션부터, 나머지는 바로」 띠를
+어떤 조작이 언제 적용되는지 보이게 풀어 썼다.
+
+**Less text, plainer text.** The per-agent skill-token sentence in the Skills tab is gone (the header table
+already shows it). The Groups tab starts with a one-line caption saying what a group is. The "switches apply
+next session" banner now says which actions apply when.
+
 ## v0.6.0
 
 **지침 파일이 서로 어떻게 이어져 있는지 보여준다.** 에이전트 지침 탭이 「이 컴퓨터 전체」와 「이 프로젝트」로

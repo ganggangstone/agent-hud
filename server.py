@@ -21,7 +21,7 @@ PROJECTS_FILE = os.path.join(TOOL_DIR, "projects.json")
 MODES_FILE = os.path.join(TOOL_DIR, "modes.json")
 PROJECT_DIR = os.getcwd()  # fallback: cwd of whichever invocation started this process
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 # 주소는 늘 같아야 한다. "앱으로 설치"한 Dock 아이콘과 북마크가 이 주소에 묶이므로, 포트가 밀리면
 # 그것들이 다른 프로그램을 열게 된다. 개발 도구가 흔히 쓰는 번호(3000, 8000, 8080 등)와 겹치지 않고,
 # macOS가 임시로 나눠 주는 범위(49152~)보다 아래인 번호를 쓴다.
@@ -2058,7 +2058,7 @@ const T = {
   wt_applied_at: at => `Last automatic application: ${new Date(at*1000).toLocaleString()}`,
   wt_state_note: 'Worktree status below reflects the saved configuration. Changing checkboxes only affects the preview.',
   wt_detail: 'Details', wt_skill_col: 'Skill', wt_source_detail: 'Source path',
-    banner: 'Switches take effect <b>next session</b>. Everything else is immediate.',
+    banner: 'The Always / Only when you type /name / Excluded switches apply from the <b>next session</b> the agent starts. Groups and the project list change right away.',
     headline_title: 'Read at the start of every session in this folder, and sent again with every message:',
     headline_none: 'Nothing is read at session start in this folder.',
     hl_instr: n => `${n} instruction file${n === 1 ? '' : 's'}`, hl_skills: n => `${n} skill${n === 1 ? '' : 's'}`,
@@ -2085,6 +2085,7 @@ const T = {
     on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
+    groups_guide: 'A group is a set of plugins and skills you switch on together. Pick a group for a project and every switch in it flips at once instead of one by one.',
     new_group: '+ create a new group', new_group_tip: 'e.g. one for coding, one for video',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin should it start with?\n',
@@ -2115,11 +2116,7 @@ const T = {
   tok_head: (enc, total, n) => `About ${total.toLocaleString()} tokens of skill names and descriptions go into every session (${n} skills found, counted with ${enc})`,
   tok_head_part: (enc, total, m, n) => `About ${total.toLocaleString()} tokens from ${m} of the ${n} skills found (counted with ${enc}); the rest could not be counted, so this is less than the real total`,
   tok_head_none: n => `${n} skills found, but none of them could be counted`,
-  tok_agent_full: (tokens, n) => `${tokens.toLocaleString()} tokens (${n} skill${n === 1 ? '' : 's'})`,
-  tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()} tokens measured (${m} of ${n})`,
-  tok_agent_none: n => `not measured (0 of ${n})`,
   tok_unmeasured: n => `${n} not counted: the name or description is missing, or the file could not be read`,
-  tok_agents: 'What each agent would read with the current switches (not what a running session actually loaded):',
   tok_off: n => `${n} skills found · token counting is not set up yet`,
   tok_hint: {
     setup: 'Token counting is not set up yet. Run this once in a terminal:',
@@ -2197,7 +2194,7 @@ const T = {
   wt_applied_at: at => `마지막 자동 적용: ${new Date(at*1000).toLocaleString()}`,
   wt_state_note: '아래 worktree 상태는 저장된 구성 기준입니다. 체크를 바꾸면 미리보기에만 반영됩니다.',
   wt_detail: '상세', wt_skill_col: '스킬', wt_source_detail: '원본 경로',
-    banner: '스위치는 <b>다음 세션부터</b>, 나머지는 바로 반영됩니다.',
+    banner: '항상 / 이름 칠 때만 / 제외 스위치는 에이전트를 <b>다음에 새로 열 때부터</b> 적용됩니다. 그룹 만들기와 프로젝트 등록은 바로 반영됩니다.',
     headline_title: '이 폴더에서 세션마다 처음에 읽히고, 메시지를 보낼 때마다 다시 함께 가는 양:',
     headline_none: '이 폴더에서 세션 시작 때 읽히는 것이 없습니다.',
     hl_instr: n => `지침 ${n}개`, hl_skills: n => `스킬 ${n}개`,
@@ -2224,6 +2221,7 @@ const T = {
     on: '항상', off: '제외', manual: '/이름 칠 때만 사용',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
+    groups_guide: '그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 프로젝트에서 그룹 하나를 고르면 그 안의 스위치가 한꺼번에 바뀌어, 하나씩 누르지 않아도 됩니다.',
     new_group: '+ 새 그룹 만들기', new_group_tip: '예: 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
@@ -2254,11 +2252,7 @@ const T = {
   tok_head: (enc, total, n) => `스킬 이름과 설명이 세션마다 약 ${total.toLocaleString()}토큰을 차지합니다 (찾은 스킬 ${n}개, ${enc}로 셈)`,
   tok_head_part: (enc, total, m, n) => `찾은 스킬 ${n}개 중 ${m}개만 세어 약 ${total.toLocaleString()}토큰입니다 (${enc}로 셈). 나머지는 못 세서 실제 합계보다 적습니다`,
   tok_head_none: n => `스킬 ${n}개를 찾았지만 하나도 세지 못했습니다`,
-  tok_agent_full: (tokens, n) => `${tokens.toLocaleString()}토큰 (${n}개)`,
-  tok_agent_part: (tokens, m, n) => `${tokens.toLocaleString()}토큰 · ${n}개 중 ${m}개만 측정`,
-  tok_agent_none: n => `미측정 (${n}개 중 0개)`,
   tok_unmeasured: n => `${n}개는 이름이나 설명이 없거나 파일을 읽지 못해 세지 않았습니다`,
-  tok_agents: '지금 스위치대로라면 에이전트마다 읽게 되는 스킬 (실제 세션이 읽은 양은 아닙니다):',
   tok_off: n => `찾은 스킬 ${n}개 · 토큰 세기는 아직 준비되지 않았습니다`,
   tok_hint: {
     setup: '토큰 수 세기가 아직 준비되지 않았습니다. 터미널에서 한 번 실행하세요:',
@@ -2400,11 +2394,6 @@ function renderTokens(c, tk, agents){
       : tk.measured === 0 ? t().tok_head_none(tk.skills)
       : t().tok_head_part(tk.encoding, tk.total, tk.measured, tk.skills);
     if(tk.measured > 0 && tk.measured < tk.skills) note(t().tok_unmeasured(tk.skills - tk.measured));
-    note(t().tok_agents + ' ' + (agents||[]).map(a => {
-      const v = (tk.agents||{})[a] || {skills: 0, measured: 0, tokens: 0};
-      return shortAgent(a) + ' ' + (v.measured === v.skills ? t().tok_agent_full(v.tokens, v.skills)
-        : v.measured === 0 ? t().tok_agent_none(v.skills) : t().tok_agent_part(v.tokens, v.measured, v.skills));
-    }).join(' · '));
   } else {
     box.className += ' loadline-off';
     line.textContent = t().tok_off(tk.skills);
@@ -2929,6 +2918,7 @@ async function tick(){
     const c = document.createElement('div'); c.className='card wide';
     // 패널 제목은 탭이 이미 보여 주므로 본문에는 다시 쓰지 않는다.
     if(p.title === 'Groups'){
+      const gd = document.createElement('div'); gd.className = 'guide'; gd.textContent = t().groups_guide; c.appendChild(gd);
       const headerRow = document.createElement('div'); headerRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px';
       const newBtn = document.createElement('span'); newBtn.className='card-action';
       newBtn.textContent = t().new_group;
