@@ -476,13 +476,33 @@ _CODE_SPAN_RE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)")  # 짝이 맞는 
 MAX_IMPORT_HOPS = 4
 
 
+def _strip_block_html_comments(text):
+    """줄 맨 앞에서 시작하는 HTML 주석을 뺀다. 코드 블록 안은 그대로 둔다(공식 문서, 측정)."""
+    out, fence, comment = [], None, False
+    for line in text.splitlines(keepends=True):
+        if comment:
+            comment = "-->" not in line
+            continue
+        m = _FENCE_RE.match(line)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+                fence = None
+        elif m:
+            fence = m.group(1)
+        elif line.lstrip().startswith("<!--"):
+            comment = "-->" not in line
+            continue
+        out.append(line)
+    return "".join(out)
+
+
 def _import_targets(path):
     """path 에 적힌 @가져오기 -> [{path, ok}]. 줄 맨 앞인데 없는 파일은 깨진 연결로 남기고,
     문장 속인데 없는 파일은 그냥 글자로 본다(\"ask @someone\")."""
     targets, fence = [], None
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
-            for line in f:
+            for line in _strip_block_html_comments(f.read()).splitlines(keepends=True):
                 m = _FENCE_RE.match(line)
                 if fence:
                     if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
@@ -814,12 +834,13 @@ def session_load(project_dir, tk):
                 except OSError:
                     texts[f] = None
     codex_texts, codex_truncated = _codex_cut_texts(files["Codex"], texts)
-    wanted = [t for t in list(texts.values()) + codex_texts if t is not None]
+    claude_texts = [_strip_block_html_comments(texts[f]) if texts[f] is not None else None for f in files["Claude Code"]]
+    wanted = [t for t in list(texts.values()) + codex_texts + claude_texts if t is not None]
     state, counts = count_tokens(wanted) if wanted else ("ok", {})
     out = {}
     for agent in SKILL_AGENTS:
         sk = (tk.get("agents") or {}).get(agent) or {"skills": 0, "measured": 0, "tokens": 0}
-        instr = codex_texts if agent == "Codex" else [texts[f] for f in files[agent]]
+        instr = {"Codex": codex_texts, "Claude Code": claude_texts}.get(agent) or [texts[f] for f in files[agent]]
         ok = tk.get("state") == "ok" and state == "ok" and sk["measured"] == sk["skills"] and all(t is not None and t in counts for t in instr)
         out[agent] = {"instructions": len(instr), "skills": sk["skills"],
                       "tokens": (sk["tokens"] or 0) + sum(counts[t] for t in instr) if ok else None}
