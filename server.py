@@ -613,9 +613,18 @@ def _claude_excluded(path, patterns):
     return any(p.fullmatch(q) for p in patterns for q in (path, os.path.realpath(path)))
 
 
-def _imports_of(path, depth=0, excludes=(), seen=None):
+def _external_imports_approved(project_dir):
+    """프로젝트 밖 @가져오기를 사용자가 승인했는지. 문서화되지 않은 ~/.claude.json 키라 없으면 미승인으로 본다."""
+    state = read_json(os.path.join(HOME, ".claude.json"), {})
+    projects = state.get("projects") if isinstance(state, dict) else None
+    entry = projects.get(os.path.abspath(project_dir)) if isinstance(projects, dict) else None
+    return isinstance(entry, dict) and entry.get("hasClaudeMdExternalIncludesApproved") is True
+
+
+def _imports_of(path, depth=0, excludes=(), seen=None, inside=None):
     """path 와 그 @가져오기 대상(있는 것만, 네 단계까지). 링크는 대상 파일로 풀고 상대 경로도
-    대상 파일 기준이다(측정). 제외된 파일은 그 @대상까지 읽히지 않는다."""
+    대상 파일 기준이다(측정). 제외된 파일은 그 @대상까지 읽히지 않는다.
+    inside: 프로젝트 밖 가져오기가 승인되지 않았으면 그 폴더 경로. 밖을 가리키는 대상은 안 읽힌다."""
     real = os.path.realpath(path)
     seen = set() if seen is None else seen
     if real in seen or not os.path.isfile(real) or _claude_excluded(path, excludes):
@@ -624,8 +633,8 @@ def _imports_of(path, depth=0, excludes=(), seen=None):
     out = [real]
     if depth < MAX_IMPORT_HOPS:
         for t in _import_targets(real):
-            if t["ok"]:
-                out += _imports_of(t["path"], depth + 1, excludes, seen)
+            if t["ok"] and (inside is None or os.path.realpath(t["path"]).startswith(inside)):
+                out += _imports_of(t["path"], depth + 1, excludes, seen, inside)
     return out
 
 
@@ -676,6 +685,12 @@ def _claude_instructions(project_dir):
         if not has_claude:
             out += [os.path.join(d, "AGENTS.md"), os.path.join(d, ".claude", "AGENTS.md")]
         out += _claude_rules(os.path.join(d, ".claude", "rules")) + [os.path.join(d, "CLAUDE.local.md")]
+    if not _external_imports_approved(project_dir):     # 밖을 가리키는 규칙 링크도 승인이 있어야 읽힌다(공식 문서)
+        root = os.path.realpath(project_dir) + os.sep
+        rules = os.sep + os.path.join(".claude", "rules") + os.sep
+        user = os.path.realpath(CLAUDE_DIR) + os.sep
+        out = [f for f in out if not (rules in f and os.path.islink(f) and not os.path.realpath(f).startswith(root)
+                                      and not os.path.realpath(f).startswith(user))]
     return out
 
 
@@ -806,11 +821,14 @@ def session_instructions(project_dir):
         "Antigravity": _antigravity_instructions(project_dir),
     }
     excludes = claude_md_excludes(project_dir)
+    user_scope = os.path.realpath(CLAUDE_DIR) + os.sep       # 사용자 지침의 가져오기는 승인이 필요 없다(공식 문서)
+    inside = None if _external_imports_approved(project_dir) else os.path.realpath(project_dir) + os.sep
     out = {}
     for agent, paths in plan.items():
         seen = []
         for p in paths:
-            for f in (_imports_of(p, excludes=excludes) if agent == "Claude Code" else ([os.path.realpath(p)] if os.path.isfile(p) else [])):
+            for f in (_imports_of(p, excludes=excludes, inside=None if os.path.realpath(p).startswith(user_scope) else inside)
+                      if agent == "Claude Code" else ([os.path.realpath(p)] if os.path.isfile(p) else [])):
                 if f not in seen:
                     seen.append(f)
         out[agent] = seen
@@ -1902,6 +1920,7 @@ def collect_instructions(ctx):
     # 위 목록이 안 훑는 곳: 상위 폴더, .claude/ 안, 규칙 폴더
     rows += [_file_row(f, f) for f in claude_reads if f not in seen_real]
     row_real = {os.path.realpath(r["path"]) for r in rows}
+    by_name = {r["name"]: r for r in rows}
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
         r["related"] = [d for d in _related_docs(r["path"], project_dir) if os.path.realpath(d) not in row_real] if r["exists"] else []
         READABLE_PATHS.update(r["related"])
@@ -1910,7 +1929,10 @@ def collect_instructions(ctx):
         # 다른 도구의 파일은 그 경로를 직접 제외했을 때만이다. 링크 대상이 제외돼도 Claude Code와는 무관하다.
         direct = (_claude_excluded(r["path"], excludes) if r["tool"] in ("Claude Code", "")
                   else any(p.fullmatch(r["path"]) for p in excludes))
-        r["claude_excluded"] = direct or (bool(r.get("via")) and os.path.realpath(r["path"]) not in claude_reads)
+        r["claude_excluded"] = direct or (bool(r.get("via")) and os.path.realpath(r["path"]) not in claude_reads
+                                          and all(by_name.get(n, {}).get("claude_excluded") for n in r["via"]))
+        r["import_unconfirmed"] = (bool(r.get("via")) and not r["claude_excluded"]
+                                   and os.path.realpath(r["path"]) not in claude_reads)
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -2539,6 +2561,8 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  import_unconfirmed: 'not confirmed',
+  import_unconfirmed_tip: 'This import points outside the project. Claude Code reads it only after you approve external imports, so it is not in the totals.',
   skill_name_only_tip: 'The AI sees only the name, not the description (skillOverrides: name-only). Click to change.',
   hl_truncated: '(cut at the size limit)',
   related_doc: 'related document',
@@ -2682,6 +2706,8 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  import_unconfirmed: '적용 미확인',
+  import_unconfirmed_tip: '프로젝트 밖을 가리키는 가져오기입니다. 외부 가져오기를 승인해야 Claude Code가 읽으므로 합계에 넣지 않았습니다.',
   skill_name_only_tip: 'AI에게 이름만 보이고 설명은 안 보입니다 (skillOverrides: name-only). 누르면 바뀝니다.',
   hl_truncated: '(크기 한도에서 잘림)',
   related_doc: '관련 문서',
@@ -3504,7 +3530,7 @@ async function tick(){
         const caret = document.createElement('span');
         caret.textContent = f.exists ? '▸ ' : '';
         left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `${depth ? '<span class="dim">↳ </span>' : ''}<span class="dot ${f.exists && !(f.claude_excluded && (!f.tool || f.tool === 'Claude Code'))?'on':'off'}" style="cursor:default"></span>${home(f.name)}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}${f.claude_excluded ? `<span class="tooltag" title="${t().claude_excluded_tip}">${t().claude_excluded}</span>` : ''}`);
+        left.insertAdjacentHTML('beforeend', `${depth ? '<span class="dim">↳ </span>' : ''}<span class="dot ${f.exists && !f.import_unconfirmed && !(f.claude_excluded && (!f.tool || f.tool === 'Claude Code'))?'on':'off'}" style="cursor:default"></span>${home(f.name)}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}${f.claude_excluded ? `<span class="tooltag" title="${t().claude_excluded_tip}">${t().claude_excluded}</span>` : ''}${f.import_unconfirmed ? `<span class="tooltag" title="${t().import_unconfirmed_tip}">${t().import_unconfirmed}</span>` : ''}`);
         // 파일에 적힌 연결을 글자 그대로: 링크는 → 대상, 가져오기는 @대상. 대상이 없으면 흐리게 지운다.
         if(f.link){
           const refs = f.link.kind === 'symlink' ? [{text: '→ ' + base(f.link.target), ok: f.link.ok, path: f.link.target}]
