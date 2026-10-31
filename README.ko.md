@@ -70,8 +70,7 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 ./install.sh
 ```
 
-설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, `modes.json.example`을
-본떠 `modes.json`을 만들고, `launchd` 서비스로 등록한다. 터미널을 닫아도 대시보드는
+설치 스크립트는 `server.py`를 `~/.claude/tools/agent-hud/`에 복사하고, `launchd` 서비스로 등록한다. 터미널을 닫아도 대시보드는
 계속 실행되며, 프로세스가 종료되면 다시 시작된다. Homebrew로 설치하면 `agent-hud` 명령이 생기고,
 같은 서버를 `brew services`가 띄운다.
 

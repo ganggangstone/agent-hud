@@ -74,7 +74,7 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 ```
 
 The install script copies `server.py` to `~/.claude/tools/agent-hud/`, creates
-`modes.json` from the example file, and registers a `launchd` service, so the dashboard
+and registers a `launchd` service, so the dashboard
 keeps running after you close terminals and restarts if the process exits. Homebrew
 installs an `agent-hud` command and runs the same server with `brew services`.
 

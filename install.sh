@@ -10,11 +10,6 @@ PLIST="$HOME/Library/LaunchAgents/com.agent-hud.plist"
 mkdir -p "$TOOL_DIR"
 cp "$SRC_DIR/server.py" "$TOOL_DIR/server.py"
 
-if [ ! -f "$TOOL_DIR/modes.json" ]; then
-  cp "$SRC_DIR/modes.json.example" "$TOOL_DIR/modes.json"
-  echo "Created $TOOL_DIR/modes.json from the example — edit it to match your own plugins."
-fi
-
 # Token counting is optional: if this fails, the dashboard still works and shows "not measured".
 # It installs tiktoken into a private venv inside $TOOL_DIR (nothing global) and downloads the public
 # o200k_base vocabulary once. Skill text never leaves this computer.
