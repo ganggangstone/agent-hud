@@ -772,6 +772,49 @@ def session_load(project_dir, tk):
     return out
 
 
+_RELATED_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)|`([^`\s]+\.(?:md|mdc|txt))`")
+RELATED_EXTS = (".md", ".mdc", ".txt")
+RELATED_MAX = 50
+_related_cache = {}     # path -> (잰 시각, mtime, 결과). 이 패널은 3초마다 다시 그려진다.
+
+
+def _related_docs(path):
+    """본문에 경로나 링크로만 적힌 문서. 필요할 때 읽히는 것이라 시작 합계에는 넣지 않는다.
+    글자에서 찾은 추정이므로 실제로 있는 문서 파일만 남긴다. 코드 블록과 URL은 건너뛴다."""
+    try:
+        mtime = os.stat(path).st_mtime
+    except OSError:
+        return []
+    hit = _related_cache.get(path)
+    if hit and hit[1] == mtime and time.time() - hit[0] < SCAN_TTL:
+        return hit[2]
+    real = os.path.realpath(path)
+    found, fence = [], None
+    try:
+        with open(real, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = _FENCE_RE.match(line)
+                if fence or m:
+                    if not fence:
+                        fence = m.group(1)
+                    elif m and m.group(1)[0] == fence[0] and not line[m.end():].strip():
+                        fence = None
+                    continue
+                for link, code in _RELATED_RE.findall(line):
+                    raw = (link or code).split("#")[0]
+                    if not raw or "://" in raw or raw.startswith("mailto:"):
+                        continue
+                    t = os.path.expanduser(raw)
+                    t = t if os.path.isabs(t) else os.path.normpath(os.path.join(os.path.dirname(real), t))
+                    if (t.endswith(RELATED_EXTS) and os.path.isfile(t) and os.path.realpath(t) != real
+                            and t not in found and len(found) < RELATED_MAX):
+                        found.append(t)
+    except OSError:
+        return []
+    _related_cache[path] = (time.time(), mtime, found)
+    return found
+
+
 def _file_row(label, path, tool="Claude Code"):
     exists = os.path.isfile(path)
     st = os.stat(path) if exists else None
@@ -1776,7 +1819,10 @@ def collect_instructions(ctx):
     seen_real = {os.path.realpath(r["path"]) for r in rows}
     # 위 목록이 안 훑는 곳: 상위 폴더, .claude/ 안, 규칙 폴더
     rows += [_file_row(f, f) for f in claude_reads if f not in seen_real]
+    row_real = {os.path.realpath(r["path"]) for r in rows}
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
+        r["related"] = [d for d in _related_docs(r["path"]) if os.path.realpath(d) not in row_real] if r["exists"] else []
+        READABLE_PATHS.update(r["related"])
         r["scope"] = "project" if r["path"].startswith(project_dir.rstrip(os.sep) + os.sep) else "global"
         # 직접 제외했거나, 제외된 파일의 @대상으로만 닿는 파일. 다른 에이전트가 읽는 것과는 별개다.
         # 다른 도구의 파일은 그 경로를 직접 제외했을 때만이다. 링크 대상이 제외돼도 Claude Code와는 무관하다.
@@ -2411,6 +2457,8 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  related_doc: 'related document',
+  related_doc_tip: 'Mentioned by path in this file. Read only when needed, so it is not in the startup totals. Found automatically from the text, so it may be wrong.',
   old_service_warning: 'An older install.sh service (com.agent-hud) is running alongside this Homebrew install and shares its data folder. This command stops and removes it.',
   claude_excluded: 'excluded from Claude Code',
   claude_excluded_tip: 'Claude Code does not read this file in this project (claudeMdExcludes). Other agents are not affected.',
@@ -2550,6 +2598,8 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  related_doc: '관련 문서',
+  related_doc_tip: '이 파일 본문에 경로로 적힌 문서입니다. 필요할 때만 읽히므로 시작 합계에는 없습니다. 글자에서 자동으로 찾은 것이라 틀릴 수 있습니다.',
   old_service_warning: '예전 install.sh 서비스(com.agent-hud)가 이 Homebrew 설치본과 함께 돌며 같은 데이터 폴더를 씁니다. 이 명령으로 끄고 지울 수 있습니다.',
   claude_excluded: 'Claude Code에서 제외',
   claude_excluded_tip: '이 프로젝트에서 Claude Code는 이 파일을 읽지 않습니다 (claudeMdExcludes). 다른 에이전트와는 상관없습니다.',
@@ -3382,6 +3432,20 @@ async function tick(){
         const box = document.createElement('div'); box.className = 'content';
         if(f.exists){ el.onclick = () => showContent(f.path, box, caret); }
         c.appendChild(box);
+        for(const doc of f.related || []){
+          const rel = document.createElement('div'); rel.className = 'row clickable';
+          rel.style.paddingLeft = ((depth + 1) * 22) + 'px';
+          const relLeft = document.createElement('span');
+          const relCaret = document.createElement('span'); relCaret.textContent = '▸ ';
+          const relName = document.createElement('span'); relName.textContent = home(doc); relName.title = t().related_doc_tip;
+          const relTag = document.createElement('span'); relTag.className = 'tooltag'; relTag.textContent = t().related_doc; relTag.title = t().related_doc_tip;
+          relLeft.append(relCaret, relName, relTag);
+          rel.appendChild(relLeft);
+          c.appendChild(rel);
+          const relBox = document.createElement('div'); relBox.className = 'content';
+          rel.onclick = () => showContent(doc, relBox, relCaret);
+          c.appendChild(relBox);
+        }
         if(depth < 4) for(const ch of children.get(f.path) || []) drawFile(ch, depth + 1);
       };
       for(const [scope, label] of [['global', t().scope_global], ['project', t().scope_project]]){
