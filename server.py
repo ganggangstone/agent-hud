@@ -464,51 +464,90 @@ RULE_EXTS = (".md", ".mdc", ".txt", ".yaml", ".yml")
 _IMPORT_FILES = {"CLAUDE.md", "CLAUDE.local.md"}
 
 
-def _link_info(path):
+# Claude Code v2.1.314에서 센티널 파일로 측정한 규칙: 문장 속 @도 읽고, 코드 블록·코드 스팬·따옴표는
+# 건너뛰고, 공백은 역슬래시로 적고, 앞 글자가 붙은 me@x 는 아니고, 네 단계까지 따라간다.
+_IMPORT_RE = re.compile(r"(?:^|(?<=\s))@((?:\\ |[^\s\\])+)")
+_FENCE_RE = re.compile(r"\s{0,3}(`{3,}|~{3,})")
+_CODE_SPAN_RE = re.compile(r"(`+).*?\1")
+MAX_IMPORT_HOPS = 4
+
+
+def _import_targets(path):
+    """path 에 적힌 @가져오기 -> [{path, ok}]. 줄 맨 앞인데 없는 파일은 깨진 연결로 남기고,
+    문장 속인데 없는 파일은 그냥 글자로 본다(\"ask @someone\")."""
+    targets, fence = [], None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = _FENCE_RE.match(line)
+                if fence:
+                    if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+                        fence = None
+                    continue
+                if m:
+                    fence = m.group(1)
+                    continue
+                for im in _IMPORT_RE.finditer(_CODE_SPAN_RE.sub(" ", line)):
+                    raw = im.group(1)
+                    if raw[0] in "\"'":
+                        continue
+                    t = os.path.expanduser(raw.replace("\\ ", " "))
+                    if not os.path.isabs(t):
+                        t = os.path.normpath(os.path.join(os.path.dirname(path), t))
+                    ok = os.path.isfile(t)
+                    if ok or im.start() == 0:
+                        targets.append({"path": t, "ok": ok})
+    except OSError:
+        return []
+    return targets
+
+
+def _link_info(path, imported=False):
     """파일이 다른 파일과 어떻게 이어져 있는지. 심볼릭 링크 → 대상, @가져오기 → 대상 목록,
-    둘 다 아니면 None(독립 파일). 어느 쪽이 원본인지는 판단하지 않는다."""
+    둘 다 아니면 None(독립 파일). 어느 쪽이 원본인지는 판단하지 않는다.
+    imported: Claude Code가 이미 가져온 파일이라 이름과 상관없이 @를 해석한다."""
     if os.path.islink(path):
         target = os.readlink(path)
         if not os.path.isabs(target):
             target = os.path.normpath(os.path.join(os.path.dirname(path), target))
         return {"kind": "symlink", "target": target, "ok": os.path.isfile(target)}
-    if os.path.basename(path) not in _IMPORT_FILES or not os.path.isfile(path):
+    if not os.path.isfile(path) or not (imported or os.path.basename(path) in _IMPORT_FILES):
         return None
-    targets = []
-    try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                m = re.match(r"@(\S+)", line)
-                if not m:
-                    continue
-                t = os.path.expanduser(m.group(1))
-                if not os.path.isabs(t):
-                    t = os.path.normpath(os.path.join(os.path.dirname(path), t))
-                targets.append({"path": t, "ok": os.path.isfile(t)})
-    except OSError:
-        return None
+    targets = _import_targets(path)
     return {"kind": "import", "targets": targets} if targets else None
 
 
 def _with_link_targets(rows):
-    """링크·@가 가리키는 파일 중 아직 행이 없는 것을 뒤에 행으로 더한다. 어느 행을 거쳐
-    닿았는지는 via에 적는다. 없는 대상은 행으로 만들지 않는다(가리키는 쪽 뱃지가 이미 말한다)."""
-    seen = {r["path"] for r in rows}
-    extra = {}
-    for r in rows:
+    """링크·@가 가리키는 파일 중 아직 행이 없는 것을 뒤에 행으로 더한다. 가져온 파일 안의 @도
+    네 단계까지 따라간다. 어느 행을 거쳐 닿았는지는 via에 적는다. 없는 대상은 행으로 만들지 않는다
+    (가리키는 쪽 뱃지가 이미 말한다)."""
+    rows = list(rows)
+    by_path = {r["path"]: r for r in rows}
+    hops = {}
+    for r in rows:      # 도는 동안 뒤에 붙는다
         link = r.get("link")
         if not link:
             continue
-        targets = [link["target"]] if link["kind"] == "symlink" else [t["path"] for t in link["targets"]]
-        for t in targets:
-            if t in seen or not os.path.isfile(t):
+        is_import = link["kind"] == "import"
+        hop = hops.get(r["path"], 0)
+        if is_import and hop >= MAX_IMPORT_HOPS:
+            continue
+        read_by_claude = is_import or r["path"] in hops or os.path.basename(r["path"]) in _IMPORT_FILES
+        for t in ([link["target"]] if not is_import else [x["path"] for x in link["targets"]]):
+            if not os.path.isfile(t):
                 continue
-            row = extra.get(t)
+            row = by_path.get(t)
             if row is None:
-                row = extra[t] = _file_row(t, t, "")
+                row = by_path[t] = _file_row(t, t, "")
                 row["via"] = []
-            row["via"].append(r["name"])
-    return rows + list(extra.values())
+                rows.append(row)
+            if "via" in row:
+                row["via"].append(r["name"])
+            if read_by_claude:
+                hops.setdefault(t, hop + 1 if is_import else hop)
+                if not row.get("link"):
+                    row["link"] = _link_info(t, imported=True)
+    return rows
 
 
 MANAGED_SETTINGS = ("/Library/Application Support/ClaudeCode/managed-settings.json" if sys.platform == "darwin"
@@ -545,18 +584,19 @@ def _claude_excluded(path, patterns):
     return any(p.fullmatch(q) for p in patterns for q in (path, os.path.realpath(path)))
 
 
-def _imports_of(path, depth=0, excludes=()):
-    """path 와 그 @가져오기 대상(있는 것만, 두 단계까지). 링크는 대상 파일로 푼다.
-    제외된 파일은 그 @대상까지 읽히지 않는다."""
+def _imports_of(path, depth=0, excludes=(), seen=None):
+    """path 와 그 @가져오기 대상(있는 것만, 네 단계까지). 링크는 대상 파일로 풀고 상대 경로도
+    대상 파일 기준이다(측정). 제외된 파일은 그 @대상까지 읽히지 않는다."""
     real = os.path.realpath(path)
-    if not os.path.isfile(real) or _claude_excluded(path, excludes):
+    seen = set() if seen is None else seen
+    if real in seen or not os.path.isfile(real) or _claude_excluded(path, excludes):
         return []
+    seen.add(real)
     out = [real]
-    link = _link_info(path)
-    if link and link["kind"] == "import" and depth < 2:
-        for t in link["targets"]:
+    if depth < MAX_IMPORT_HOPS:
+        for t in _import_targets(real):
             if t["ok"]:
-                out += _imports_of(t["path"], depth + 1, excludes)
+                out += _imports_of(t["path"], depth + 1, excludes, seen)
     return out
 
 
@@ -1413,8 +1453,9 @@ def _loaded_count(rows):
 
 
 def _claude_off(row, sk):
-    """Claude Code만 거는 스위치: 꺼진 플러그인, skillOverrides로 끈 스킬. 다른 에이전트는 상관없다."""
-    return row["enabled"] is False or sk.get("enabled") is False
+    """Claude Code가 시작할 때 설명을 읽지 않는 스킬: 꺼진 플러그인, skillOverrides로 끈 스킬,
+    머리말의 disable-model-invocation. 다른 에이전트는 상관없다."""
+    return row["enabled"] is False or sk.get("enabled") is False or bool(sk.get("manual_only"))
 
 
 def _attach_tokens(rows):
@@ -1497,6 +1538,7 @@ def collect_skills(ctx):
             # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
             # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
             decorate(sk, ["Claude Code"])
+            sk["manual_only"] = _manual_only(os.path.join(sk["path"], "SKILL.md"))
         rows.append({
             "name": name,
             "section_state": _section_state(skills),
