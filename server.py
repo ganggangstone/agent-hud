@@ -511,10 +511,14 @@ def _with_link_targets(rows):
     return rows + list(extra.values())
 
 
+MANAGED_SETTINGS = ("/Library/Application Support/ClaudeCode/managed-settings.json" if sys.platform == "darwin"
+                    else "/etc/claude-code/managed-settings.json")
+
+
 def claude_md_excludes(project_dir):
     """이 프로젝트에 적용되는 claudeMdExcludes -> 정규식 목록. 설정 계층의 배열은 합쳐진다(공식 문서)."""
     patterns = []
-    for f in (os.path.join(CLAUDE_DIR, "settings.json"),
+    for f in (MANAGED_SETTINGS, os.path.join(CLAUDE_DIR, "settings.json"),
               os.path.join(project_dir, ".claude", "settings.json"),
               os.path.join(project_dir, LOCAL_SETTINGS)):
         v = read_json(f).get("claudeMdExcludes")
@@ -524,9 +528,16 @@ def claude_md_excludes(project_dir):
 
 
 def _glob_regex(pattern):
-    """절대 경로에 맞추는 glob. ** 는 폴더 경계를 넘고 * 와 ? 는 넘지 않는다."""
+    """절대 경로에 맞추는 glob. ** 는 폴더 경계를 넘고 * 와 ? 와 [abc] 는 넘지 않는다."""
     rx = {"**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}
-    return re.compile("".join(rx.get(part) or re.escape(part) for part in re.split(r"(\*\*/|\*\*|\*|\?)", pattern)))
+    def part_rx(part):
+        if part in rx:
+            return rx[part]
+        if len(part) > 2 and part[0] == "[" and part[-1] == "]":
+            body = part[1:-1]
+            return "[" + ("^/" + re.escape(body[1:]) if body[0] == "!" else re.escape(body)) + "]"
+        return re.escape(part)
+    return re.compile("".join(part_rx(p) for p in re.split(r"(\*\*/|\*\*|\*|\?|\[[^\]/]+\])", pattern)))
 
 
 def _claude_excluded(path, patterns):
