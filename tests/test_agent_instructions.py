@@ -159,6 +159,37 @@ def test_same_name_merges_only_same_file():
         shutil.rmtree(tmp)
 
 
+def test_unassign_restores_switches():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); os.makedirs(p)
+        hud.SETS_FILE = os.path.join(tmp, "sets.json"); hud.MODES_FILE = os.path.join(tmp, "modes.json")
+        for n in ("in-g", "out-g", "was-off", "user-set"):
+            w(os.path.join(hud.CLAUDE_DIR, "skills", n, "SKILL.md"), f"---\nname: {n}\ndescription: x\n---\n")
+        d = os.path.join(hud.CLAUDE_DIR, "plugins"); ip = os.path.join(tmp, "pl"); os.makedirs(os.path.join(ip, "skills"))
+        w(os.path.join(d, "installed_plugins.json"), json.dumps({"plugins": {"a@m": [{"installPath": ip}], "b@m": [{"installPath": ip}]}}))
+        json.dump({"g": {"plugins": ["a@m"], "skills": ["in-g"]}, "h": {"plugins": [], "skills": []}}, open(hud.MODES_FILE, "w"))
+        local = os.path.join(p, ".claude", "settings.local.json")
+        before = {"keep": 1, "enabledPlugins": {"b@m": True}, "skillOverrides": {"was-off": "off"}}
+        w(local, json.dumps(before))
+        ok, err = hud.assign_set("g", p); assert ok, err
+        cur = json.load(open(local))
+        assert cur["enabledPlugins"] == {"a@m": True, "b@m": False} and cur["skillOverrides"]["out-g"] == "off", cur
+        ok, err = hud.assign_set("h", p); assert ok, err     # 그룹을 바꿔도 처음 값을 기억한다
+        ok, err = hud.assign_set("", p); assert ok, err
+        assert json.load(open(local)) == before, json.load(open(local))
+        # 적용 뒤 사용자가 직접 바꾼 값은 남긴다
+        ok, err = hud.assign_set("g", p); assert ok, err
+        cur = json.load(open(local)); cur["skillOverrides"]["user-set"] = "user-invocable-only"; cur["enabledPlugins"]["b@m"] = True
+        cur["skillOverrides"]["out-g"] = "user-invocable-only"
+        json.dump(cur, open(local, "w"))
+        ok, err = hud.assign_set("", p); assert ok, err
+        got = json.load(open(local))
+        assert got["skillOverrides"]["out-g"] == "user-invocable-only" and got["skillOverrides"]["was-off"] == "off", got
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
