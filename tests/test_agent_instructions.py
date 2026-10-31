@@ -504,6 +504,30 @@ def test_external_imports_need_approval():
         shutil.rmtree(tmp)
 
 
+def test_review_findings_on_imports_and_rules():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); a = w(os.path.join(p, "a.md"))
+        # 주석 뒤 같은 줄의 본문은 남는다
+        assert hud._strip_block_html_comments("<!-- m --> body\nnext\n") == " body\nnext\n"
+        # 프로젝트 안 파일이 깊이 제한으로 빠진 것은 승인 문제가 아니다
+        for i in range(1, 7):
+            w(os.path.join(p, f"h{i}.md"), f"@h{i + 1}.md\n")
+        w(os.path.join(p, "h7.md"))
+        w(os.path.join(p, "CLAUDE.md"), "@h1.md\n@a.md\n")
+        rows = {os.path.basename(r["path"]): r for r in hud.collect_instructions({"project_dir": p})["files"] if r["exists"]}
+        assert not any(r["import_unconfirmed"] for r in rows.values()), [(k, r["import_unconfirmed"]) for k, r in rows.items()]
+        # 폴더째 프로젝트 밖으로 링크한 규칙도 승인이 필요하다. 상위 폴더의 규칙은 링크가 아니라 그대로 읽힌다.
+        shared = os.path.join(tmp, "shared"); out = w(os.path.join(shared, "r.md"))
+        rules = os.path.join(p, ".claude", "rules"); os.makedirs(rules); os.symlink(shared, os.path.join(rules, "shared"))
+        parent = w(os.path.join(tmp, ".claude", "rules", "parent.md"))
+        got = hud.session_instructions(p)["Claude Code"]
+        assert parent in got, got
+        assert not any(os.path.realpath(f) == out for f in got), got
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
