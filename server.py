@@ -7,6 +7,7 @@ Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
 import json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+from collections import deque
 from contextlib import contextmanager
 import fcntl
 
@@ -468,7 +469,7 @@ _IMPORT_FILES = {"CLAUDE.md", "CLAUDE.local.md"}
 # 건너뛰고, 공백은 역슬래시로 적고, 앞 글자가 붙은 me@x 는 아니고, 네 단계까지 따라간다.
 _IMPORT_RE = re.compile(r"(?:^|(?<=\s))@((?:\\ |[^\s\\])+)")
 _FENCE_RE = re.compile(r"\s{0,3}(`{3,}|~{3,})")
-_CODE_SPAN_RE = re.compile(r"(`+).*?\1")
+_CODE_SPAN_RE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)")  # 짝이 맞는 백틱만
 MAX_IMPORT_HOPS = 4
 
 
@@ -524,7 +525,9 @@ def _with_link_targets(rows):
     rows = list(rows)
     by_path = {r["path"]: r for r in rows}
     hops = {}
-    for r in rows:      # 도는 동안 뒤에 붙는다
+    queue = deque(rows)
+    while queue:
+        r = queue.popleft()
         link = r.get("link")
         if not link:
             continue
@@ -541,12 +544,15 @@ def _with_link_targets(rows):
                 row = by_path[t] = _file_row(t, t, "")
                 row["via"] = []
                 rows.append(row)
+                queue.append(row)
             if "via" in row:
                 row["via"].append(r["name"])
             if read_by_claude:
                 hops.setdefault(t, hop + 1 if is_import else hop)
                 if not row.get("link"):
                     row["link"] = _link_info(t, imported=True)
+                    if row["link"] and row not in queue:    # 이미 지나간 행이면 다시 본다
+                        queue.append(row)
     return rows
 
 
