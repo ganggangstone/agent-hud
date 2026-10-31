@@ -490,7 +490,10 @@ def _strip_block_html_comments(text):
         elif m:
             fence = m.group(1)
         elif line.lstrip().startswith("<!--"):
-            comment = "-->" not in line
+            head, sep, rest = line.partition("-->")
+            comment = not sep
+            if rest.strip():
+                out.append(rest)
             continue
         out.append(line)
     return "".join(out)
@@ -679,18 +682,20 @@ def _claude_instructions(project_dir):
     dirs = _dirs_from_root(project_dir)
     names = (("CLAUDE.md",), (".claude", "CLAUDE.md"), ("CLAUDE.local.md",))
     has_claude = any(os.path.isfile(os.path.join(d, *n)) for d in dirs if d != HOME for n in names)
+    approved = _external_imports_approved(project_dir)
+    allowed = (os.path.realpath(project_dir) + os.sep, os.path.realpath(CLAUDE_DIR) + os.sep)
+
+    def rules_of(folder):
+        # 규칙 폴더 밖을 가리키는 링크(파일이든 폴더든)는 프로젝트 밖이면 승인이 있어야 읽힌다(공식 문서)
+        own = os.path.realpath(folder) + os.sep
+        return [f for f in _claude_rules(folder) if approved or os.path.realpath(f).startswith((own,) + allowed)]
+
     out = [os.path.join(CLAUDE_DIR, "CLAUDE.md")] + _claude_rules(os.path.join(CLAUDE_DIR, "rules"))
     for d in dirs:
         out += [os.path.join(d, "CLAUDE.md"), os.path.join(d, ".claude", "CLAUDE.md")]
         if not has_claude:
             out += [os.path.join(d, "AGENTS.md"), os.path.join(d, ".claude", "AGENTS.md")]
-        out += _claude_rules(os.path.join(d, ".claude", "rules")) + [os.path.join(d, "CLAUDE.local.md")]
-    if not _external_imports_approved(project_dir):     # 밖을 가리키는 규칙 링크도 승인이 있어야 읽힌다(공식 문서)
-        root = os.path.realpath(project_dir) + os.sep
-        rules = os.sep + os.path.join(".claude", "rules") + os.sep
-        user = os.path.realpath(CLAUDE_DIR) + os.sep
-        out = [f for f in out if not (rules in f and os.path.islink(f) and not os.path.realpath(f).startswith(root)
-                                      and not os.path.realpath(f).startswith(user))]
+        out += rules_of(os.path.join(d, ".claude", "rules")) + [os.path.join(d, "CLAUDE.local.md")]
     return out
 
 
@@ -1921,6 +1926,8 @@ def collect_instructions(ctx):
     rows += [_file_row(f, f) for f in claude_reads if f not in seen_real]
     row_real = {os.path.realpath(r["path"]) for r in rows}
     by_name = {r["name"]: r for r in rows}
+    imports_approved = _external_imports_approved(project_dir)
+    project_real = os.path.realpath(project_dir) + os.sep
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
         r["related"] = [d for d in _related_docs(r["path"], project_dir) if os.path.realpath(d) not in row_real] if r["exists"] else []
         READABLE_PATHS.update(r["related"])
@@ -1931,8 +1938,9 @@ def collect_instructions(ctx):
                   else any(p.fullmatch(r["path"]) for p in excludes))
         r["claude_excluded"] = direct or (bool(r.get("via")) and os.path.realpath(r["path"]) not in claude_reads
                                           and all(by_name.get(n, {}).get("claude_excluded") for n in r["via"]))
-        r["import_unconfirmed"] = (bool(r.get("via")) and not r["claude_excluded"]
-                                   and os.path.realpath(r["path"]) not in claude_reads)
+        r["import_unconfirmed"] = (bool(r.get("via")) and not r["claude_excluded"] and not imports_approved
+                                   and os.path.realpath(r["path"]) not in claude_reads
+                                   and not os.path.realpath(r["path"]).startswith(project_real))
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
