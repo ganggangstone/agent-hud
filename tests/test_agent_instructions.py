@@ -115,6 +115,24 @@ def test_claude_reads_agents_only_without_claude_md():
         shutil.rmtree(tmp)
 
 
+def test_antigravity_instructions():
+    tmp = env()
+    try:
+        c = os.path.join(tmp, "c"); r = os.path.join(c, "r"); os.makedirs(r)
+        w(os.path.join(c, "AGENTS.md"))         # 상위 폴더는 안 읽는다(측정)
+        g = w(os.path.join(hud.HOME, ".gemini", "GEMINI.md"))
+        cfg = w(os.path.join(hud.HOME, ".gemini", "config", "rules", "g.md"), "---\ntrigger: always_on\n---\n")
+        ag = w(os.path.join(r, "AGENTS.md")); ge = w(os.path.join(r, "GEMINI.md"))
+        da = w(os.path.join(r, ".agents", "AGENTS.md")); dg = w(os.path.join(r, ".agents", "GEMINI.md"))
+        on = w(os.path.join(r, ".agents", "rules", "on.md"), "---\ntrigger: always_on\n---\n@[l](inc2.md)\n@inc.md\n")
+        inc2 = w(os.path.join(r, ".agents", "rules", "inc2.md")); w(os.path.join(r, ".agents", "rules", "inc.md"))
+        w(os.path.join(r, ".agents", "rules", "plain.md")); w(os.path.join(r, ".agents", "rules", "man.md"), "---\ntrigger: manual\n---\n")
+        got = hud.session_instructions(r)["Antigravity"]
+        assert got == [g, cfg, ag, ge, da, dg, on, inc2], got
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
