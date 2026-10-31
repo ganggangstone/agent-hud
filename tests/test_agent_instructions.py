@@ -35,16 +35,46 @@ def test_plugin_row_group_chip_both_formats():
         shutil.rmtree(tmp)
 
 
-def test_codex_skips_empty_override():
+def test_codex_empty_files_measured():
+    """Codex 0.166 측정: 프로젝트 폴더는 처음 발견한 파일 하나만 쓰고, 비어 있으면 그 폴더 지침은 없다.
+    전역 폴더는 비어 있지 않은 첫 파일을 쓴다."""
     tmp = env()
     try:
         proj = os.path.join(tmp, "p"); real = w(os.path.join(proj, "AGENTS.md"))
-        w(os.path.join(proj, "AGENTS.override.md"), "")
         assert hud.session_instructions(proj)["Codex"] == [real]
+        w(os.path.join(proj, "AGENTS.override.md"), "")
+        assert hud.session_instructions(proj)["Codex"] == [], "빈 override가 AGENTS.md를 막는다"
         over = w(os.path.join(proj, "AGENTS.override.md"))
         assert hud.session_instructions(proj)["Codex"] == [over]
-        gl = w(os.path.join(hud.HOME, ".codex", "AGENTS.md")); go = w(os.path.join(hud.HOME, ".codex", "AGENTS.override.md"))
-        assert hud.session_instructions(proj)["Codex"] == [go, over]
+        gl = w(os.path.join(hud.HOME, ".codex", "AGENTS.md")); w(os.path.join(hud.HOME, ".codex", "AGENTS.override.md"), "")
+        assert hud.session_instructions(proj)["Codex"] == [gl, over], "전역은 빈 파일을 건너뛴다"
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_codex_fallback_and_byte_limit_measured():
+    tmp = env()
+    try:
+        cfg = w(os.path.join(hud.HOME, ".codex", "config.toml"), 'project_doc_fallback_filenames = ["TEAM.md"]\nproject_doc_max_bytes = 10\n')
+        g = w(os.path.join(hud.HOME, ".codex", "AGENTS.md"), "g" * 50)      # 전역은 한도에 안 들어간다
+        r = os.path.join(tmp, "r"); os.makedirs(os.path.join(r, ".git"))
+        top = w(os.path.join(r, "AGENTS.md"), "a" * 8)
+        team = w(os.path.join(r, "x", "TEAM.md"), "b" * 8)
+        w(os.path.join(r, "x", "y", "AGENTS.md"), "c" * 8)                   # 한도를 넘어 안 읽힌다
+        got = hud.session_instructions(os.path.join(r, "x", "y"))["Codex"]
+        assert got == [g, top, team], got
+        real = hud.count_tokens
+        hud.count_tokens = lambda texts: ("ok", {t: len(t) for t in texts})
+        try:
+            tk = {"state": "ok", "agents": {"Codex": {"skills": 0, "measured": 0, "tokens": 0}}}
+            load = hud.session_load(os.path.join(r, "x", "y"), tk)["Codex"]
+        finally:
+            hud.count_tokens = real
+        assert load["tokens"] == 50 + 8 + 2 and load["truncated"] is True, load
+        w(cfg, 'project_doc_fallback_filenames = ["TEAM.md"]\nproject_doc_max_bytes = 0\n')
+        assert hud.session_instructions(os.path.join(r, "x"))["Codex"] == [g], "0이면 프로젝트 지침을 읽지 않는다"
+        w(cfg, "[[broken")
+        assert top in hud.session_instructions(os.path.join(r, "x"))["Codex"], "깨진 설정이면 기본값으로 본다"
     finally:
         shutil.rmtree(tmp)
 
