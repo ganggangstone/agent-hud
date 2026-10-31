@@ -1,6 +1,6 @@
 # Agent HUD에서 되는 것과 안 되는 것
 
-Agent HUD를 쓰는 사람과, 사람 대신 HUD를 다루는 에이전트를 위한 문서입니다. v0.6.3 기준입니다.
+Agent HUD를 쓰는 사람과, 사람 대신 HUD를 다루는 에이전트를 위한 문서입니다. v0.6.4 기준입니다.
 
 근거 표시: **[실측]** 직접 실행, **[문서]** 공식 문서, **[미확인]** 확인하지 못함.
 
@@ -19,12 +19,13 @@ HUD가 켜고 끌 수 있는 것은 **Claude Code뿐**입니다. 다른 에이�
 |---|---|---|---|
 | Claude Code | 됨 [실측] | 됨 [실측] | 됨. 상위 폴더, `.claude/CLAUDE.md`, 규칙, `AGENTS.md` 대체, `claudeMdExcludes`, `@` 가져오기 반영 [실측] |
 | Codex | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 됨. Git 루트부터 폴더마다, 대체 파일 이름과 크기 한도 반영 [실측]. 빈 `AGENTS.override.md`는 같은 폴더의 `AGENTS.md`를 막음 [실측] |
-| Gemini CLI | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. 전역과 루트 `GEMINI.md`만 셈, `@` 가져오기 미반영 |
 | Antigravity | 안 됨 | 됨 (`.agents/skills`) [문서] | 됨. 시작 폴더의 지침과 `always_on` 규칙 [실측], 전역 지침과 규칙 [문서] |
 | Cursor | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. 루트 `AGENTS.md`만 셈 [미확인: 규칙 파일 집계, [#35](../../../issues/35)] |
 | Copilot | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. `.github/copilot-instructions.md`와 루트 `AGENTS.md`만 셈 [미확인: [#35](../../../issues/35)] |
 
 **관련 문서:** 지침 파일 본문에 경로나 링크로 적힌 문서는 지침 탭의 그 파일 아래에 표시합니다. 필요할 때 읽히는 문서라 시작 합계에는 없습니다. 글자에서 자동으로 찾은 것이라 틀릴 수 있고, 지침 파일의 폴더와 프로젝트 안의 `.md`, `.mdc`, `.txt`만 표시합니다.
+
+**Gemini CLI:** v0.6.4부터 HUD에 별도 행이 없습니다. 무료 등급과 Google One은 2026년 6월 Antigravity CLI로 교체됐습니다. `GEMINI.md`는 Antigravity 파일로 표시하고, `.gemini/skills`와 Gemini CLI 설정은 읽지 않습니다.
 
 ## 자주 틀리는 것
 

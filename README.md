@@ -138,7 +138,7 @@ tokenizer. The skill body is not counted. These are reference counts made on you
 not any provider's own count or bill, and they do not say how many skills a session loaded.
 
 - Every skill found is counted once, including plugins that are switched off and skills
-  only Codex, Cursor, Copilot, Gemini CLI or Antigravity can see. A skill in two folders is
+  only Codex, Cursor, Copilot or Antigravity can see. A skill in two folders is
   one skill.
 - The per-agent figures count the skills each agent can see with the current settings, and
   add up the tokens of those that could be counted. Switching a plugin off, or a skill off in `skillOverrides`, removes it from Claude Code's
@@ -182,11 +182,11 @@ setup with an error).
 ### Skill
 
 A folder with a `SKILL.md` file, following the [Agent Skills](https://agentskills.io)
-standard. The six agents read the same format but look in different folders: in a
-project, Claude Code reads `.claude/skills/`, Codex, Gemini CLI and Antigravity read
+standard. The five agents read the same format but look in different folders: in a
+project, Claude Code reads `.claude/skills/`, Codex and Antigravity read
 `.agents/skills/`, and Cursor and Copilot read both. Agent HUD links the skill into both
 folders instead of copying it, so an agent reads the same copy whichever folder it looks in.
-Following the link was checked with Claude Code, Codex, Gemini CLI, Copilot and Antigravity,
+Following the link was checked with Claude Code, Codex, Copilot and Antigravity,
 not yet with Cursor.
 
 A skill that isn't part of a plugin, whether in `~/.claude/skills/` or in the project, can
@@ -241,12 +241,12 @@ project skill links, which can change the skills other agents discover.
 | | In the group | Not in the group |
 |---|---|---|
 | Claude Code | On | Plugins and skills outside a plugin are turned off |
-| Codex, Gemini CLI, Antigravity, Cursor, Copilot | Skills are read | Not turned off |
+| Codex, Antigravity, Cursor, Copilot | Skills are read | Not turned off |
 
 If you use more than one agent, keep your skills in `~/.claude/skills` and link them with
-groups. Codex, Gemini CLI and Antigravity then read a skill only in the projects a group
+groups. Codex and Antigravity then read a skill only in the projects a group
 linked it into, and Claude Code can switch it per project. A skill in `~/.agents/skills` is
-read by Codex and Gemini CLI in every project. Cursor and Copilot read both folders
+read by Codex in every project. Cursor and Copilot read both folders
 everywhere, so they can't be split per project.
 
 The same from a terminal (`agent-hud` instead of `python3 …/server.py` if you installed

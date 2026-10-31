@@ -1,6 +1,6 @@
 # What works and what does not in Agent HUD
 
-For people using Agent HUD, and for agents operating it on someone's behalf. Based on v0.6.3. [한국어](GUIDE.ko.md)
+For people using Agent HUD, and for agents operating it on someone's behalf. Based on v0.6.4. [한국어](GUIDE.ko.md)
 
 Evidence labels: **[measured]** run directly, **[docs]** official documentation, **[unverified]** not confirmed.
 
@@ -19,12 +19,13 @@ HUD can switch things on and off **only for Claude Code**. For other agents it o
 |---|---|---|---|
 | Claude Code | Yes [measured] | Yes [measured] | Yes, including parent folders, `.claude/CLAUDE.md`, rules, the `AGENTS.md` fallback, `claudeMdExcludes` and `@` imports [measured] |
 | Codex | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Yes. Per folder from the Git root, with fallback names and the size limit [measured]. An empty `AGENTS.override.md` blocks `AGENTS.md` in the same folder [measured] |
-| Gemini CLI | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Partial. Global and root `GEMINI.md` only, `@` imports not followed |
 | Antigravity | No | Yes (`.agents/skills`) [docs] | Yes. Instructions in the start folder and `always_on` rules [measured], global instructions and rules [docs] |
 | Cursor | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. Root `AGENTS.md` only [unverified: rule file totals, [#35](../../../issues/35)] |
 | Copilot | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. `.github/copilot-instructions.md` and root `AGENTS.md` only [unverified: [#35](../../../issues/35)] |
 
 **Related documents:** documents mentioned by path or link in an instruction file appear under that file in the Instructions tab. They are read only when needed, so they are not in the startup totals. They are found automatically from the text and may be wrong, and only `.md`, `.mdc` and `.txt` files inside the instruction file's folder or the project are shown.
+
+**Gemini CLI:** HUD has no separate row for it from v0.6.4. Unpaid and Google One users were moved to Antigravity CLI in June 2026. `GEMINI.md` is shown as an Antigravity file, and `.gemini/skills` and Gemini CLI settings are not read.
 
 ## Common mistakes
 

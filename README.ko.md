@@ -111,7 +111,7 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 이 컴퓨터에서 센 참고용 숫자이며, 어느 제공자의 실제 계산이나 청구액이 아니고 세션이 스킬을
 몇 개 올렸는지를 말해 주지도 않는다.
 
-- 찾은 스킬은 전부 한 번씩 센다. 꺼진 플러그인의 스킬, Codex·Cursor·Copilot·Gemini CLI·
+- 찾은 스킬은 전부 한 번씩 센다. 꺼진 플러그인의 스킬, Codex·Cursor·Copilot·
   Antigravity만 보는 스킬도 포함한다. 폴더 두 곳에 있어도 한 스킬이다.
 - 에이전트별 수는 지금 설정에서 그 에이전트가 볼 수 있는 스킬 수이고, 토큰은 그중 센 스킬만 더한
   값이다. 플러그인을 끄거나
@@ -152,11 +152,11 @@ python3 server.py tokens setup            # 저장소를 받았다면 그 폴더
 ### 스킬
 
 `SKILL.md` 파일이 든 폴더다. [Agent Skills](https://agentskills.io) 표준을 따르므로
-여섯 에이전트가 같은 형식을 읽지만, 찾아보는 폴더는 다르다. 프로젝트 안에서 Claude
-Code는 `.claude/skills/`를, Codex·Gemini CLI·Antigravity는 `.agents/skills/`를 읽고,
+다섯 에이전트가 같은 형식을 읽지만, 찾아보는 폴더는 다르다. 프로젝트 안에서 Claude
+Code는 `.claude/skills/`를, Codex·Antigravity는 `.agents/skills/`를 읽고,
 Cursor와 Copilot은 둘 다 읽는다. Agent HUD는 스킬을 복사하지 않고 두 폴더에 연결만 해서,
 어느 폴더를 보는 에이전트든 같은 스킬을 읽는다. 연결을 따라 읽는지는 Claude Code·Codex·
-Gemini CLI·Copilot·Antigravity에서 확인했고, Cursor는 아직 확인하지 않았다.
+Copilot·Antigravity에서 확인했고, Cursor는 아직 확인하지 않았다.
 
 플러그인에 들지 않은 스킬은 `~/.claude/skills/`에 있든 프로젝트 안에 있든 프로젝트마다 끄거나
 수동 전용으로 둘 수 있다. Agent HUD가 프로젝트의 `.claude/settings.local.json`에
@@ -207,11 +207,11 @@ Agent HUD의 ON/OFF 스위치는 Claude Code 설정만 수정한다. 다른 에�
 | | 그룹에 든 것 | 그룹에 없는 것 |
 |---|---|---|
 | Claude Code | 켜진다 | 플러그인과 플러그인 밖 스킬이 꺼진다 |
-| Codex, Gemini CLI, Antigravity, Cursor, Copilot | 스킬을 읽는다 | 꺼지지 않는다 |
+| Codex, Antigravity, Cursor, Copilot | 스킬을 읽는다 | 꺼지지 않는다 |
 
 여러 에이전트를 같이 쓴다면 스킬을 `~/.claude/skills`에 두고 그룹으로 연결하는 게 좋다.
-Codex·Gemini CLI·Antigravity는 그룹으로 연결한 프로젝트에서만 그 스킬을 읽고, Claude Code는
-프로젝트마다 켜고 끌 수 있다. `~/.agents/skills`에 둔 스킬은 Codex와 Gemini CLI가 모든
+Codex·Antigravity는 그룹으로 연결한 프로젝트에서만 그 스킬을 읽고, Claude Code는
+프로젝트마다 켜고 끌 수 있다. `~/.agents/skills`에 둔 스킬은 Codex가 모든
 프로젝트에서 읽는다. Cursor와 Copilot은 두 폴더를 모두 전역으로 읽어서 프로젝트마다 나눌 수 없다.
 
 터미널에서도 할 수 있다. Homebrew로 설치했다면 `python3 …/server.py` 대신 `agent-hud`를
