@@ -113,20 +113,21 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
 - **Plugins & skills**: every installed skill, listed by plugin, with a badge for each
   agent that can read it in the selected project. Plugins, and skills that aren't part of
   a plugin, have a switch for Claude Code. For skills outside a plugin it has three
-  positions: ON, MANUAL (hidden from Claude until you type `/name`) and OFF. A skill whose
-  `SKILL.md` sets `disable-model-invocation: true` shows MANUAL and can't be changed here.
+  positions: ON, MANUAL (hidden from Claude until you type `/name`) and OFF. A skill whose `SKILL.md` sets `disable-model-invocation: true` moves only between MANUAL and OFF.
+  A skill with `skillOverrides: name-only` shows NAME ONLY.
 - **Reference token counts**: next to each skill, and as a total for every skill Agent HUD
   found plus a total per agent. See [Token counts](#token-counts).
 - **Header**: for the selected project, what each agent reads at the start of every session
   and sends again with every message: how many instruction files, how many skills, and about
   how many tokens the two add up to. Instruction files are counted in full; skills by name and
-  description. Only files read at session start count (the user-level and project-root files,
-  plus what `CLAUDE.md` imports), not `CLAUDE.md` files in subfolders.
+  description. Only files read at session start count, not instructions in subfolders. For Claude Code that includes
+  parent-folder instructions, `.claude/CLAUDE.md`, rules and `@` imports, and leaves out files excluded by `claudeMdExcludes`
+  and unapproved imports outside the project. Per-agent rules are in [docs/GUIDE.md](docs/GUIDE.md).
 - **Agent instructions**: 31 kinds of instruction files in the project, such as
   `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/`, with their size and modified time,
   plus the user-level `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`.
-  Files that read another file are nested under it, with the actual `@path` line or symlink
-  arrow shown next to the name, so you can see at a glance which files share one source and
+  Files that read another file are nested under it, with the actual `@path` line or symlink arrow shown next to the name. Documents mentioned by path or link appear
+  under the file as related documents; they are read only when needed and are not in the startup totals. This way you can see at a glance which files share one source and
   which stand alone and can drift. Agent HUD does not decide which file is the source of truth; one way to set that up
   is in [How do you keep instruction files in sync?](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966).
 
@@ -138,10 +139,9 @@ tokenizer. The skill body is not counted. These are reference counts made on you
 not any provider's own count or bill, and they do not say how many skills a session loaded.
 
 - Every skill found is counted once, including plugins that are switched off and skills
-  only Codex, Cursor, Copilot or Antigravity can see. A skill in two folders is
-  one skill.
+  only Codex, Cursor, Copilot or Antigravity can see. A linked or identical skill in two folders is one skill; different content is counted separately.
 - The per-agent figures count the skills each agent can see with the current settings, and
-  add up the tokens of those that could be counted. Switching a plugin off, or a skill off in `skillOverrides`, removes it from Claude Code's
+  add up the tokens of those that could be counted. Switching a plugin off, a skill off in `skillOverrides`, or setting `disable-model-invocation` removes it from Claude Code's
   total only; another agent that reads the skill through a link keeps it.
 - A skill whose name or description is missing, can't be read, or whose `---` frontmatter is
   not closed shows `tok n/a` and is left out of the token sum, instead of counting its folder
@@ -183,8 +183,7 @@ setup with an error).
 
 A folder with a `SKILL.md` file, following the [Agent Skills](https://agentskills.io)
 standard. The five agents read the same format but look in different folders: in a
-project, Claude Code reads `.claude/skills/`, Codex and Antigravity read
-`.agents/skills/`, and Cursor and Copilot read both. Agent HUD links the skill into both
+project, Claude Code reads `.claude/skills/`, Codex and Antigravity read `.agents/skills/` (Codex also reads `.codex/skills/`), and Cursor and Copilot read both `.claude/skills/` and `.agents/skills/`. Agent HUD links the skill into both
 folders instead of copying it, so an agent reads the same copy whichever folder it looks in.
 Following the link was checked with Claude Code, Codex, Copilot and Antigravity,
 not yet with Cursor.
@@ -309,10 +308,12 @@ may need `/reload-skills` if the top-level directory did not exist when the sess
 On Claude Code 2.1.277 and later, a worktree without its own `.claude/skills` can read the
 main checkout’s skills. Creating that directory stops the fallback, so choose only
 `.agents/skills` to share with Codex alone. These session behaviors follow the official
-documentation; this change was tested with temporary Git worktrees and HTTP/browser
+documentation; this feature was tested with temporary Git worktrees and HTTP/browser
 requests, not live Codex or Claude sessions.
 
 ## Managing the service
+
+For a script install:
 
 ```bash
 launchctl list | grep agent-hud                               # check it is running

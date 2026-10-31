@@ -380,7 +380,7 @@ footer a:hover{color:var(--text)}
 
 <section class="w tell">
   <p class="say col-n">프로젝트의 지침 파일과 수정 시각을 확인합니다.</p>
-  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span>처럼 에이전트마다 다른 지침 파일을 찾아 크기와 수정 시각을 보여줍니다. 수정 시각을 비교해 함께 갱신할 파일을 확인할 수 있습니다.</p>
+  <p class="small dim col-n" style="margin-top:16px"><span class="mono">CLAUDE.md</span>, <span class="mono">AGENTS.md</span>, <span class="mono">.cursor/rules/</span>처럼 에이전트마다 다른 지침 파일을 찾아 크기와 수정 시각을 보여줍니다. 수정 시각을 비교해 함께 갱신할 파일을 확인할 수 있습니다. 본문에 경로나 링크로 적힌 문서는 관련 문서로 함께 보여주며, 필요할 때 읽히는 문서라 시작 합계에는 넣지 않습니다.</p>
   <figure style="margin-top:clamp(26px,4vw,44px)">
     <div class="shot"><img src="../images/instructions-ko.png" loading="lazy" decoding="async" alt="에이전트 지침 탭" width="1469" height="580"></div>
   </figure>
@@ -394,7 +394,7 @@ footer a:hover{color:var(--text)}
     <p class="q">내 컴퓨터에서 무엇이 바뀌나요?</p>
     <p class="small dim">ON/OFF 스위치는 선택한 프로젝트의 <span class="mono">.claude/settings.local.json</span>을 수정합니다. 스킬 연결과 그룹 적용은 프로젝트 스킬 폴더의 링크도 바꿉니다. worktree 공유는 선택한 작업 폴더에 없는 링크만 추가합니다. 지침 파일은 읽어서 보여주며 수정하지 않습니다.</p>
     <p class="q">되돌리거나 지우려면요?</p>
-    <p class="small dim">그룹 적용을 해제하면 그룹이 관리하는 스킬 링크가 삭제됩니다. <span class="mono">enabledPlugins</span>와 <span class="mono">skillOverrides</span> 설정은 남습니다. 이 설정까지 되돌리려면 프로젝트의 <span class="mono">.claude/settings.local.json</span>에서 Agent HUD로 바꾼 항목을 확인해 제거합니다. worktree 자동 적용은 별도로 끄며, 이미 만든 링크는 유지됩니다.</p>
+    <p class="small dim">그룹 적용을 해제하면 그룹의 스킬 링크를 지우고, 그룹이 쓴 <span class="mono">enabledPlugins</span>와 <span class="mono">skillOverrides</span> 값을 적용 전으로 되돌립니다. 적용 뒤 직접 바꾼 값은 남습니다. v0.6.3 전에 적용한 그룹은 적용 전 값이 기록돼 있지 않아 설정이 그대로 남으므로, 필요하면 프로젝트의 <span class="mono">.claude/settings.local.json</span>에서 직접 제거합니다. worktree 자동 적용은 별도로 끄며, 이미 만든 링크는 유지됩니다.</p>
     <p class="small dim">Homebrew 설치본은 <span class="mono">brew services stop agent-hud</span>로 중지합니다. 앱도 설치했다면 <span class="mono">brew uninstall --cask agent-hud-app</span>으로 앱을 지운 뒤, <span class="mono">brew uninstall agent-hud</span>로 명령과 서버를 지웁니다. 설치 스크립트로 설치했다면 <span class="mono">launchctl bootout gui/$(id -u)/com.agent-hud</span>로 중지하고 <span class="mono">~/Library/LaunchAgents/com.agent-hud.plist</span>를 지웁니다. 그룹과 프로젝트 목록의 저장 위치는 설치 방식과 <span class="mono">AGENT_HUD_HOME</span> 설정에 따라 다릅니다. <a href="https://github.com/ganggangstone/agent-hud/blob/main/CONTRIBUTING.md#where-its-data-lives">데이터 위치 설명</a>을 확인하세요.</p>
     <p class="q">다른 에이전트도 따로 설정해야 하나요?</p>
     <p class="small dim">프로젝트 등록은 사용하는 에이전트와 관계없이 할 수 있습니다. ON/OFF 스위치는 Claude Code 설정만 수정합니다. 다른 에이전트에는 스킬 연결 체크박스로 원본 폴더를 연결합니다. 그룹을 바꾸면 프로젝트의 링크도 추가되거나 삭제되므로, 다른 에이전트가 찾는 스킬 목록도 달라질 수 있습니다. 기존 세션에 반영됐는지는 해당 에이전트의 스킬 목록에서 확인하세요.</p>

@@ -88,18 +88,20 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 - **플러그인 & 스킬**: 설치된 스킬을 플러그인별로 보여준다. 선택한 프로젝트에서 그
   스킬을 읽을 수 있는 에이전트마다 뱃지가 붙는다. 플러그인과 플러그인 밖 스킬에는
   Claude Code용 스위치가 있다. 플러그인 밖 스킬의 스위치는 켜짐 · 수동(`/이름`으로 부를
-  때만 읽힌다) · 꺼짐 세 단계다. `SKILL.md`에 `disable-model-invocation: true`가 있는 스킬은
-  수동으로 표시만 되고 여기서는 못 바꾼다.
+  때만 읽힌다) · 꺼짐 세 단계다. `SKILL.md`에 `disable-model-invocation: true`가 있는 스킬은 수동과 꺼짐만 오갈 수 있다.
+  `skillOverrides`가 `name-only`면 "이름만"으로 표시한다.
 - **참고용 토큰 수**: 스킬마다, 찾은 모든 스킬의 합계, 에이전트별 합계를 보여준다.
   [토큰 수](#토큰-수)를 본다.
 - **머리글**: 선택한 프로젝트에서 에이전트마다 세션을 시작할 때 읽고 메시지를 보낼 때마다 다시
   함께 가는 양. 지침 파일 수, 스킬 수, 둘을 더한 대략의 토큰 수다. 지침 파일은 본문 전체를,
-  스킬은 이름과 설명을 센다. 세션 시작 때 읽히는 파일(사용자 전역과 프로젝트 루트의 파일,
-  `CLAUDE.md`가 가져오는 파일)만 세고 하위 폴더의 `CLAUDE.md`는 세지 않는다.
+  스킬은 이름과 설명을 센다. 세션 시작 때 읽히는 파일만 세고 하위 폴더의 지침은 세지 않는다. Claude Code는 상위 폴더 지침, `.claude/CLAUDE.md`,
+  규칙, `@` 가져오기를 포함하고, `claudeMdExcludes`로 제외한 파일과 승인되지 않은 프로젝트 밖 가져오기는 뺀다.
+  에이전트별 규칙은 [docs/GUIDE.ko.md](docs/GUIDE.ko.md)에 있다.
 - **에이전트 지침**: 프로젝트 안의 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/` 같은
   지침 파일 31종과 사용자 전역의 `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
   `~/.gemini/GEMINI.md`를 찾아 크기와 수정 시각을 보여준다. 다른 파일을 읽는 파일은 그 파일
   아래에 들여 쓰고, 파일에 실제로 적힌 `@경로` 줄이나 링크 화살표를 이름 옆에 그대로 보여준다.
+  본문에 경로나 링크로 적힌 문서는 "관련 문서"로 그 아래에 보여준다. 필요할 때 읽히는 문서라 시작 합계에는 없다.
   그래서 어느 파일들이 한 원본을 같이 쓰고 어느 파일이 혼자라서 갈라질 수 있는지가 한눈에 보인다.
   어느 파일이 원본인지는 Agent HUD가 정하지 않는다.
   한 가지 정리 방법은 [지침 파일을 어떻게 동기화할까](https://medium.com/@adventuresol/how-do-you-keep-instruction-files-agents-md-and-claude-md-in-sync-c335873b3966)에 있다.
@@ -112,10 +114,9 @@ git clone https://github.com/ganggangstone/agent-hud.git agent-hud && cd agent-h
 몇 개 올렸는지를 말해 주지도 않는다.
 
 - 찾은 스킬은 전부 한 번씩 센다. 꺼진 플러그인의 스킬, Codex·Cursor·Copilot·
-  Antigravity만 보는 스킬도 포함한다. 폴더 두 곳에 있어도 한 스킬이다.
+  Antigravity만 보는 스킬도 포함한다. 링크이거나 내용이 같으면 폴더가 두 곳이어도 한 스킬이고, 내용이 다르면 따로 센다.
 - 에이전트별 수는 지금 설정에서 그 에이전트가 볼 수 있는 스킬 수이고, 토큰은 그중 센 스킬만 더한
-  값이다. 플러그인을 끄거나
-  `skillOverrides`로 스킬을 끄면 Claude Code 합계에서만 빠지고, 링크로 그 스킬을 읽는 다른
+  값이다. 플러그인을 끄거나 `skillOverrides`로 스킬을 끄거나 `disable-model-invocation`을 쓰면 Claude Code 합계에서만 빠지고, 링크로 그 스킬을 읽는 다른
   에이전트의 합계에는 남는다.
 - 이름이나 설명이 없거나 읽지 못했거나 `---` 머리말이 닫히지 않은 스킬은 폴더 이름을 설명인 것처럼
   세지 않고 `토큰 미측정`으로 표시하며 토큰 합에서 뺀다. 찾은 스킬, 볼 수 있는 스킬로는 그대로
@@ -153,8 +154,7 @@ python3 server.py tokens setup            # 저장소를 받았다면 그 폴더
 
 `SKILL.md` 파일이 든 폴더다. [Agent Skills](https://agentskills.io) 표준을 따르므로
 다섯 에이전트가 같은 형식을 읽지만, 찾아보는 폴더는 다르다. 프로젝트 안에서 Claude
-Code는 `.claude/skills/`를, Codex·Antigravity는 `.agents/skills/`를 읽고,
-Cursor와 Copilot은 둘 다 읽는다. Agent HUD는 스킬을 복사하지 않고 두 폴더에 연결만 해서,
+Code는 `.claude/skills/`를, Codex·Antigravity는 `.agents/skills/`를 읽고(Codex는 `.codex/skills/`도 읽는다), Cursor와 Copilot은 `.claude/skills/`와 `.agents/skills/`를 모두 읽는다. Agent HUD는 스킬을 복사하지 않고 두 폴더에 연결만 해서,
 어느 폴더를 보는 에이전트든 같은 스킬을 읽는다. 연결을 따라 읽는지는 Claude Code·Codex·
 Copilot·Antigravity에서 확인했고, Cursor는 아직 확인하지 않았다.
 
@@ -271,10 +271,11 @@ checkout에서 `agent-hud worktrees apply`를 실행한다. 대시보드와 같�
 세션 시작 때 최상위 스킬 디렉터리가 없었다면 `/reload-skills`가 필요할 수 있다.
 Claude Code 2.1.277 이상은 worktree에 자체 `.claude/skills`가 없으면 원본 checkout에서
 스킬을 읽을 수 있다. 그 디렉터리를 만들면 대신 읽던 동작이 멈추므로, Codex에만 공유하려면
-`.agents/skills`만 선택한다. 세션 동작은 공식 문서 기준이며 이번 변경은 임시 Git worktree와
-HTTP·브라우저 요청으로 검증했다. 실제 Codex·Claude 세션에서는 아직 확인하지 않았다.
+`.agents/skills`만 선택한다. 세션 동작은 공식 문서 기준이며 이 기능은 임시 Git worktree와 HTTP·브라우저 요청으로 검증했다. 실제 Codex·Claude 세션에서는 아직 확인하지 않았다.
 
 ## 서비스 관리
+
+설치 스크립트로 설치했다면:
 
 ```bash
 launchctl list | grep agent-hud                               # 돌고 있는지 확인
