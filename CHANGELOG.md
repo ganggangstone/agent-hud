@@ -2,6 +2,37 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.3
+
+**에이전트마다 실제로 읽는 지침과 스킬에 더 가깝게 맞췄다.** Claude Code는 상위 폴더 지침, `.claude/CLAUDE.md`,
+`.claude/rules/`, `AGENTS.md` 대체를 집계한다. Codex는 Git 루트부터 폴더마다 고르고 빈 파일을 건너뛴다.
+Antigravity는 지침과 `always_on` 규칙을 집계하고, agy CLI 스킬 경로도 읽는다. Codex, Gemini CLI, Copilot이 자체
+설정으로 끈 스킬은 읽어서 표시와 집계에서 뺀다. HUD가 그 설정을 바꾸지는 않는다.
+
+**그룹을 해제하면 적용 전 상태로 돌아간다.** 그룹이 쓴 플러그인과 스킬 값을 되돌리고, 적용 뒤 직접 바꾼 값은
+남긴다. 이전 버전에서 적용한 그룹은 적용 전 값이 기록돼 있지 않아 해제해도 그대로 둔다.
+
+**같은 이름의 스킬은 링크이거나 내용이 같을 때만 합친다.** 내용이 다르면 행을 나눈다.
+
+**`agent-hud --version`이 버전을 출력한다.** 서버를 띄우고 끝나지 않던 문제를 고쳤다. 모르는 인자는 서버를 띄우지
+않고 사용법을 출력한 뒤 끝난다. 새 형식 `modes.json`에서 플러그인 행의 그룹 표시가 사라지던 문제도 고쳤다.
+
+**Closer to what each agent actually reads.** Claude Code totals include parent folders, `.claude/CLAUDE.md`,
+`.claude/rules/` and the `AGENTS.md` fallback. Codex picks one file per folder from the Git root and skips empty files.
+Antigravity totals include instructions and `always_on` rules, and agy CLI skill paths are read. Skills that Codex,
+Gemini CLI or Copilot disabled in their own settings are read and left out of the display and totals. HUD does not
+change those settings.
+
+**Unassigning a group restores the previous state.** Plugin and skill values the group wrote go back, and values you
+changed yourself afterwards stay. Groups applied by an earlier version have no recorded values, so unassigning leaves
+their settings as they are.
+
+**Skills with the same name merge only when linked or identical.** Different content gets its own row.
+
+**`agent-hud --version` prints the version.** It used to start the server and never return. Unknown arguments now print
+usage and exit without starting the server. The group label on plugin rows no longer disappears with the new
+`modes.json` format.
+
 ## v0.6.2
 
 **Claude Code가 실제로 읽는 지침과 스킬에 표시와 집계를 맞췄다.** 지침 탭과 머리글이 `claudeMdExcludes`를
