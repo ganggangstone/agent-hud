@@ -701,9 +701,16 @@ def _antigravity_instructions(project_dir):
     return out
 
 
+def _file_size(path):
+    try:
+        return os.path.getsize(path)
+    except OSError:     # 확인과 읽기 사이에 지워진 파일
+        return 0
+
+
 def _first_nonempty(*paths):
     for p in paths:
-        if os.path.isfile(p) and os.path.getsize(p) > 0:
+        if os.path.isfile(p) and _file_size(p) > 0:
             return [p]
     return []
 
@@ -740,20 +747,23 @@ def _codex_instructions(project_dir):
     roots = [i for i, d in enumerate(dirs) if os.path.exists(os.path.join(d, ".git"))]
     for d in dirs[roots[-1]:] if roots else [os.path.abspath(project_dir)]:
         found = next((os.path.join(d, n) for n in names if os.path.isfile(os.path.join(d, n))), None)
-        if found and budget > 0 and os.path.getsize(found) > 0:
+        size = _file_size(found) if found else 0
+        if budget > 0 and size > 0:
             out.append(found)
-            budget -= os.path.getsize(found)
+            budget -= size
     return out
 
 
 def _codex_cut_texts(files, texts):
     """프로젝트 쪽 지침을 크기 한도에 맞춰 자른 본문과 잘렸는지. 넘치면 파일 중간에서 잘린다(측정)."""
-    home = os.path.realpath(os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")) + os.sep
+    home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+    global_file = _first_nonempty(os.path.join(home, "AGENTS.override.md"), os.path.join(home, "AGENTS.md"))
+    global_real = os.path.realpath(global_file[0]) if global_file else None
     budget = _codex_byte_limit(_codex_config())
     out, truncated = [], False
     for f in files:
         t = texts[f]
-        if t is not None and not f.startswith(home):
+        if t is not None and f != global_real:
             raw = t.encode("utf-8")
             if len(raw) > budget:
                 t, truncated = raw[:budget].decode("utf-8", "ignore"), True
