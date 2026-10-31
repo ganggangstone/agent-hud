@@ -391,6 +391,35 @@ def test_old_service_command_survives_unloaded_service():
     assert "돌며" not in hud.PAGE, "plist만 보고 돌고 있다고 단정하지 않는다"
 
 
+def test_codex_limit_applies_to_project_under_codex_home():
+    tmp = env()
+    try:
+        home = os.path.join(hud.HOME, ".codex")
+        w(os.path.join(home, "config.toml"), "project_doc_max_bytes = 10\n")
+        g = w(os.path.join(home, "AGENTS.md"), "g" * 50)
+        repo = os.path.join(home, "repo"); pf = w(os.path.join(repo, "AGENTS.md"), "p" * 100)
+        assert hud.session_instructions(repo)["Codex"] == [g, pf]
+        real = hud.count_tokens
+        hud.count_tokens = lambda texts: ("ok", {t: len(t) for t in texts})
+        try:
+            load = hud.session_load(repo, {"state": "ok", "agents": {"Codex": {"skills": 0, "measured": 0, "tokens": 0}}})["Codex"]
+        finally:
+            hud.count_tokens = real
+        assert load["tokens"] == 50 + 10 and load["truncated"] is True, load
+        # 링크된 CODEX_HOME의 전역 파일은 한도가 0이어도 잘리지 않는다
+        w(os.path.join(home, "config.toml"), "project_doc_max_bytes = 0\n")
+        link = os.path.join(tmp, "linked"); os.symlink(home, link); os.environ["CODEX_HOME"] = link
+        hud.count_tokens = lambda texts: ("ok", {t: len(t) for t in texts})
+        try:
+            load = hud.session_load(os.path.join(tmp, "elsewhere"), {"state": "ok", "agents": {"Codex": {"skills": 0, "measured": 0, "tokens": 0}}})["Codex"]
+        finally:
+            hud.count_tokens = real
+        assert load["tokens"] == 50, load
+    finally:
+        os.environ.pop("CODEX_HOME", None)
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
