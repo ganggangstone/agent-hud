@@ -43,7 +43,7 @@ def main():
         assert got["Gemini CLI"] == [], got["Gemini CLI"]
         assert got["Cursor"] == [pagents], got["Cursor"]
         assert got["Copilot"] == [copilot, pagents], got["Copilot"]
-        assert got["Antigravity"] == [], got["Antigravity"]
+        assert got["Antigravity"] == [pagents], got["Antigravity"]
 
         os.remove(poverride)
         assert hud.session_instructions(proj)["Codex"] == [princ, pagents]
@@ -71,7 +71,7 @@ def test_session_load():
         assert load["Claude Code"] == {"instructions": 1, "skills": 3, "tokens": 104}, load["Claude Code"]
         assert load["Codex"] == {"instructions": 1, "skills": 1, "tokens": None}, load["Codex"]   # 스킬을 못 셈
         assert load["Cursor"] == {"instructions": 1, "skills": 0, "tokens": 2}, load["Cursor"]
-        assert load["Antigravity"] == {"instructions": 0, "skills": 0, "tokens": 0}, load["Antigravity"]
+        assert load["Antigravity"] == {"instructions": 1, "skills": 0, "tokens": 2}, load["Antigravity"]
         hud.count_tokens = lambda texts: ("setup", {})
         assert hud.session_load(proj, {"state": "setup", "agents": {}})["Claude Code"]["tokens"] is None
     finally:

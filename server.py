@@ -651,6 +651,42 @@ def _claude_instructions(project_dir):
     return out
 
 
+def _agy_expand(path, seen):
+    """@[이름](경로)는 본문에 넣는다. @이름 은 참조일 뿐이다(측정, 공식 문서)."""
+    real = os.path.realpath(path)
+    if real in seen or not os.path.isfile(real):
+        return []
+    seen.add(real)
+    out = [real]
+    try:
+        with open(real, encoding="utf-8", errors="replace") as f:
+            for rel in re.findall(r"@\[[^\]]*\]\(([^)\s]+)\)", f.read(INSTRUCTION_READ_MAX)):
+                t = os.path.expanduser(rel)
+                out += _agy_expand(t if os.path.isabs(t) else os.path.join(os.path.dirname(real), t), seen)
+    except OSError:
+        pass
+    return out
+
+
+def _antigravity_instructions(project_dir):
+    """시작 폴더의 지침 4종과 trigger: always_on 규칙(agy 측정), 전역 지침과 규칙(공식 문서)."""
+    gem = os.path.join(HOME, ".gemini")
+    P = lambda *a: os.path.join(project_dir, *a)
+    files = [os.path.join(gem, "GEMINI.md"), os.path.join(gem, "AGENTS.md"),
+             os.path.join(gem, "config", "GEMINI.md"), os.path.join(gem, "config", "AGENTS.md")]
+    rule_dirs = [os.path.join(gem, "config", "rules")]
+    files_after = [P("AGENTS.md"), P("GEMINI.md"), P(".agents", "AGENTS.md"), P(".agents", "GEMINI.md")]
+    rule_dirs_after = [P(".agents", "rules"), P(".agent", "rules")]
+    def always_on(folder):
+        names = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+        return [os.path.join(folder, n) for n in names if n.endswith(".md")
+                and re.search(r"^trigger\s*:\s*always_on\s*$", _frontmatter_text(os.path.join(folder, n)), re.M)]
+    out, seen = [], set()
+    for f in files + [r for d in rule_dirs for r in always_on(d)] + files_after + [r for d in rule_dirs_after for r in always_on(d)]:
+        out += _agy_expand(f, seen)
+    return out
+
+
 def _first_nonempty(*paths):
     for p in paths:
         if os.path.isfile(p) and os.path.getsize(p) > 0:
@@ -681,7 +717,7 @@ def session_instructions(project_dir):
         "Gemini CLI": [os.path.join(HOME, ".gemini", "GEMINI.md"), P("GEMINI.md")],
         "Cursor": [P("AGENTS.md")],
         "Copilot": [P(".github", "copilot-instructions.md"), P("AGENTS.md")],
-        "Antigravity": [],
+        "Antigravity": _antigravity_instructions(project_dir),
     }
     excludes = claude_md_excludes(project_dir)
     out = {}
