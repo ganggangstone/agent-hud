@@ -34,6 +34,25 @@ def tokens_input_validation(tmp):
     assert not any(n.startswith("tokenizer") for n in leftovers), f"잘못된 입력이 폴더를 만들었다: {leftovers}"
 
 
+def version_and_unknown_args(tmp):
+    """버전 확인과 잘못된 인자는 서버를 띄우지 않고 바로 끝난다. 서버가 뜨면 timeout으로 실패한다(#37)."""
+    home = os.path.join(tmp, "verhome"); os.makedirs(home)
+    quiet = {"AGENT_HUD_PORT": "41999", "AGENT_HUD_NO_BROWSER": "1"}
+    spec = importlib.util.spec_from_file_location("hud_ver", SERVER)
+    hud = importlib.util.module_from_spec(spec); spec.loader.exec_module(hud)
+    for flag in ("--version", "-V"):
+        r = run([flag], home, extra_env=quiet, timeout=5)
+        assert r.returncode == 0 and r.stdout.strip() == f"agent-hud {hud.VERSION}", (flag, r.stdout, r.stderr)
+    r = run(["--version"], home, extra_env=dict(quiet, CLAUDE_HUD_DISABLE="1"), timeout=5)
+    assert r.stdout.strip() == f"agent-hud {hud.VERSION}", "꺼 둔 상태에서도 버전은 알려 준다"
+    for bad in (["--nope"], ["nope"], ["--register"]):
+        r = run(bad, home, extra_env=quiet, timeout=5)
+        assert r.returncode == 2 and "agent-hud open" in r.stderr, (bad, r.returncode, r.stderr)
+    assert not os.path.exists(os.path.join(home, "projects.json")), "서버가 뜨면 안 된다"
+    r = run(["--help"], home, extra_env=quiet, timeout=5)
+    assert "--version" in r.stdout, "도움말에 버전 옵션이 없다"
+
+
 def tokens_setup_python_switch(tmp):
     """다른 파이썬으로 setup을 다시 돌리면 venv를 그 파이썬으로 다시 만든다. 진짜 설치 없이 명령만 본다:
     venv의 python 자리에 "파이썬 2.7"이라고 답하는 스텁을 두고, subprocess.run 은 기록만 하는 가짜로 바꾼다."""
@@ -158,6 +177,7 @@ def main():
         assert r.returncode == 0 and "agent-hud apply" in r.stdout
         assert "agent-hud tokens setup" in r.stdout, "도움말에 토큰 설정 명령이 없다"
 
+        version_and_unknown_args(tmp)
         tokens_input_validation(tmp)
         tokens_setup_python_switch(tmp)
         tokens_setup(tmp)
