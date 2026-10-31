@@ -289,6 +289,22 @@ def test_install_does_not_copy_example_groups():
         shutil.rmtree(tmp)
 
 
+def test_old_service_warning_only_on_brew_with_old_plist():
+    tmp = env()
+    real = hud.brew_prefix
+    try:
+        hud.brew_prefix = lambda *a: "/opt/homebrew"
+        assert hud.collect_update({})["old_service"] is False
+        w(os.path.join(hud.HOME, "Library", "LaunchAgents", "com.agent-hud.plist"))
+        assert hud.collect_update({})["old_service"] is True
+        hud.brew_prefix = lambda *a: None       # 클론 설치본에게 이 서비스는 자기 자신이다
+        assert hud.collect_update({})["old_service"] is False
+        assert "com.agent-hud" in hud.PAGE and "oldServiceBanner" in hud.PAGE
+    finally:
+        hud.brew_prefix = real
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
