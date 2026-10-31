@@ -18,8 +18,8 @@ HUD가 켜고 끌 수 있는 것은 **Claude Code뿐**입니다. 다른 에이�
 | 에이전트 | HUD로 스킬 끄기 | 그룹 링크로 스킬 추가 | 지침 집계 |
 |---|---|---|---|
 | Claude Code | 됨 [실측] | 됨 [실측] | 됨. `claudeMdExcludes`와 `@` 가져오기 반영 [실측]. 상위 폴더, `.claude/CLAUDE.md`, `.claude/rules/`는 아직 안 셈 ([#30](../../../issues/30)) |
-| Codex | 안 됨 ([#28](../../../issues/28)) | 됨 (`.agents/skills`) [문서] | 부분. 상위 폴더 탐색 안 함 ([#23](../../../issues/23)), 빈 override 오판 ([#22](../../../issues/22)) |
-| Gemini CLI | 안 됨 ([#28](../../../issues/28)) | 됨 (`.agents/skills`) [문서] | 부분. 전역과 루트 `GEMINI.md`만 셈, `@` 가져오기 미반영 |
+| Codex | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. 상위 폴더 탐색 안 함 ([#23](../../../issues/23)), 빈 override 오판 ([#22](../../../issues/22)) |
+| Gemini CLI | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. 전역과 루트 `GEMINI.md`만 셈, `@` 가져오기 미반영 |
 | Antigravity | 안 됨 | 됨 (`.agents/skills`) [문서] | 안 됨. 항상 0으로 표시 ([#21](../../../issues/21)) |
 | Cursor | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. 루트 `AGENTS.md`만 셈 [미확인: 규칙 파일 집계, [#35](../../../issues/35)] |
 | Copilot | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. `.github/copilot-instructions.md`와 루트 `AGENTS.md`만 셈 [미확인: [#35](../../../issues/35)] |

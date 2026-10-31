@@ -1615,6 +1615,33 @@ def _section_state(skills):
     return out
 
 
+def _skills_disabled_elsewhere(project_dir):
+    """다른 에이전트가 자기 설정으로 끈 스킬 -> (Codex SKILL.md 경로, {에이전트: 스킬 이름}).
+    HUD는 읽기만 한다. Codex는 ~/.codex/config.toml, Gemini CLI는 사용자·작업 폴더 settings.json의
+    skills.disabled, Copilot은 사용자·저장소 settings.json의 disabledSkills(각 공식 문서)."""
+    paths = set()
+    try:
+        import tomllib      # Python 3.11부터. 없으면 Codex 설정은 못 읽는다.
+        home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+        with open(os.path.join(home, "config.toml"), "rb") as f:
+            entries = ((tomllib.load(f).get("skills") or {}).get("config")) or []
+        paths = {os.path.realpath(os.path.expanduser(e["path"])) for e in entries
+                 if isinstance(e, dict) and e.get("enabled") is False and isinstance(e.get("path"), str)}
+    except (ImportError, OSError, ValueError, AttributeError) as e:
+        if not isinstance(e, (ImportError, FileNotFoundError)):
+            print(f"Codex 설정을 읽지 못했습니다: {e}", file=sys.stderr)
+    def names(path, *keys):
+        v = read_json(path, {})
+        for k in keys:
+            v = v.get(k) if isinstance(v, dict) else None
+        return {x for x in v if isinstance(x, str)} if isinstance(v, list) else set()
+    gem = names(os.path.join(HOME, ".gemini", "settings.json"), "skills", "disabled") | \
+        names(os.path.join(project_dir, ".gemini", "settings.json"), "skills", "disabled")
+    cop = names(os.path.join(HOME, ".copilot", "settings.json"), "disabledSkills") | \
+        names(os.path.join(project_dir, ".github", "copilot", "settings.json"), "disabledSkills")
+    return paths, {"Gemini CLI": gem, "Copilot": cop}
+
+
 def _skill_root_index(project_dir):
     """스킬 폴더들을 훑어 {이름: (볼 수 있는 에이전트, 어느 폴더)}."""
     found = {}
@@ -1635,6 +1662,7 @@ def collect_skills(ctx):
     project_dir = default_project_dir(ctx)
     index = _skill_root_index(project_dir)
     sources = skill_sources(project_dir)
+    codex_off, by_name_off = _skills_disabled_elsewhere(project_dir)
     enabled, has_local = plugin_state(project_dir)
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
@@ -1643,6 +1671,8 @@ def collect_skills(ctx):
     def decorate(skill, fallback_agents):
         hit = index.get(skill["id"])
         agents = hit["agents"] if hit else list(fallback_agents)
+        real_md = os.path.realpath(os.path.join(skill["path"], "SKILL.md"))
+        agents = [a for a in agents if not ((a == "Codex" and real_md in codex_off) or skill.get("name") in by_name_off.get(a, ()))]
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []

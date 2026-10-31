@@ -18,8 +18,8 @@ HUD can switch things on and off **only for Claude Code**. For other agents it o
 | Agent | Turn a skill off from HUD | Add a skill with a group link | Instruction totals |
 |---|---|---|---|
 | Claude Code | Yes [measured] | Yes [measured] | Yes, including `claudeMdExcludes` and `@` imports [measured]. Parent folders, `.claude/CLAUDE.md` and `.claude/rules/` are not counted yet ([#30](../../../issues/30)) |
-| Codex | No ([#28](../../../issues/28)) | Yes (`.agents/skills`) [docs] | Partial. No parent folder lookup ([#23](../../../issues/23)), empty override misread ([#22](../../../issues/22)) |
-| Gemini CLI | No ([#28](../../../issues/28)) | Yes (`.agents/skills`) [docs] | Partial. Global and root `GEMINI.md` only, `@` imports not followed |
+| Codex | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Partial. No parent folder lookup ([#23](../../../issues/23)), empty override misread ([#22](../../../issues/22)) |
+| Gemini CLI | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Partial. Global and root `GEMINI.md` only, `@` imports not followed |
 | Antigravity | No | Yes (`.agents/skills`) [docs] | No. Always shown as 0 ([#21](../../../issues/21)) |
 | Cursor | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. Root `AGENTS.md` only [unverified: rule file totals, [#35](../../../issues/35)] |
 | Copilot | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. `.github/copilot-instructions.md` and root `AGENTS.md` only [unverified: [#35](../../../issues/35)] |
