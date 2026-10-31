@@ -687,7 +687,7 @@ def _claude_instructions(project_dir):
 
     def rules_of(folder):
         # 규칙 폴더 밖을 가리키는 링크(파일이든 폴더든)는 프로젝트 밖이면 승인이 있어야 읽힌다(공식 문서)
-        own = os.path.realpath(folder) + os.sep
+        own = os.path.join(os.path.realpath(os.path.dirname(folder)), os.path.basename(folder)) + os.sep
         return [f for f in _claude_rules(folder) if approved or os.path.realpath(f).startswith((own,) + allowed)]
 
     out = [os.path.join(CLAUDE_DIR, "CLAUDE.md")] + _claude_rules(os.path.join(CLAUDE_DIR, "rules"))
