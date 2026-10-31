@@ -305,6 +305,32 @@ def test_old_service_warning_only_on_brew_with_old_plist():
         shutil.rmtree(tmp)
 
 
+def test_related_documents():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        g1 = w(os.path.join(hud.HOME, ".codex", "guides", "git.md")); g2 = w(os.path.join(p, "docs", "rel.md"))
+        imp = w(os.path.join(p, "imp.md")); w(os.path.join(p, "code.md")); w(os.path.join(p, "secret.key"))
+        body = ("| 언제 | 파일 |\n|---|---|\n| 커밋 | `~/.codex/guides/git.md` |\n"
+                "[관련](docs/rel.md#절)\n[웹](https://example.com/a.md)\n`없는파일.md`\n`secret.key`\n"
+                "@imp.md\n[자기](CLAUDE.md)\n```\n`code.md`\n```\n`docs/rel.md`\n")
+        claude = w(os.path.join(p, "CLAUDE.md"), body)
+        real = os.path.expanduser
+        os.path.expanduser = lambda q: q.replace("~", hud.HOME, 1) if q.startswith("~") else real(q)
+        try:
+            rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
+        finally:
+            os.path.expanduser = real
+        assert rows[claude]["related"] == [g1, g2], rows[claude]["related"]     # 있는 문서만, 중복 없이
+        assert g1 in hud.READABLE_PATHS, "화면에서 열 수 있어야 한다"
+        reads = hud.session_instructions(p)["Claude Code"]
+        assert g1 not in reads and g2 not in reads, "시작 합계에 들어가면 안 된다"
+        assert g1 not in rows and g2 not in rows, "지침 행으로 만들지 않는다"
+        assert all("related" in r for r in rows.values())
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
