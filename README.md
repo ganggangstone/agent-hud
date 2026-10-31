@@ -84,8 +84,7 @@ Steps for an agent asked to install, open, or update Agent HUD on the user's Mac
 
 1. **Install.** If `brew` is available, run
    `brew install --cask ganggangstone/tap/agent-hud-app && brew services start agent-hud`.
-   The first installs the dashboard, its command and an app icon; the second keeps it running
-   from login and opens it in the browser. Otherwise clone this repository (for example to `~/agent-hud`) and run `./install.sh` in it.
+   The first command installs the dashboard, its command line tool and an app icon. The second keeps it running from login and opens it in the browser. Otherwise clone this repository (for example to `~/agent-hud`) and run `./install.sh` in it.
 2. **Register sessions (Claude Code only).** Add a `SessionStart` hook to
    `~/.claude/settings.json`. Merge it into any hooks already there; do not replace them.
    The command is `nohup agent-hud --register "$PWD" >/dev/null 2>&1 & disown` for a Homebrew
@@ -143,9 +142,7 @@ not any provider's own count or bill, and they do not say how many skills a sess
 - The per-agent figures count the skills each agent can see with the current settings, and
   add up the tokens of those that could be counted. Switching a plugin off, a skill off in `skillOverrides`, or setting `disable-model-invocation` removes it from Claude Code's
   total only; another agent that reads the skill through a link keeps it.
-- A skill whose name or description is missing, can't be read, or whose `---` frontmatter is
-  not closed shows `tok n/a` and is left out of the token sum, instead of counting its folder
-  name as if it were the description. It still counts as a skill found and visible. When
+- If a skill's name or description is missing or unreadable, or its `---` frontmatter is not closed, it shows `tok n/a` and stays out of the token sum. Its folder name is not counted in place of the description. It still counts as a skill found and visible. When
   some skills are left out, the line reads "Measured subtotal ... N of M skills, not a full
   total" and the affected agents read "17 measured (3 of 4)"; with none counted it says
   "Not measured" rather than 0.
@@ -185,8 +182,7 @@ A folder with a `SKILL.md` file, following the [Agent Skills](https://agentskill
 standard. The five agents read the same format but look in different folders: in a
 project, Claude Code reads `.claude/skills/`, Codex and Antigravity read `.agents/skills/` (Codex also reads `.codex/skills/`), and Cursor and Copilot read both `.claude/skills/` and `.agents/skills/`. Agent HUD links the skill into both
 folders instead of copying it, so an agent reads the same copy whichever folder it looks in.
-Following the link was checked with Claude Code, Codex, Copilot and Antigravity,
-not yet with Cursor.
+We checked that Claude Code, Codex, Copilot and Antigravity follow the link; Cursor is not checked yet.
 
 A skill that isn't part of a plugin, whether in `~/.claude/skills/` or in the project, can
 be switched off, or set to manual-only, per project. Agent HUD writes `skillOverrides`
@@ -355,8 +351,7 @@ the top of the page when there is one.
   `~/.claude/tools/agent-hud/`, so `git pull` alone changes nothing; `./install.sh` copies
   the new file and restarts the service.
 
-The daily check is the only request the dashboard makes on its own. It downloads an update
-only when you click **Update now**, and Homebrew does the downloading. Agent HUD reads and
+The daily check is the only request the dashboard makes on its own. It downloads an update only when you click **Update now**, and Homebrew does the download. Agent HUD reads and
 writes settings files on this computer only and needs no account.
 
 ## Known limitations
