@@ -881,17 +881,31 @@ SKILL_ROOTS_HOME = [
 
 
 def _scan_skill_root(root, label, agents, found):
-    """같은 이름의 스킬은 한 행으로 합친다 -- 두 곳에 두면 보는 도구가 늘어난다."""
+    """링크거나 내용이 똑같은 스킬만 한 행으로 합친다. 내용이 다르면 행을 나누고, 에이전트는 먼저 찾은
+    쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서)."""
     if not os.path.isdir(root):
         return
     for name in sorted(os.listdir(root)):
         md = os.path.join(root, name, "SKILL.md")
         if not os.path.isfile(md):
             continue
-        row = found.setdefault(name, {"name": name, "agents": [], "roots": [], "path": md})
+        real = os.path.realpath(md)
+        with open(md, "rb") as f:
+            content = f.read()
+        same_name = [r for k, r in found.items() if r["name"] == name]
+        row = next((r for r in same_name if r["real"] == real or r["content"] == content), None)
+        if row is None:
+            row = found[f"{name}@{label}" if same_name else name] = {
+                "name": name, "agents": [], "roots": [], "path": md, "real": real, "content": content}
         row["roots"].append(label)
+        others = [r for r in same_name if r is not row]
         for a in agents:
-            if a not in row["agents"]:
+            taken = [r for r in others if a in r["agents"]]
+            if a == "Claude Code" and taken and label.startswith("~/"):
+                for r in taken:
+                    r["agents"].remove(a)
+                taken = []
+            if not taken and a not in row["agents"]:
                 row["agents"].append(a)
         READABLE_PATHS.add(md)
 
