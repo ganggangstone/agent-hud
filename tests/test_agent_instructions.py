@@ -35,6 +35,37 @@ def test_plugin_row_group_chip_both_formats():
         shutil.rmtree(tmp)
 
 
+def test_codex_skips_empty_override():
+    tmp = env()
+    try:
+        proj = os.path.join(tmp, "p"); real = w(os.path.join(proj, "AGENTS.md"))
+        w(os.path.join(proj, "AGENTS.override.md"), "")
+        assert hud.session_instructions(proj)["Codex"] == [real]
+        over = w(os.path.join(proj, "AGENTS.override.md"))
+        assert hud.session_instructions(proj)["Codex"] == [over]
+        gl = w(os.path.join(hud.HOME, ".codex", "AGENTS.md")); go = w(os.path.join(hud.HOME, ".codex", "AGENTS.override.md"))
+        assert hud.session_instructions(proj)["Codex"] == [go, over]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_codex_walks_from_git_root():
+    tmp = env()
+    try:
+        repo = os.path.join(tmp, "r"); os.makedirs(os.path.join(repo, ".git"))
+        w(os.path.join(tmp, "AGENTS.md"))                # 저장소 밖: 안 읽는다
+        top = w(os.path.join(repo, "AGENTS.md")); leaf = w(os.path.join(repo, "pkg", "a", "AGENTS.md"))
+        assert hud.session_instructions(os.path.join(repo, "pkg", "a"))["Codex"] == [top, leaf]
+        os.rmdir(os.path.join(repo, ".git"))             # 루트가 없으면 현재 폴더만
+        assert hud.session_instructions(os.path.join(repo, "pkg", "a"))["Codex"] == [leaf]
+        os.environ["CODEX_HOME"] = os.path.join(tmp, "ch")
+        ch = w(os.path.join(tmp, "ch", "AGENTS.md"))
+        assert hud.session_instructions(os.path.join(repo, "pkg", "a"))["Codex"] == [ch, leaf]
+    finally:
+        os.environ.pop("CODEX_HOME", None)
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
