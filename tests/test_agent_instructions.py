@@ -214,6 +214,69 @@ def test_other_agents_disabled_skills():
         shutil.rmtree(tmp)
 
 
+def test_robust_against_bad_files():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        # 읽을 수 없는 스킬 파일과 규칙 폴더로 수집이 죽지 않는다
+        locked = w(os.path.join(p, ".claude", "skills", "locked", "SKILL.md"), "---\nname: locked\ndescription: x\n---\n")
+        w(os.path.join(p, ".agents", "skills", "locked", "SKILL.md"), "---\nname: locked\ndescription: y\n---\n")
+        os.chmod(locked, 0)
+        rules = os.path.join(p, ".agents", "rules"); os.makedirs(rules); os.chmod(rules, 0)
+        try:
+            hud._skill_root_index(p)
+            hud.session_instructions(p)
+        finally:
+            os.chmod(locked, 0o644); os.chmod(rules, 0o755)
+        # 규칙 폴더의 순환 링크에서 멈춘다
+        r = os.path.join(p, ".claude", "rules"); w(os.path.join(r, "a.md"))
+        os.symlink(r, os.path.join(r, "loop"))
+        assert [f for f in hud._claude_rules(r)] == [os.path.join(r, "a.md")], hud._claude_rules(r)
+        # @[..](..) 사슬이 아주 길어도 죽지 않는다
+        d = os.path.join(p, "c")
+        for i in range(3000):
+            w(os.path.join(d, f"{i}.md"), f"@[n]({i + 1}.md)\n")
+        assert len(hud._agy_expand(os.path.join(d, "0.md"), set())) < 100
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_reapply_keeps_user_change_and_failed_restore_keeps_record():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); os.makedirs(p)
+        hud.SETS_FILE = os.path.join(tmp, "sets.json"); hud.MODES_FILE = os.path.join(tmp, "modes.json")
+        for n in ("a", "b", "c", "z"):
+            w(os.path.join(hud.CLAUDE_DIR, "skills", n, "SKILL.md"), f"---\nname: {n}\ndescription: x\n---\n")
+        json.dump({"noa": {"plugins": [], "skills": ["b", "c", "z"]}}, open(hud.MODES_FILE, "w"))
+        local = os.path.join(p, ".claude", "settings.local.json")
+        w(local, json.dumps({"skillOverrides": {"c": "user-invocable-only"}}))
+        ok, err = hud.assign_set("noa", p); assert ok, err
+        cur = json.load(open(local)); assert cur["skillOverrides"]["a"] == "off", cur
+        # 적용 뒤 사용자가 값을 바꾸고 재적용해도, 해제가 그 값을 지우지 않는다
+        cur["skillOverrides"]["a"] = "user-invocable-only"; json.dump(cur, open(local, "w"))
+        ok, err = hud.assign_set("noa", p); assert ok, err
+        assert json.load(open(local))["skillOverrides"]["a"] == "off"      # 재적용은 그룹 값을 다시 쓴다
+        cur = json.load(open(local)); cur["skillOverrides"]["q"] = "off"; json.dump(cur, open(local, "w"))
+        ok, err = hud.assign_set("", p); assert ok, err
+        got = json.load(open(local))["skillOverrides"]
+        assert got.get("q") == "off", "그룹과 무관한 사용자 값이 지워졌다"
+        assert "a" not in got or got["a"] == "user-invocable-only", got
+        # 복원 쓰기가 실패하면 기록을 남겨 다시 시도할 수 있다
+        ok, err = hud.assign_set("noa", p); assert ok, err
+        real = hud._write_local
+        hud._write_local = lambda *a: (False, "disk")
+        try:
+            ok, err = hud.assign_set("", p); assert not ok
+        finally:
+            hud._write_local = real
+        assert p in json.load(open(hud.SETS_FILE + ".restore")), "복원 기록이 사라졌다"
+        ok, err = hud.assign_set("", p); assert ok, err
+        assert p not in json.load(open(hud.SETS_FILE + ".restore"))
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
