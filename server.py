@@ -606,15 +606,44 @@ def _imports_of(path, depth=0, excludes=(), seen=None):
     return out
 
 
+def _dirs_from_root(project_dir):
+    """파일시스템 루트부터 project_dir 까지."""
+    out, cur = [], os.path.abspath(project_dir)
+    while True:
+        out.append(cur)
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return out[::-1]
+        cur = parent
+
+
+def _first_nonempty(*paths):
+    for p in paths:
+        if os.path.isfile(p) and os.path.getsize(p) > 0:
+            return [p]
+    return []
+
+
+def _codex_instructions(project_dir):
+    """전역 하나, 그리고 Git 루트부터 프로젝트 폴더까지 폴더마다 하나. 빈 파일은 건너뛴다.
+    루트를 못 찾으면 프로젝트 폴더만 본다(Codex 공식 문서)."""
+    home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+    out = _first_nonempty(os.path.join(home, "AGENTS.override.md"), os.path.join(home, "AGENTS.md"))
+    dirs = _dirs_from_root(project_dir)
+    roots = [i for i, d in enumerate(dirs) if os.path.exists(os.path.join(d, ".git"))]
+    for d in dirs[roots[-1]:] if roots else [os.path.abspath(project_dir)]:
+        out += _first_nonempty(os.path.join(d, "AGENTS.override.md"), os.path.join(d, "AGENTS.md"))
+    return out
+
+
 # 에이전트마다 세션을 시작할 때 늘 읽는 지침 파일. 하위 폴더의 파일은 그 폴더를 건드릴 때만
 # 읽히므로 넣지 않는다. 출처: INSTRUCTION_SOURCES 의 도구 표와 각 도구 문서(ADR 11).
 def session_instructions(project_dir):
     """-> {에이전트: [파일 경로]} (실재하는 것만, 링크는 대상으로, 중복 없이)"""
     P = lambda *a: os.path.join(project_dir, *a)
-    agents_md = P("AGENTS.override.md") if os.path.isfile(P("AGENTS.override.md")) else P("AGENTS.md")
     plan = {
         "Claude Code": [os.path.join(CLAUDE_DIR, "CLAUDE.md"), P("CLAUDE.md"), P("CLAUDE.local.md")],
-        "Codex": [os.path.join(HOME, ".codex", "AGENTS.md"), agents_md],
+        "Codex": _codex_instructions(project_dir),
         "Gemini CLI": [os.path.join(HOME, ".gemini", "GEMINI.md"), P("GEMINI.md")],
         "Cursor": [P("AGENTS.md")],
         "Copilot": [P(".github", "copilot-instructions.md"), P("AGENTS.md")],

@@ -9,6 +9,7 @@
 import importlib.util, json, os, shutil, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.environ.pop("CODEX_HOME", None)   # 이 셸의 실제 Codex 폴더를 읽지 않게 한다
 spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
