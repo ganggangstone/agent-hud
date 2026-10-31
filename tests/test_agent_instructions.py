@@ -133,6 +133,32 @@ def test_antigravity_instructions():
         shutil.rmtree(tmp)
 
 
+def test_same_name_merges_only_same_file():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        cl = w(os.path.join(p, ".claude", "skills", "same", "SKILL.md"), "---\nname: same\ndescription: CLAUDE\n---\n")
+        ag = w(os.path.join(p, ".agents", "skills", "same", "SKILL.md"), "---\nname: same\ndescription: AGENTS\n---\n")
+        rows = [r for r in hud.collect_skills({"project_dir": p})["rows"] if not r["name"]][0]["skills"]
+        by = {s["desc"]: s for s in rows if s["name"] == "same"}
+        assert set(by) == {"CLAUDE", "AGENTS"}, rows
+        assert "Claude Code" in by["CLAUDE"]["agents"] and "Codex" not in by["CLAUDE"]["agents"]
+        assert "Codex" in by["AGENTS"]["agents"] and "Claude Code" not in by["AGENTS"]["agents"]
+        # 링크로 공유한 같은 파일은 한 행이다
+        shutil.rmtree(os.path.join(p, ".agents", "skills", "same"))
+        os.symlink(os.path.dirname(cl), os.path.join(p, ".agents", "skills", "same"))
+        rows = [r for r in hud.collect_skills({"project_dir": p})["rows"] if not r["name"]][0]["skills"]
+        assert [s["name"] for s in rows].count("same") == 1, rows
+        assert "Codex" in rows[0]["agents"] and "Claude Code" in rows[0]["agents"]
+        # Claude Code는 같은 이름이면 전역이 프로젝트를 이긴다(공식 문서). 프로젝트 쪽은 Claude 뱃지를 잃는다.
+        w(os.path.join(hud.CLAUDE_DIR, "skills", "same", "SKILL.md"), "---\nname: same\ndescription: GLOBAL\n---\n")
+        rows = [r for r in hud.collect_skills({"project_dir": p})["rows"] if not r["name"]][0]["skills"]
+        by = {s["desc"]: s for s in rows if s["name"] == "same"}
+        assert "Claude Code" in by["GLOBAL"]["agents"] and "Claude Code" not in by["CLAUDE"]["agents"], by
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
