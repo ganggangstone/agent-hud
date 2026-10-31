@@ -93,7 +93,7 @@ def test_claude_hierarchy_and_rules():
         w(os.path.join(p, "sub", "CLAUDE.md"))
         ur = w(os.path.join(hud.CLAUDE_DIR, "rules", "u.md"))
         got = hud.session_instructions(p)["Claude Code"]
-        assert got == [ur, par, pdot, prule, ploc, dot, deep, top, loc], got
+        assert got == [ur, par, pdot, prule, ploc, dot, top, deep, loc], got
         rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
         for f in got:
             assert f in rows, f

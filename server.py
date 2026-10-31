@@ -617,6 +617,40 @@ def _dirs_from_root(project_dir):
         cur = parent
 
 
+def _frontmatter_text(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            m = re.match(r"---\s*\n(.*?)\n---", f.read(8192), re.S)
+    except OSError:
+        return ""
+    return m.group(1) if m else ""
+
+
+def _claude_rules(folder):
+    """시작 때 읽는 규칙: 하위 폴더까지의 .md 중 paths 가 없는 것(측정)."""
+    out = []
+    for cur, subs, files in os.walk(folder, followlinks=True):
+        subs.sort()
+        out += [os.path.join(cur, f) for f in sorted(files)
+                if f.endswith(".md") and not re.search(r"^paths\s*:", _frontmatter_text(os.path.join(cur, f)), re.M)]
+    return out
+
+
+def _claude_instructions(project_dir):
+    """전역, 그리고 파일시스템 루트부터 프로젝트까지 폴더마다(측정, v2.1.314). 프로젝트 쪽 CLAUDE 파일이
+    하나도 없으면 AGENTS.md를 대신 읽는다. 전역 CLAUDE.md와 규칙은 이 판정에 들어가지 않는다."""
+    dirs = _dirs_from_root(project_dir)
+    names = (("CLAUDE.md",), (".claude", "CLAUDE.md"), ("CLAUDE.local.md",))
+    has_claude = any(os.path.isfile(os.path.join(d, *n)) for d in dirs if d != HOME for n in names)
+    out = [os.path.join(CLAUDE_DIR, "CLAUDE.md")] + _claude_rules(os.path.join(CLAUDE_DIR, "rules"))
+    for d in dirs:
+        out += [os.path.join(d, "CLAUDE.md"), os.path.join(d, ".claude", "CLAUDE.md")]
+        if not has_claude:
+            out += [os.path.join(d, "AGENTS.md"), os.path.join(d, ".claude", "AGENTS.md")]
+        out += _claude_rules(os.path.join(d, ".claude", "rules")) + [os.path.join(d, "CLAUDE.local.md")]
+    return out
+
+
 def _first_nonempty(*paths):
     for p in paths:
         if os.path.isfile(p) and os.path.getsize(p) > 0:
@@ -642,7 +676,7 @@ def session_instructions(project_dir):
     """-> {에이전트: [파일 경로]} (실재하는 것만, 링크는 대상으로, 중복 없이)"""
     P = lambda *a: os.path.join(project_dir, *a)
     plan = {
-        "Claude Code": [os.path.join(CLAUDE_DIR, "CLAUDE.md"), P("CLAUDE.md"), P("CLAUDE.local.md")],
+        "Claude Code": _claude_instructions(project_dir),
         "Codex": _codex_instructions(project_dir),
         "Gemini CLI": [os.path.join(HOME, ".gemini", "GEMINI.md"), P("GEMINI.md")],
         "Cursor": [P("AGENTS.md")],
@@ -1638,6 +1672,9 @@ def collect_instructions(ctx):
     rows = _with_link_targets(rows + sub_rows)
     excludes = claude_md_excludes(project_dir)
     claude_reads = session_instructions(project_dir)["Claude Code"]
+    seen_real = {os.path.realpath(r["path"]) for r in rows}
+    # 위 목록이 안 훑는 곳: 상위 폴더, .claude/ 안, 규칙 폴더
+    rows += [_file_row(f, f) for f in claude_reads if f not in seen_real]
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
         r["scope"] = "project" if r["path"].startswith(project_dir.rstrip(os.sep) + os.sep) else "global"
         # 직접 제외했거나, 제외된 파일의 @대상으로만 닿는 파일. 다른 에이전트가 읽는 것과는 별개다.
