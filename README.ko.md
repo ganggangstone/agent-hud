@@ -287,6 +287,8 @@ Homebrew로 설치했다면 `brew services restart agent-hud`, `brew services st
 쓴다. 로그는 `$(brew --prefix)/var/log/agent-hud.err.log`에 있다. `agent-hud open`은
 대시보드를 브라우저로 연다. 꺼져 있으면 먼저 띄운다.
 
+Homebrew로 옮긴 뒤 예전 `com.agent-hud` 서비스 설정이 남아 있으면 대시보드가 경고와 끄는 명령을 보여 준다. HUD가 직접 끄지는 않는다.
+
 대시보드는 늘 41717번 포트를 쓴다. 그래서 북마크와 앱으로 설치한 아이콘이 계속 맞는 주소를
 연다. 다른 프로그램이 이미 그 포트를 쓰고 있으면 다른 번호로 옮기지 않고 비기를 기다리며,
 로그에 그렇게 적는다.

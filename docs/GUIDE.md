@@ -24,6 +24,8 @@ HUD can switch things on and off **only for Claude Code**. For other agents it o
 | Cursor | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. Root `AGENTS.md` only [unverified: rule file totals, [#35](../../../issues/35)] |
 | Copilot | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. `.github/copilot-instructions.md` and root `AGENTS.md` only [unverified: [#35](../../../issues/35)] |
 
+**Related documents:** documents mentioned by path or link in an instruction file appear under that file in the Instructions tab. They are read only when needed, so they are not in the startup totals. They are found automatically from the text and may be wrong, and only `.md`, `.mdc` and `.txt` files inside the instruction file's folder or the project are shown.
+
 ## Common mistakes
 
 | What you try | What happens | Do this instead |

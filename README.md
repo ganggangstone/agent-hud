@@ -325,6 +325,8 @@ With Homebrew, use `brew services restart agent-hud` and `brew services stop age
 logs are in `$(brew --prefix)/var/log/agent-hud.err.log`. `agent-hud open` opens the
 dashboard in your browser, starting it first if it is not running.
 
+If settings for the old `com.agent-hud` service remain after moving to Homebrew, the dashboard shows a warning and the command to stop it. HUD does not stop it on its own.
+
 The dashboard always uses port 41717, so bookmarks and the installed app keep working. If
 another program already uses that port, the dashboard waits for it to be free instead of
 moving to another number, and says so in the log.
