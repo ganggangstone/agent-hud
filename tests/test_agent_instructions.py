@@ -190,6 +190,30 @@ def test_unassign_restores_switches():
         shutil.rmtree(tmp)
 
 
+def test_other_agents_disabled_skills():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        for n in ("cx", "gm", "gu", "cp", "cr", "ok"):
+            w(os.path.join(p, ".agents", "skills", n, "SKILL.md"), f"---\nname: {n}\ndescription: x\n---\n")
+        cx = os.path.join(p, ".agents", "skills", "cx", "SKILL.md")
+        w(os.path.join(hud.HOME, ".codex", "config.toml"), f"[[skills.config]]\npath = {json.dumps(cx)}\nenabled = false\n")
+        w(os.path.join(p, ".gemini", "settings.json"), json.dumps({"skills": {"disabled": ["gm"]}}))
+        w(os.path.join(hud.HOME, ".gemini", "settings.json"), json.dumps({"skills": {"disabled": ["gu"]}}))
+        w(os.path.join(hud.HOME, ".copilot", "settings.json"), json.dumps({"disabledSkills": ["cp"]}))
+        w(os.path.join(p, ".github", "copilot", "settings.json"), json.dumps({"disabledSkills": ["cr"]}))
+        rows = [r for r in hud.collect_skills({"project_dir": p})["rows"] if not r["name"]][0]["skills"]
+        by = {s["name"]: s["agents"] for s in rows}
+        assert "Codex" not in by["cx"] and "Codex" in by["ok"], by
+        assert "Gemini CLI" not in by["gm"] and "Gemini CLI" not in by["gu"] and "Gemini CLI" in by["ok"], by
+        assert "Copilot" not in by["cp"] and "Copilot" not in by["cr"] and "Copilot" in by["ok"], by
+        for bad in ("[[skills.config", "\xff"):
+            open(os.path.join(hud.HOME, ".codex", "config.toml"), "w", errors="replace").write(bad)
+            hud.collect_skills({"project_dir": p})              # 깨진 설정 파일로 죽지 않는다
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
