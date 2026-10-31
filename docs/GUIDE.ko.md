@@ -1,6 +1,6 @@
 # Agent HUD에서 되는 것과 안 되는 것
 
-Agent HUD를 쓰는 사람과, 사람 대신 HUD를 다루는 에이전트를 위한 문서입니다. v0.6.2 기준입니다.
+Agent HUD를 쓰는 사람과, 사람 대신 HUD를 다루는 에이전트를 위한 문서입니다. v0.6.3 기준입니다.
 
 근거 표시: **[실측]** 직접 실행, **[문서]** 공식 문서, **[미확인]** 확인하지 못함.
 
@@ -17,10 +17,10 @@ HUD가 켜고 끌 수 있는 것은 **Claude Code뿐**입니다. 다른 에이�
 
 | 에이전트 | HUD로 스킬 끄기 | 그룹 링크로 스킬 추가 | 지침 집계 |
 |---|---|---|---|
-| Claude Code | 됨 [실측] | 됨 [실측] | 됨. `claudeMdExcludes`와 `@` 가져오기 반영 [실측]. 상위 폴더, `.claude/CLAUDE.md`, `.claude/rules/`는 아직 안 셈 ([#30](../../../issues/30)) |
-| Codex | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. 상위 폴더 탐색 안 함 ([#23](../../../issues/23)), 빈 override 오판 ([#22](../../../issues/22)) |
+| Claude Code | 됨 [실측] | 됨 [실측] | 됨. 상위 폴더, `.claude/CLAUDE.md`, 규칙, `AGENTS.md` 대체, `claudeMdExcludes`, `@` 가져오기 반영 [실측] |
+| Codex | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. Git 루트부터 폴더마다 집계 [문서]. 크기 한도와 대체 파일 이름은 안 셈 ([#23](../../../issues/23)) |
 | Gemini CLI | 안 됨. 자체 설정으로 끈 것은 읽어서 표시 | 됨 (`.agents/skills`) [문서] | 부분. 전역과 루트 `GEMINI.md`만 셈, `@` 가져오기 미반영 |
-| Antigravity | 안 됨 | 됨 (`.agents/skills`) [문서] | 안 됨. 항상 0으로 표시 ([#21](../../../issues/21)) |
+| Antigravity | 안 됨 | 됨 (`.agents/skills`) [문서] | 됨. 시작 폴더의 지침과 `always_on` 규칙 [실측], 전역 지침과 규칙 [문서] |
 | Cursor | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. 루트 `AGENTS.md`만 셈 [미확인: 규칙 파일 집계, [#35](../../../issues/35)] |
 | Copilot | 안 됨 | 됨. 다만 전역 폴더도 읽어 프로젝트별로 나눌 수 없음 [문서] | 부분. `.github/copilot-instructions.md`와 루트 `AGENTS.md`만 셈 [미확인: [#35](../../../issues/35)] |
 
@@ -32,9 +32,8 @@ HUD가 켜고 끌 수 있는 것은 **Claude Code뿐**입니다. 다른 에이�
 | `claudeMdExcludes`로 Codex 지침 끄기 | Codex는 이 설정을 읽지 않음 | Codex의 파일 구조로 조정 |
 | 플러그인 안의 스킬 하나만 끄기 | 안 됨. `permissions.deny`도 토큰을 못 줄임 [실측] | 플러그인을 통째로 끔 |
 | 폴더째 링크한 `.agents/skills`에서 "다른 에이전트도 쓰게" 체크 | 쓰기가 막힘 (안전장치) [실측] | 실제 폴더를 두고 스킬별 링크를 사용 |
-| 같은 이름의 다른 스킬을 `.claude`와 `.agents`에 두기 | 한 행으로 합쳐져 잘못 표시됨 ([#24](../../../issues/24)) | 이름을 다르게 둠 |
+| 같은 이름의 다른 스킬을 `.claude`와 `.agents`에 두기 | 행이 나뉘어 표시되지만 도구마다 다른 내용을 읽음 | 이름을 다르게 둠 |
 | 전역 스킬과 같은 이름의 프로젝트 스킬 만들기 | Claude Code는 전역 스킬을 먼저 씀 [문서] | 이름을 다르게 둠 |
-| `agent-hud --version` | 서버가 뜨고 끝나지 않음 ([#37](../../../issues/37)) | `brew list --versions agent-hud` 또는 `/api/state`의 `version` |
 
 ## 에이전트용 안내
 
@@ -47,6 +46,7 @@ curl -s "http://127.0.0.1:41717/api/state?project=<절대 경로>"   # 패널 �
 agent-hud groups                                                  # 그룹 목록
 agent-hud worktrees [폴더]                                         # worktree의 스킬 상태
 agent-hud --help                                                  # 사용법
+agent-hud --version                                               # 버전
 ```
 
 **파일을 바꾸는 것: 사용자가 요청했을 때만**
@@ -59,7 +59,7 @@ agent-hud worktrees apply [폴더]  # 저장된 스킬 구성을 추가
 
 **하지 말 것**
 
-- `agent-hud`, `agent-hud --version`처럼 서버를 띄우는 명령을 확인용으로 실행하지 않습니다. 포그라운드에서 끝나지 않습니다.
+- 인자 없는 `agent-hud`는 서버를 띄우는 명령이라 확인용으로 실행하지 않습니다. 포그라운드에서 끝나지 않습니다.
 - `POST /api/*`로 설정을 바꾸지 않습니다. 화면을 위한 내부 경로이며, 바뀔 수 있습니다.
 - 값을 고치려고 `modes.json`이나 `settings.local.json`을 먼저 건드리지 않습니다. 위 명령이 있으면 그 명령을 씁니다.
 - 임시 시험에는 실제 데이터 폴더를 쓰지 않습니다. `AGENT_HUD_HOME`과 `AGENT_HUD_PORT`로 분리합니다.
