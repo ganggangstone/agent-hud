@@ -130,6 +130,19 @@ def test_claude_md_excludes():
         w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [shared]}))
         assert shared not in hud.session_instructions(proj)["Claude Code"]
 
+        # managed 설정의 배열도 합친다
+        managed = w(os.path.join(tmp, "managed", "managed-settings.json"), json.dumps({"claudeMdExcludes": [shared]}))
+        hud.MANAGED_SETTINGS = managed
+        w(os.path.join(proj, ".claude", "settings.local.json"), "{}")
+        assert shared not in hud.session_instructions(proj)["Claude Code"]
+        os.remove(managed)
+
+        # 문자 클래스
+        assert hud._glob_regex("/r/[ab]/C.md").fullmatch("/r/a/C.md")
+        assert not hud._glob_regex("/r/[ab]/C.md").fullmatch("/r/c/C.md")
+        assert hud._glob_regex("/r/[!ab]/C.md").fullmatch("/r/c/C.md")
+        assert hud._glob_regex("/r/[x.md").fullmatch("/r/[x.md"), "닫히지 않은 [ 는 글자 그대로"
+
         # 잘못된 값은 무시한다
         w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": "x"}))
         assert shared in hud.session_instructions(proj)["Claude Code"]
