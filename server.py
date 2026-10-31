@@ -778,21 +778,25 @@ RELATED_MAX = 50
 _related_cache = {}     # path -> (잰 시각, mtime, 결과). 이 패널은 3초마다 다시 그려진다.
 
 
-def _related_docs(path):
+def _related_docs(path, project_dir):
     """본문에 경로나 링크로만 적힌 문서. 필요할 때 읽히는 것이라 시작 합계에는 넣지 않는다.
-    글자에서 찾은 추정이므로 실제로 있는 문서 파일만 남긴다. 코드 블록과 URL은 건너뛴다."""
+    글자에서 찾은 추정이므로 실제로 있는 문서 파일만 남긴다. 코드 블록과 URL은 건너뛴다.
+    지침은 남의 저장소에서 올 수 있으니 그 파일의 폴더와 프로젝트 안만 허용한다. 링크는 대상으로 판단한다."""
     try:
         mtime = os.stat(path).st_mtime
     except OSError:
         return []
-    hit = _related_cache.get(path)
+    hit = _related_cache.get((path, project_dir))
     if hit and hit[1] == mtime and time.time() - hit[0] < SCAN_TTL:
         return hit[2]
     real = os.path.realpath(path)
+    roots = (os.path.dirname(real) + os.sep, os.path.realpath(project_dir) + os.sep)
     found, fence = [], None
     try:
         with open(real, encoding="utf-8", errors="replace") as f:
             for line in f:
+                if len(found) >= RELATED_MAX:
+                    break
                 m = _FENCE_RE.match(line)
                 if fence or m:
                     if not fence:
@@ -806,12 +810,14 @@ def _related_docs(path):
                         continue
                     t = os.path.expanduser(raw)
                     t = t if os.path.isabs(t) else os.path.normpath(os.path.join(os.path.dirname(real), t))
-                    if (t.endswith(RELATED_EXTS) and os.path.isfile(t) and os.path.realpath(t) != real
-                            and t not in found and len(found) < RELATED_MAX):
+                    if len(found) >= RELATED_MAX or not t.endswith(RELATED_EXTS) or t in found:
+                        continue
+                    target = os.path.realpath(t)
+                    if target != real and target.startswith(roots) and os.path.isfile(target):
                         found.append(t)
     except OSError:
         return []
-    _related_cache[path] = (time.time(), mtime, found)
+    _related_cache[(path, project_dir)] = (time.time(), mtime, found)
     return found
 
 
@@ -1821,7 +1827,7 @@ def collect_instructions(ctx):
     rows += [_file_row(f, f) for f in claude_reads if f not in seen_real]
     row_real = {os.path.realpath(r["path"]) for r in rows}
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
-        r["related"] = [d for d in _related_docs(r["path"]) if os.path.realpath(d) not in row_real] if r["exists"] else []
+        r["related"] = [d for d in _related_docs(r["path"], project_dir) if os.path.realpath(d) not in row_real] if r["exists"] else []
         READABLE_PATHS.update(r["related"])
         r["scope"] = "project" if r["path"].startswith(project_dir.rstrip(os.sep) + os.sep) else "global"
         # 직접 제외했거나, 제외된 파일의 @대상으로만 닿는 파일. 다른 에이전트가 읽는 것과는 별개다.
@@ -2459,7 +2465,7 @@ const T = {
   not_found: 'not found',
   related_doc: 'related document',
   related_doc_tip: 'Mentioned by path in this file. Read only when needed, so it is not in the startup totals. Found automatically from the text, so it may be wrong.',
-  old_service_warning: 'An older install.sh service (com.agent-hud) is running alongside this Homebrew install and shares its data folder. This command stops and removes it.',
+  old_service_warning: 'Settings for an older install.sh service (com.agent-hud) are still here. If it runs alongside this Homebrew install, both use the same data folder. This command stops and removes it.',
   claude_excluded: 'excluded from Claude Code',
   claude_excluded_tip: 'Claude Code does not read this file in this project (claudeMdExcludes). Other agents are not affected.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
@@ -2600,7 +2606,7 @@ const T = {
   not_found: '없음',
   related_doc: '관련 문서',
   related_doc_tip: '이 파일 본문에 경로로 적힌 문서입니다. 필요할 때만 읽히므로 시작 합계에는 없습니다. 글자에서 자동으로 찾은 것이라 틀릴 수 있습니다.',
-  old_service_warning: '예전 install.sh 서비스(com.agent-hud)가 이 Homebrew 설치본과 함께 돌며 같은 데이터 폴더를 씁니다. 이 명령으로 끄고 지울 수 있습니다.',
+  old_service_warning: '예전 install.sh 서비스(com.agent-hud) 설정이 남아 있습니다. 이 Homebrew 설치본과 함께 돌면 같은 데이터 폴더를 씁니다. 이 명령으로 끄고 지울 수 있습니다.',
   claude_excluded: 'Claude Code에서 제외',
   claude_excluded_tip: '이 프로젝트에서 Claude Code는 이 파일을 읽지 않습니다 (claudeMdExcludes). 다른 에이전트와는 상관없습니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
@@ -3040,7 +3046,7 @@ function renderFeedback(upd){
 // 배너는 tick마다 다시 그려지므로 버튼 상태는 updState에 둔다.
 let updState = '';  // '' | 'running' | 'copied' | 'failed'
 let updError = '';
-const OLD_SERVICE_STOP = 'launchctl bootout gui/$(id -u)/com.agent-hud && rm ~/Library/LaunchAgents/com.agent-hud.plist';
+const OLD_SERVICE_STOP = 'launchctl bootout gui/$(id -u)/com.agent-hud; rm -f ~/Library/LaunchAgents/com.agent-hud.plist';
 function renderOldService(upd){
   const el = document.getElementById('oldServiceBanner');
   if(!(upd && upd.old_service)){ el.style.display = 'none'; return; }
