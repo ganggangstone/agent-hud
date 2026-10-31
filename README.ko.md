@@ -321,6 +321,8 @@ Chrome과 Edge에서는 바로 설치된다. 이 기능이 없는 브라우저(S
 
 ## 한계
 
+에이전트별로 되는 것과 안 되는 것, 에이전트가 HUD를 다룰 때의 규칙은 [docs/GUIDE.ko.md](docs/GUIDE.ko.md)에 있다.
+
 - **macOS만 지원한다.** 설치 스크립트와 앱은 macOS용이다. Linux에서는 `server.py`를
   직접 실행하고 `systemd --user` 같은 서비스 관리 도구를 별도로 설정해야 한다.
   Finder 폴더 선택 같은 macOS 기능은 사용할 수 없다.
