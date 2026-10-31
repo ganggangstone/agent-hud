@@ -277,6 +277,18 @@ def test_reapply_keeps_user_change_and_failed_restore_keeps_record():
         shutil.rmtree(tmp)
 
 
+def test_install_does_not_copy_example_groups():
+    text = open(os.path.join(ROOT, "install.sh"), encoding="utf-8").read()
+    assert "modes.json" not in text, "첫 설치에 자리표시자 그룹을 만들면 안 된다"
+    assert not os.path.exists(os.path.join(ROOT, "modes.json.example"))
+    tmp = env()
+    try:
+        hud.MODES_FILE = os.path.join(tmp, "none.json")
+        assert hud.collect_groups({"project_dir": tmp})["groups"] == []     # 그룹 없이 시작해도 화면이 뜬다
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
