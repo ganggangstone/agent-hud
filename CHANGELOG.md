@@ -2,6 +2,22 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.2
+
+**Claude Code가 실제로 읽는 지침과 스킬에 표시와 집계를 맞췄다.** 지침 탭과 머리글이 `claudeMdExcludes`를
+반영한다. 제외된 파일과 그 파일로만 닿는 `@` 대상은 합계에서 빠지고, 목록에는 「Claude Code에서 제외」로 남는다.
+`skillOverrides`가 `off`인 스킬은 머리말이 수동 전용이어도 「제외」로 보이고, 스위치로 제외하고 되돌릴 수 있다.
+`disable-model-invocation` 스킬은 읽히는 스킬 수와 토큰에서 빠진다. `@` 가져오기는 Claude Code v2.1.314에서
+측정한 규칙을 따른다. 문장 속 `@`, 공백, 다른 이름의 파일, 링크된 파일을 네 단계까지 따라가고, 코드 영역과
+따옴표로 감싼 경로는 건너뛴다.
+
+**Display and totals now match what Claude Code actually reads.** The instructions tab and header honour
+`claudeMdExcludes`: excluded files, and `@` targets reached only through them, leave the totals and stay listed as
+"excluded from Claude Code". A skill with `skillOverrides: off` shows as excluded even when its frontmatter makes it
+manual-only, and the switch can exclude and restore it. `disable-model-invocation` skills no longer count toward
+loaded skills or tokens. `@` imports follow rules measured on Claude Code v2.1.314: mid-sentence `@`, escaped spaces,
+any file name and linked files up to four hops, skipping code regions and quoted paths.
+
 ## v0.6.1
 
 **설명 문구를 줄이고 풀어 썼다.** 스킬 탭에서 에이전트별 스킬 토큰 문장을 지웠다(머리글 표가 같은 내용을 보여준다).
