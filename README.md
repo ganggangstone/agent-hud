@@ -358,6 +358,8 @@ writes settings files on this computer only and needs no account.
 
 ## Known limitations
 
+What works and what does not for each agent, and the rules for agents operating HUD, are in [docs/GUIDE.md](docs/GUIDE.md).
+
 - **macOS only.** The installer and app are built for macOS. On Linux, run `server.py`
   directly and configure a service manager such as `systemd --user` separately.
   macOS features such as the Finder folder picker are unavailable. Windows is not

@@ -30,6 +30,7 @@ user clicks Update now, and then Homebrew does the download.
 - Install with an AI agent: ask it to "Install Agent HUD from https://github.com/ganggangstone/agent-hud and follow the For AI agents section of its README"
 - Install: `brew install --cask ganggangstone/tap/agent-hud-app` (app icon plus the `agent-hud` command), or `brew install ganggangstone/tap/agent-hud && brew services start agent-hud` for the command only (or `git clone https://github.com/ganggangstone/agent-hud.git && cd agent-hud && ./install.sh`)
 - Design decisions: https://github.com/ganggangstone/agent-hud/blob/main/docs/ADR.md
+- What works per agent, and rules for agents operating HUD: https://github.com/ganggangstone/agent-hud/blob/main/docs/GUIDE.md
 
 ## Summary
 
