@@ -91,6 +91,22 @@ def test_import_rules():
         link = hud._link_info(claude)
         assert [t["path"] for t in link["targets"]] == [inline, space, upper], link
 
+        # 짝이 안 맞는 백틱은 코드 스팬이 아니고, 따옴표 문장 속 @는 읽고, 앞에 글자가 붙은 @는 안 읽는다.
+        q1, q2, q3, q4, q5 = [w(f"q/q{i}.md") for i in range(1, 6)]
+        qc = w("q/CLAUDE.md", "\"see @q1.md here\"\n` @q2.md ``\nit is \"@q3.md\" ok\nsay (@q4.md) now\n``@q5.md``\n")
+        assert hud._imports_of(qc) == [qc, q1, q2], hud._imports_of(qc)
+
+        # 깊은 경로로 먼저 닿은 파일은 얕은 경로로 다시 파고들지 않는다(측정).
+        ax = w("x/x.md", "@y.md\n"); ay = w("x/y.md")
+        ac = w("x/c.md", "@x.md\n"); ab = w("x/b.md", "@c.md\n"); aa2 = w("x/a.md", "@b.md\n")
+        dia = w("x/CLAUDE.md", "@a.md\n@x.md\n")
+        assert hud._imports_of(dia) == [dia, aa2, ab, ac, ax], hud._imports_of(dia)
+
+        # 이미 지나간 행이 뒤의 CLAUDE.md에 가져와져도 그 안의 @를 따라간다.
+        px = w("o/x.md", "@y.md\n"); py = w("o/y.md"); pc = w("o/CLAUDE.md", "@x.md\n")
+        by = {r["path"]: r for r in hud._with_link_targets([hud._file_row("x.md", px, "Codex"), hud._file_row("CLAUDE.md", pc)])}
+        assert py in by, list(by)
+
         # 줄 맨 앞인데 없는 파일은 깨진 연결로 보여 주고, 문장 속이면 그냥 글자다.
         broken = w("b/CLAUDE.md", "@gone.md\nask @nobody here\n")
         assert [t["ok"] for t in hud._link_info(broken)["targets"]] == [False]
