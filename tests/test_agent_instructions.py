@@ -478,6 +478,32 @@ def test_claude_strips_block_html_comments():
         shutil.rmtree(tmp)
 
 
+def test_external_imports_need_approval():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); out = w(os.path.join(tmp, "out.md"))
+        inside = w(os.path.join(p, "in.md"))
+        claude = w(os.path.join(p, "CLAUDE.md"), "@../out.md\n@in.md\n")
+        g = w(os.path.join(hud.CLAUDE_DIR, "CLAUDE.md"), "@../gout.md\n")          # 사용자 지침은 승인과 무관하다
+        gout = w(os.path.join(hud.HOME, "gout.md"))
+        state = os.path.join(hud.HOME, ".claude.json")
+        assert hud.session_instructions(p)["Claude Code"] == [g, gout, claude, inside]
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
+        assert rows[out]["import_unconfirmed"] is True and rows[out]["claude_excluded"] is False, rows[out]
+        assert rows[inside]["import_unconfirmed"] is False
+        w(state, json.dumps({"projects": {p: {"hasClaudeMdExternalIncludesApproved": True}}}))
+        assert out in hud.session_instructions(p)["Claude Code"], "승인했으면 읽힌다"
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
+        assert rows[out]["import_unconfirmed"] is False
+        # 프로젝트 밖을 가리키는 규칙 링크도 승인이 필요하다
+        w(state, "{}")
+        rule_dir = os.path.join(p, ".claude", "rules"); os.makedirs(rule_dir)
+        os.symlink(out, os.path.join(rule_dir, "linked.md"))
+        assert out not in hud.session_instructions(p)["Claude Code"]
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
