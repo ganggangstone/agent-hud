@@ -528,6 +528,24 @@ def test_review_findings_on_imports_and_rules():
         shutil.rmtree(tmp)
 
 
+def test_gemini_row_removed():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        assert "Gemini CLI" not in hud.SKILL_AGENTS
+        got = hud.session_instructions(p)
+        assert "Gemini CLI" not in got
+        g = w(os.path.join(hud.HOME, ".gemini", "GEMINI.md")); pg = w(os.path.join(p, "GEMINI.md"))
+        assert hud.session_instructions(p)["Antigravity"] == [g, pg]
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
+        assert rows[g]["tool"] == "Antigravity" and rows[pg]["tool"] == "Antigravity", rows
+        w(os.path.join(p, ".gemini", "skills", "only-gem", "SKILL.md"), "---\nname: only-gem\ndescription: x\n---\n")
+        assert "only-gem" not in hud._skill_root_index(p)
+        assert "Gemini CLI" not in hud.PAGE
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
