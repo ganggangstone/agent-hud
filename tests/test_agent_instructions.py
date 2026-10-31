@@ -420,6 +420,27 @@ def test_codex_limit_applies_to_project_under_codex_home():
         shutil.rmtree(tmp)
 
 
+def test_codex_skill_paths_measured():
+    """Codex 0.166 측정: 프로젝트 .agents, .codex와 $CODEX_HOME/skills를 읽고 .claude는 안 읽는다."""
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); sk = "---\nname: {0}\ndescription: x\n---\n"
+        for root, n in ((".agents", "a"), (".codex", "c"), (".claude", "l")):
+            w(os.path.join(p, root, "skills", n, "SKILL.md"), sk.format(n))
+        w(os.path.join(hud.HOME, ".codex", "skills", "h", "SKILL.md"), sk.format("h"))
+        idx = hud._skill_root_index(p)
+        assert "Codex" in idx["a"]["agents"] and "Codex" in idx["c"]["agents"] and "Codex" in idx["h"]["agents"], idx
+        assert "Codex" not in idx["l"]["agents"], idx
+        os.environ["CODEX_HOME"] = os.path.join(tmp, "ch")
+        w(os.path.join(tmp, "ch", "skills", "e", "SKILL.md"), sk.format("e"))
+        idx = hud._skill_root_index(p)
+        assert "Codex" in idx["e"]["agents"], idx
+        assert "Codex" not in idx["h"]["agents"], "CODEX_HOME을 옮기면 ~/.codex/skills는 Codex가 안 읽는다"
+    finally:
+        os.environ.pop("CODEX_HOME", None)
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
