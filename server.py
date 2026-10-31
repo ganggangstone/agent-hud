@@ -260,6 +260,9 @@ def collect_update(ctx):
         "has_update": newer(latest, VERSION),
         "repo": UPDATE_REPO,
         "brew": bool(brew_prefix()),
+        # Homebrew 설치본과 install.sh 서비스가 같이 돌면 같은 데이터 폴더를 함께 쓴다. HUD가 끄지는 않는다.
+        "old_service": bool(brew_prefix()) and os.path.isfile(
+            os.path.join(HOME, "Library", "LaunchAgents", "com.agent-hud.plist")),
     }
 
 
@@ -2338,6 +2341,7 @@ span.clickable:hover,div.skill-desc.clickable:hover{color:var(--accent)}
   <span id="h1sub"></span>
 </div>
 <div class="note" id="updateBanner" style="margin-bottom:12px;display:none"></div>
+<div class="note" id="oldServiceBanner" style="margin-bottom:12px;display:none"></div>
 <div id="tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px"></div>
 <div id="applyBanner" class="rule-note"></div>
 <div class="grid" id="app"></div>
@@ -2407,6 +2411,7 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  old_service_warning: 'An older install.sh service (com.agent-hud) is running alongside this Homebrew install and shares its data folder. This command stops and removes it.',
   claude_excluded: 'excluded from Claude Code',
   claude_excluded_tip: 'Claude Code does not read this file in this project (claudeMdExcludes). Other agents are not affected.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
@@ -2545,6 +2550,7 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  old_service_warning: '예전 install.sh 서비스(com.agent-hud)가 이 Homebrew 설치본과 함께 돌며 같은 데이터 폴더를 씁니다. 이 명령으로 끄고 지울 수 있습니다.',
   claude_excluded: 'Claude Code에서 제외',
   claude_excluded_tip: '이 프로젝트에서 Claude Code는 이 파일을 읽지 않습니다 (claudeMdExcludes). 다른 에이전트와는 상관없습니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
@@ -2984,6 +2990,16 @@ function renderFeedback(upd){
 // 배너는 tick마다 다시 그려지므로 버튼 상태는 updState에 둔다.
 let updState = '';  // '' | 'running' | 'copied' | 'failed'
 let updError = '';
+const OLD_SERVICE_STOP = 'launchctl bootout gui/$(id -u)/com.agent-hud && rm ~/Library/LaunchAgents/com.agent-hud.plist';
+function renderOldService(upd){
+  const el = document.getElementById('oldServiceBanner');
+  if(!(upd && upd.old_service)){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.textContent = '';
+  el.appendChild(document.createTextNode(t().old_service_warning + ' '));
+  const code = document.createElement('code'); code.textContent = OLD_SERVICE_STOP; el.appendChild(code);
+}
+
 function renderUpdate(upd){
   const el = document.getElementById('updateBanner');
   if(!(upd && upd.has_update)){ el.style.display = 'none'; return; }
@@ -3226,7 +3242,7 @@ async function tick(){
   if(!polling) return;
   const r = await fetch(stateUrl()); const d = await r.json();
   const upd = d.panels.find(p => p.panel === 'update');
-  renderUpdate(upd);
+  renderUpdate(upd); renderOldService(upd);
   const sp = d.panels.find(p => p.tokens) || {};
   lastTokens = sp.tokens || null; lastLoad = sp.load || null;
   renderHeadline();
