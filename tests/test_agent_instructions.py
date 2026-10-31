@@ -79,6 +79,42 @@ def test_agy_cli_skill_paths():
         shutil.rmtree(tmp)
 
 
+def test_claude_hierarchy_and_rules():
+    tmp = env()
+    try:
+        a = os.path.join(tmp, "a"); p = os.path.join(a, "p"); os.makedirs(p)
+        par = w(os.path.join(a, "CLAUDE.md")); pdot = w(os.path.join(a, ".claude", "CLAUDE.md"))
+        prule = w(os.path.join(a, ".claude", "rules", "r.md")); ploc = w(os.path.join(a, "CLAUDE.local.md"))
+        w(os.path.join(a, "AGENTS.md")); w(os.path.join(p, "AGENTS.md"))
+        dot = w(os.path.join(p, ".claude", "CLAUDE.md")); deep = w(os.path.join(p, ".claude", "rules", "deep", "d.md"))
+        top = w(os.path.join(p, ".claude", "rules", "top.md"))
+        w(os.path.join(p, ".claude", "rules", "scoped.md"), "---\npaths:\n  - \"**/*.zzz\"\n---\nx\n")
+        w(os.path.join(p, ".claude", "rules", "n.txt")); loc = w(os.path.join(p, "CLAUDE.local.md"))
+        w(os.path.join(p, "sub", "CLAUDE.md"))
+        ur = w(os.path.join(hud.CLAUDE_DIR, "rules", "u.md"))
+        got = hud.session_instructions(p)["Claude Code"]
+        assert got == [ur, par, pdot, prule, ploc, dot, deep, top, loc], got
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": p})["files"]}
+        for f in got:
+            assert f in rows, f
+        assert rows[dot]["scope"] == "project" and rows[par]["scope"] == "global"
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_claude_reads_agents_only_without_claude_md():
+    tmp = env()
+    try:
+        b = os.path.join(tmp, "b"); q = os.path.join(b, "q"); os.makedirs(q)
+        pa = w(os.path.join(b, "AGENTS.md")); qa = w(os.path.join(q, "AGENTS.md")); qd = w(os.path.join(q, ".claude", "AGENTS.md"))
+        gl = w(os.path.join(hud.CLAUDE_DIR, "CLAUDE.md"))   # 전역 CLAUDE.md는 대체 판정에 안 들어간다
+        assert hud.session_instructions(q)["Claude Code"] == [gl, pa, qa, qd]
+        c = w(os.path.join(b, "CLAUDE.md"))
+        assert hud.session_instructions(q)["Claude Code"] == [gl, c]
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
