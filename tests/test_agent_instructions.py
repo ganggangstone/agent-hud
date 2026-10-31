@@ -309,9 +309,9 @@ def test_related_documents():
     tmp = env()
     try:
         p = os.path.join(tmp, "p")
-        g1 = w(os.path.join(hud.HOME, ".codex", "guides", "git.md")); g2 = w(os.path.join(p, "docs", "rel.md"))
+        g1 = w(os.path.join(p, "guides", "git.md")); g2 = w(os.path.join(p, "docs", "rel.md"))
         imp = w(os.path.join(p, "imp.md")); w(os.path.join(p, "code.md")); w(os.path.join(p, "secret.key"))
-        body = ("| 언제 | 파일 |\n|---|---|\n| 커밋 | `~/.codex/guides/git.md` |\n"
+        body = ("| 언제 | 파일 |\n|---|---|\n| 커밋 | `guides/git.md` |\n"
                 "[관련](docs/rel.md#절)\n[웹](https://example.com/a.md)\n`없는파일.md`\n`secret.key`\n"
                 "@imp.md\n[자기](CLAUDE.md)\n```\n`code.md`\n```\n`docs/rel.md`\n")
         claude = w(os.path.join(p, "CLAUDE.md"), body)
@@ -329,6 +329,36 @@ def test_related_documents():
         assert all("related" in r for r in rows.values())
     finally:
         shutil.rmtree(tmp)
+
+
+def test_related_documents_stay_in_scope():
+    """다른 사람의 저장소가 적은 경로로 이 컴퓨터의 파일을 열 수 있으면 안 된다."""
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        secret = w(os.path.join(hud.HOME, ".aws", "credentials.txt"))
+        ok = w(os.path.join(p, "ok.md")); os.symlink(secret, os.path.join(p, "leak.txt"))
+        outside = w(os.path.join(tmp, "outside.md"))
+        claude = w(os.path.join(p, "CLAUDE.md"), f"[a]({secret})\n`leak.txt`\n`../outside.md`\n`ok.md`\n")
+        row = hud._file_row("CLAUDE.md", claude)
+        got = hud._related_docs(claude, p)
+        assert got == [ok], got
+        # 전역 지침은 자기 폴더의 문서를 가리킬 수 있다
+        guide = w(os.path.join(hud.HOME, ".codex", "guides", "git.md"))
+        g = w(os.path.join(hud.HOME, ".codex", "AGENTS.md"), f"`{guide}`\n`guides/git.md`\n")
+        assert hud._related_docs(g, p) == [guide]
+        # 링크가 많아도 상한에서 멈춘다
+        many = w(os.path.join(p, "many.md"), "`ok.md`\n" + "".join(f"`d{i}.md`\n" for i in range(hud.RELATED_MAX + 20)))
+        for i in range(hud.RELATED_MAX + 20):
+            w(os.path.join(p, f"d{i}.md"))
+        assert len(hud._related_docs(many, p)) == hud.RELATED_MAX
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_old_service_command_survives_unloaded_service():
+    assert "com.agent-hud && rm" not in hud.PAGE, "등록이 없으면 bootout이 실패해 rm까지 못 간다"
+    assert "돌며" not in hud.PAGE, "plist만 보고 돌고 있다고 단정하지 않는다"
 
 
 #TESTS
