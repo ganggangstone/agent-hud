@@ -459,6 +459,25 @@ def test_name_only_skill():
         shutil.rmtree(tmp)
 
 
+def test_claude_strips_block_html_comments():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        hidden = w(os.path.join(p, "hidden.md")); shown = w(os.path.join(p, "shown.md"))
+        claude = w(os.path.join(p, "CLAUDE.md"), "<!-- note\n@hidden.md\n-->\nBODY\n@shown.md\n```\n<!-- KEEP -->\n```\n")
+        assert hud.session_instructions(p)["Claude Code"] == [claude, shown]
+        real = hud.count_tokens; seen = []
+        hud.count_tokens = lambda texts: (seen.extend(texts), ("ok", {t: len(t) for t in texts}))[1]
+        try:
+            load = hud.session_load(p, {"state": "ok", "agents": {"Claude Code": {"skills": 0, "measured": 0, "tokens": 0}}})["Claude Code"]
+        finally:
+            hud.count_tokens = real
+        stripped = "BODY\n@shown.md\n```\n<!-- KEEP -->\n```\n"
+        assert stripped in seen and load["tokens"] == len(stripped) + len("x\n"), (seen, load)
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
