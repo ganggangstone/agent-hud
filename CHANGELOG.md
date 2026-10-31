@@ -2,6 +2,42 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.4
+
+**지침 탭에 관련 문서를 보여준다.** 지침 파일 본문에 경로나 링크로 적힌 문서를 그 파일 아래에 보여준다. 필요할 때
+읽히는 문서라 시작 합계에는 넣지 않고, 지침 파일의 폴더와 프로젝트 안의 `.md`, `.mdc`, `.txt`만 표시한다.
+
+**Gemini CLI 행을 없앴다.** 무료 등급과 Google One은 2026년 6월 Antigravity CLI로 교체됐다. `GEMINI.md`는 Antigravity
+파일로 표시하고, `.gemini/skills`와 Gemini CLI 설정은 더 읽지 않는다.
+
+**Codex 집계를 측정한 동작에 맞췄다.** v0.6.3의 틀린 수정을 바로잡았다. 프로젝트 폴더에 빈 `AGENTS.override.md`가
+있으면 Codex는 같은 폴더의 `AGENTS.md`를 읽지 않는다. 대체 파일 이름과 크기 한도를 반영하고, 프로젝트
+`.codex/skills`와 `$CODEX_HOME/skills`도 Codex가 읽는 것으로 표시한다.
+
+**Claude Code 집계를 더 맞췄다.** `name-only` 스킬은 「이름만」으로 표시하고 설명을 세지 않는다. 블록 HTML 주석을
+세지 않는다. 승인되지 않은 프로젝트 밖 가져오기와 규칙 링크는 합계에서 빼고 「적용 미확인」으로 표시한다.
+
+**설치와 서비스.** 첫 설치에 예시 그룹 `dev`, `video`를 만들지 않는다. 이미 있는 `modes.json`은 그대로 둔다.
+Homebrew 설치본 옆에 옛 `com.agent-hud` 설정이 남아 있으면 경고와 끄는 명령을 보여준다.
+
+**The Instructions tab shows related documents.** Documents mentioned by path or link in an instruction file appear
+under that file. They are read only when needed, so they stay out of the startup totals, and only `.md`, `.mdc` and
+`.txt` files inside the instruction file's folder or the project are shown.
+
+**The Gemini CLI row is gone.** Unpaid and Google One users were moved to Antigravity CLI in June 2026. `GEMINI.md` is
+shown as an Antigravity file, and `.gemini/skills` and Gemini CLI settings are no longer read.
+
+**Codex totals follow measured behaviour.** This corrects a wrong fix in v0.6.3: an empty `AGENTS.override.md` in a
+project folder stops Codex from reading `AGENTS.md` in that folder. Fallback file names and the size limit now apply,
+and project `.codex/skills` and `$CODEX_HOME/skills` are shown as read by Codex.
+
+**Closer Claude Code totals.** `name-only` skills show as name only and their descriptions are not counted. Block HTML
+comments are not counted. Unapproved imports and rule links outside the project leave the totals and show as not
+confirmed.
+
+**Install and service.** First install no longer creates the example groups `dev` and `video`; an existing `modes.json`
+stays. A Homebrew install warns and shows the stop command if settings for the old `com.agent-hud` service remain.
+
 ## v0.6.3
 
 **에이전트마다 실제로 읽는 지침과 스킬에 더 가깝게 맞췄다.** Claude Code는 상위 폴더 지침, `.claude/CLAUDE.md`,
