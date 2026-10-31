@@ -189,6 +189,8 @@ def check_skill_switch(js):
         ({"override": "on", "enabled": True, "manual_only": False}, ["on", "user-invocable-only"]),
         ({"override": "user-invocable-only", "enabled": False, "manual_only": False}, ["manual", "off"]),
         ({"override": "off", "enabled": False, "manual_only": False}, ["off", "on"]),
+        ({"override": "name-only", "enabled": True, "manual_only": False}, ["name_only", "user-invocable-only"]),
+        ({"override": "name-only", "enabled": True, "manual_only": True}, ["manual", "off"]),
     ]
     script = m.group(0) + "\nconst cases = " + json.dumps(cases) + \
         "\nfor(const [s, want] of cases){ const g = skillSwitch(s); if(g.st !== want[0] || g.next !== want[1]) throw new Error(JSON.stringify([s, g])); }"

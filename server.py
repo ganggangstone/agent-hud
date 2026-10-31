@@ -1709,6 +1709,7 @@ def _attach_tokens(rows):
     그 에이전트가 볼 수 있는 스킬이고(못 센 것도 든다), 세션에서 실제로 올라간 양이 아니다. 같은 SKILL.md는 한 번만 센다."""
     skills = [(row, sk) for row in rows for sk in row["skills"]]
     text = {id(sk): None if {i["code"] for i in sk.get("issues", [])} & set(TOKEN_INCOMPLETE)
+            else sk["name"] if sk.get("override") == "name-only"     # 이름만 올라간다(측정)
             else sk["name"] + "\n" + sk["desc"] for _, sk in skills}
     state, counts = count_tokens([t for t in text.values() if t is not None])
     seen = {}
@@ -2508,7 +2509,7 @@ const T = {
     member_plugin_tip: 'ALWAYS in this project',
     member_skill_tip: 'Linked into this project',
     assign_failed: 'Could not apply that group: ',
-    on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name',
+    on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name', name_only: 'NAME ONLY',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
     groups_guide: 'A group is a set of plugins and skills you switch on together. Pick a group for a project and every switch in it flips at once instead of one by one.',
@@ -2517,6 +2518,7 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  skill_name_only_tip: 'The AI sees only the name, not the description (skillOverrides: name-only). Click to change.',
   hl_truncated: '(cut at the size limit)',
   related_doc: 'related document',
   related_doc_tip: 'Mentioned by path in this file. Read only when needed, so it is not in the startup totals. Found automatically from the text, so it may be wrong.',
@@ -2650,7 +2652,7 @@ const T = {
     member_plugin_tip: '이 프로젝트에서 항상',
     member_skill_tip: '이 프로젝트에 걸려 있음',
     assign_failed: '그룹을 적용하지 못했습니다: ',
-    on: '항상', off: '제외', manual: '/이름 칠 때만 사용',
+    on: '항상', off: '제외', manual: '/이름 칠 때만 사용', name_only: '이름만',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
     groups_guide: '그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 프로젝트에서 그룹 하나를 고르면 그 안의 스위치가 한꺼번에 바뀌어, 하나씩 누르지 않아도 됩니다.',
@@ -2659,6 +2661,7 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  skill_name_only_tip: 'AI에게 이름만 보이고 설명은 안 보입니다 (skillOverrides: name-only). 누르면 바뀝니다.',
   hl_truncated: '(크기 한도에서 잘림)',
   related_doc: '관련 문서',
   related_doc_tip: '이 파일 본문에 경로로 적힌 문서입니다. 필요할 때만 읽히므로 시작 합계에는 없습니다. 글자에서 자동으로 찾은 것이라 틀릴 수 있습니다.',
@@ -3046,8 +3049,8 @@ async function toggle(name, enable, dotEl){
 }
 // off가 먼저다. 머리말이 수동 전용이어도 off면 목록과 / 메뉴 어디에도 나오지 않는다(공식 문서).
 function skillSwitch(s){
-  const st = s.override === 'off' ? 'off' : s.manual_only || s.override === 'user-invocable-only' ? 'manual' : s.enabled ? 'on' : 'off';
-  return { st, next: { on: 'user-invocable-only', manual: 'off', off: 'on' }[st] };
+  const st = s.override === 'off' ? 'off' : s.manual_only || s.override === 'user-invocable-only' ? 'manual' : s.override === 'name-only' ? 'name_only' : s.enabled ? 'on' : 'off';
+  return { st, next: { on: 'user-invocable-only', name_only: 'user-invocable-only', manual: 'off', off: 'on' }[st] };
 }
 
 async function toggleSkill(name, value, el){
@@ -3668,9 +3671,9 @@ async function tick(){
                 const ssw = document.createElement('span');
                 // 켜짐 → 수동 → 꺼짐 → 켜짐. name-only 는 쓰는 사람이 드물어 스위치에 안 넣었다.
                 const {st, next} = skillSwitch(s);
-                ssw.className = 'switch sw-' + st;
+                ssw.className = 'switch sw-' + (st === 'name_only' ? 'on' : st);
                 ssw.textContent = t()[st];
-                ssw.title = s.manual_only && st === 'manual' ? t().skill_manual_md_tip : { on: t().skill_on_tip, manual: t().skill_manual_tip, off: t().skill_off_tip }[st];
+                ssw.title = s.manual_only && st === 'manual' ? t().skill_manual_md_tip : { on: t().skill_on_tip, name_only: t().skill_name_only_tip, manual: t().skill_manual_tip, off: t().skill_off_tip }[st];
                 ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, next, ssw); };
                 srow.appendChild(ssw);
               }
