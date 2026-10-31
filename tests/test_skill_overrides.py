@@ -95,6 +95,13 @@ def main():
             "---\nname: g-off\ndisable-model-invocation: true\ndescription: x\n---\n")
         assert state(proj)[1]["g-off"]["manual_only"] is True
         assert state(proj)[1]["g-on"]["manual_only"] is False
+        # 수동 전용 스킬의 설명은 시작 컨텍스트에 안 올라간다: 읽히는 수와 토큰에서 뺀다(#26)
+        panel = hud.collect_skills({"project_dir": proj})
+        names = {sk["name"] for row in panel["rows"] for sk in row["skills"]
+                 if not hud._claude_off(row, sk) and "Claude Code" in sk["agents"]}
+        assert "g-off" not in names and "g-on" in names, names
+        assert panel["loaded"] == len(names), panel["loaded"]
+        assert panel["tokens"]["agents"]["Claude Code"]["skills"] == len(names), panel["tokens"]["agents"]["Claude Code"]
 
         # 모르는 이름은 쓰지 않는다
         ok, err = hud.set_skill_overrides({"nope": False}, proj)
