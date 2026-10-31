@@ -441,6 +441,24 @@ def test_codex_skill_paths_measured():
         shutil.rmtree(tmp)
 
 
+def test_name_only_skill():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p")
+        w(os.path.join(p, ".claude", "skills", "n", "SKILL.md"), "---\nname: n\ndescription: LONG DESCRIPTION\n---\n")
+        w(os.path.join(p, ".claude", "settings.local.json"), json.dumps({"skillOverrides": {"n": "name-only"}}))
+        seen = []
+        real = hud.count_tokens
+        hud.count_tokens = lambda texts: (seen.extend(texts), ("ok", {t: len(t) for t in texts}))[1]
+        try:
+            hud.collect_skills({"project_dir": p})
+        finally:
+            hud.count_tokens = real
+        assert "n" in seen and not any("LONG DESCRIPTION" in t for t in seen), seen
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
