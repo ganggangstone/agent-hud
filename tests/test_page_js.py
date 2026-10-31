@@ -2,7 +2,7 @@
    여기가 깨지면 대시보드는 200을 돌려주고 헤더만 그린 채 아무것도 안 나온다 --
    파이썬 테스트도 curl도 전부 통과하므로 이 검사가 없으면 아무도 못 잡는다.
    python3 tests/test_page_js.py"""
-import importlib.util, os, re, shutil, subprocess, sys, tempfile
+import importlib.util, json, os, re, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
@@ -178,6 +178,24 @@ def check_tokens(js):
     assert r.returncode == 0, f"renderTokens 실행 검사 실패:\n{r.stderr}"
 
 
+def check_skill_switch(js):
+    """스위치 상태: off는 머리말이 수동 전용이어도 제외로 보이고, 수동 전용은 제외로만 바꿀 수 있다."""
+    m = re.search(r"function skillSwitch\(s\)\{.*?\n\}", js, re.S)
+    assert m, "skillSwitch가 없다"
+    cases = [
+        ({"override": "off", "enabled": False, "manual_only": True}, ["off", "on"]),
+        ({"override": "on", "enabled": True, "manual_only": True}, ["manual", "off"]),
+        ({"override": "user-invocable-only", "enabled": False, "manual_only": True}, ["manual", "off"]),
+        ({"override": "on", "enabled": True, "manual_only": False}, ["on", "user-invocable-only"]),
+        ({"override": "user-invocable-only", "enabled": False, "manual_only": False}, ["manual", "off"]),
+        ({"override": "off", "enabled": False, "manual_only": False}, ["off", "on"]),
+    ]
+    script = m.group(0) + "\nconst cases = " + json.dumps(cases) + \
+        "\nfor(const [s, want] of cases){ const g = skillSwitch(s); if(g.st !== want[0] || g.next !== want[1]) throw new Error(JSON.stringify([s, g])); }"
+    r = subprocess.run([shutil.which("node"), "-"], input=script, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+
 def main():
     node = shutil.which("node")
     if not node:
@@ -196,6 +214,7 @@ def main():
             os.unlink(path)
     check_worktrees(max(blocks, key=len))
     check_tokens(max(blocks, key=len))
+    check_skill_switch(max(blocks, key=len))
     print(f"PASS ({len(blocks)} script block)")
 
 

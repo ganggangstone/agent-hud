@@ -4,8 +4,9 @@
    - Gemini CLI: ~/.gemini/GEMINI.md, 루트 GEMINI.md
    - Cursor·Copilot: 루트 AGENTS.md (Copilot 은 .github/copilot-instructions.md 도)
    - 하위 폴더의 파일과 없는 파일은 세지 않는다. 같은 파일은 한 번만 센다.
+   - Claude Code는 claudeMdExcludes에 걸린 파일과 그 파일의 @가져오기를 세지 않는다. 다른 에이전트는 상관없다.
    python3 tests/test_session_instructions.py"""
-import importlib.util, os, shutil, tempfile
+import importlib.util, json, os, shutil, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
@@ -77,7 +78,61 @@ def test_session_load():
         shutil.rmtree(tmp)
 
 
+def test_claude_md_excludes():
+    """설정 계층의 배열을 합쳐 적용하고, 지침 목록에는 지우지 않고 제외됐다고 표시한다."""
+    tmp = os.path.realpath(tempfile.mkdtemp())
+    try:
+        home = os.path.join(tmp, "home"); proj = os.path.join(tmp, "proj")
+        hud.HOME = home; hud.CLAUDE_DIR = os.path.join(home, ".claude")
+        rtk = w(os.path.join(home, ".claude", "RTK.md"))
+        gagents = w(os.path.join(home, ".codex", "AGENTS.md"))
+        gclaude = w(os.path.join(home, ".claude", "CLAUDE.md"), "@~/.codex/AGENTS.md\n@RTK.md\n")
+        pclaude = w(os.path.join(proj, "CLAUDE.md"), "@AGENTS.md\n@shared.md\n")
+        pagents = w(os.path.join(proj, "AGENTS.md"))
+        shared = w(os.path.join(proj, "shared.md"))
+        real_expand = os.path.expanduser
+        os.path.expanduser = lambda q: q.replace("~", home, 1) if q.startswith("~") else real_expand(q)
+
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [gclaude]}))
+        got = hud.session_instructions(proj)
+        assert got["Claude Code"] == [pclaude, pagents, shared], got["Claude Code"]    # 제외한 파일의 @대상도 안 읽힌다
+        assert got["Codex"] == [gagents, pagents], got["Codex"]                         # Codex는 설정을 읽지 않는다
+
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": proj})["files"]}
+        assert rows[gclaude]["claude_excluded"] is True
+        assert rows[rtk]["claude_excluded"] is True, "제외한 파일로만 닿는 @대상도 안 읽힌다"
+        assert rows[pclaude]["claude_excluded"] is False
+        assert rows[gagents]["claude_excluded"] is False, "Codex 파일 행: 직접 제외하지 않았다"
+
+        # 계층 합치기와 ** 패턴. 패턴은 절대 경로에 맞춘다.
+        w(os.path.join(home, ".claude", "settings.json"), json.dumps({"claudeMdExcludes": ["**/proj/shared.md"]}))
+        w(os.path.join(proj, ".claude", "settings.json"), json.dumps({"claudeMdExcludes": ["**/proj/AGENT?.md"]}))
+        got = hud.session_instructions(proj)["Claude Code"]
+        assert got == [pclaude], got
+
+        # * 는 폴더 경계를 넘지 않는다
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [tmp + "/*.md"]}))
+        os.remove(os.path.join(home, ".claude", "settings.json"))
+        os.remove(os.path.join(proj, ".claude", "settings.json"))
+        assert gclaude in hud.session_instructions(proj)["Claude Code"]
+
+        # 링크는 링크 경로와 대상 경로 어느 쪽으로도 제외된다
+        os.remove(pclaude); os.symlink(shared, pclaude)
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [pclaude]}))
+        assert shared not in hud.session_instructions(proj)["Claude Code"]
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [shared]}))
+        assert shared not in hud.session_instructions(proj)["Claude Code"]
+
+        # 잘못된 값은 무시한다
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": "x"}))
+        assert shared in hud.session_instructions(proj)["Claude Code"]
+        os.path.expanduser = real_expand
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     main()
     test_session_load()
+    test_claude_md_excludes()
     print("PASS")
