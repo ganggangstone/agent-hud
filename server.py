@@ -628,8 +628,13 @@ def _frontmatter_text(path):
 
 def _claude_rules(folder):
     """시작 때 읽는 규칙: 하위 폴더까지의 .md 중 paths 가 없는 것(측정)."""
-    out = []
+    out, visited = [], set()
     for cur, subs, files in os.walk(folder, followlinks=True):
+        real = os.path.realpath(cur)
+        if real in visited:     # 순환 링크
+            subs[:] = []
+            continue
+        visited.add(real)
         subs.sort()
         out += [os.path.join(cur, f) for f in sorted(files)
                 if f.endswith(".md") and not re.search(r"^paths\s*:", _frontmatter_text(os.path.join(cur, f)), re.M)]
@@ -651,10 +656,13 @@ def _claude_instructions(project_dir):
     return out
 
 
-def _agy_expand(path, seen):
+MAX_AGY_LINK_DEPTH = 16     # 문서에 한도가 없다. 사슬이 길어도 집계가 죽지 않게 하는 안전장치다.
+
+
+def _agy_expand(path, seen, depth=0):
     """@[이름](경로)는 본문에 넣는다. @이름 은 참조일 뿐이다(측정, 공식 문서)."""
     real = os.path.realpath(path)
-    if real in seen or not os.path.isfile(real):
+    if real in seen or depth > MAX_AGY_LINK_DEPTH or not os.path.isfile(real):
         return []
     seen.add(real)
     out = [real]
@@ -662,7 +670,7 @@ def _agy_expand(path, seen):
         with open(real, encoding="utf-8", errors="replace") as f:
             for rel in re.findall(r"@\[[^\]]*\]\(([^)\s]+)\)", f.read(INSTRUCTION_READ_MAX)):
                 t = os.path.expanduser(rel)
-                out += _agy_expand(t if os.path.isabs(t) else os.path.join(os.path.dirname(real), t), seen)
+                out += _agy_expand(t if os.path.isabs(t) else os.path.join(os.path.dirname(real), t), seen, depth + 1)
     except OSError:
         pass
     return out
@@ -678,7 +686,10 @@ def _antigravity_instructions(project_dir):
     files_after = [P("AGENTS.md"), P("GEMINI.md"), P(".agents", "AGENTS.md"), P(".agents", "GEMINI.md")]
     rule_dirs_after = [P(".agents", "rules"), P(".agent", "rules")]
     def always_on(folder):
-        names = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+        try:
+            names = sorted(os.listdir(folder))
+        except OSError:
+            return []
         return [os.path.join(folder, n) for n in names if n.endswith(".md")
                 and re.search(r"^trigger\s*:\s*always_on\s*$", _frontmatter_text(os.path.join(folder, n)), re.M)]
     out, seen = [], set()
@@ -880,6 +891,14 @@ SKILL_ROOTS_HOME = [
 ]
 
 
+def _same_bytes(a, b):
+    try:
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            return fa.read() == fb.read()
+    except OSError:
+        return False
+
+
 def _scan_skill_root(root, label, agents, found):
     """링크거나 내용이 똑같은 스킬만 한 행으로 합친다. 내용이 다르면 행을 나누고, 에이전트는 먼저 찾은
     쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서)."""
@@ -890,13 +909,12 @@ def _scan_skill_root(root, label, agents, found):
         if not os.path.isfile(md):
             continue
         real = os.path.realpath(md)
-        with open(md, "rb") as f:
-            content = f.read()
-        same_name = [r for k, r in found.items() if r["name"] == name]
-        row = next((r for r in same_name if r["real"] == real or r["content"] == content), None)
+        # 3초마다 도는 코드라 이름이 겹칠 때만 찾고 읽는다
+        same_name = [r for r in found.values() if r["name"] == name] if name in found else []
+        row = next((r for r in same_name if r["real"] == real or _same_bytes(r["path"], md)), None)
         if row is None:
             row = found[f"{name}@{label}" if same_name else name] = {
-                "name": name, "agents": [], "roots": [], "path": md, "real": real, "content": content}
+                "name": name, "agents": [], "roots": [], "path": md, "real": real}
         row["roots"].append(label)
         others = [r for r in same_name if r is not row]
         for a in agents:
@@ -1957,19 +1975,30 @@ def _local_switches(project_dir):
     return {k: dict(data.get(k)) if isinstance(data.get(k), dict) else {} for k in ("enabledPlugins", "skillOverrides")}
 
 
+def _record_group_writes(saved, pre, post):
+    """그룹이 이번에 바꾼 키만 {적용 전 값, 그룹이 쓴 값}으로 적는다. 그룹이 쓴 값을 사용자가 바꿨으면 그 키는 사용자 것이다."""
+    for section in ("enabledPlugins", "skillOverrides"):
+        entries = saved.setdefault(section, {})
+        for key in set(pre[section]) | set(post[section]) | set(entries):
+            old, new, e = pre[section].get(key), post[section].get(key), entries.get(key)
+            if old != new:
+                entries[key] = {"before": e["before"] if e and e["wrote"] == old else old, "wrote": new}
+            elif e and e["wrote"] != old:
+                del entries[key]
+
+
 def _restore_switches(project_dir, saved):
-    """그룹이 쓴 값만 적용 전 값으로 되돌린다. 적용 뒤 사용자가 직접 바꾼 값은 남긴다."""
+    """그룹이 쓴 값이 그대로인 키만 적용 전 값으로 되돌린다."""
     data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
     for section in ("enabledPlugins", "skillOverrides"):
-        before, wrote = saved["before"][section], saved.get("wrote", {}).get(section, {})
         cur = data.get(section) if isinstance(data.get(section), dict) else {}
-        for key in set(before) | set(wrote):
-            if cur.get(key) != wrote.get(key):
+        for key, e in saved.get(section, {}).items():
+            if cur.get(key) != e["wrote"]:
                 continue
-            if key in before:
-                cur[key] = before[key]
-            else:
+            if e["before"] is None:
                 cur.pop(key, None)
+            else:
+                cur[key] = e["before"]
         if cur:
             data[section] = cur
         else:
@@ -1989,8 +2018,9 @@ def assign_set(name, project_dir):
     restore_file = SETS_FILE + ".restore"
     restore = read_json(restore_file, {})
     saved = restore.get(project_dir)
-    if name and not saved:
-        saved = restore[project_dir] = {"before": _local_switches(project_dir)}
+    if name and saved is None:
+        saved = restore[project_dir] = {}
+    pre = _local_switches(project_dir)
 
     # 1) 스킬: 이 세트 것만 남긴다. 어느 세트에도 없는 스킬 링크는 사용자가 직접 건 것이므로 둔다.
     wanted = set(sets.get(name, {}).get("skills", [])) if name else set()
@@ -2018,13 +2048,14 @@ def assign_set(name, project_dir):
                 errors.append(err)
 
     if name:
-        saved["wrote"] = _local_switches(project_dir)
-    elif saved:
+        _record_group_writes(saved, pre, _local_switches(project_dir))
+    elif saved is not None:
         ok, err = _restore_switches(project_dir, saved)
-        if not ok:
+        if ok:
+            restore.pop(project_dir, None)
+        else:       # 다시 해제하면 복원할 수 있게 기록을 둔다
             errors.append(err)
-        restore.pop(project_dir, None)
-    if name or saved:
+    if name or saved is not None:
         try:
             write_json(restore_file, restore, ensure_ascii=False, indent=2)
         except Exception as e:
