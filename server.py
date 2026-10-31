@@ -1520,7 +1520,7 @@ def collect_skills(ctx):
     enabled, has_local = plugin_state(project_dir)
     installed = read_json(os.path.join(CLAUDE_DIR, "plugins", "installed_plugins.json")).get("plugins", {})
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
-    modes = read_json(MODES_FILE)
+    sets = read_sets()
 
     def decorate(skill, fallback_agents):
         hit = index.get(skill["id"])
@@ -1551,7 +1551,7 @@ def collect_skills(ctx):
             "components": plugin_components(install_path),
             "version": entry.get("version", "?"),
             "enabled": bool(enabled.get(name, False)),
-            "modes": [m for m, plist in modes.items() if name in plist],
+            "modes": [m for m, v in sets.items() if name in v["plugins"]],
             "source": mp_src.get("repo") or mp_src.get("path") or mp_name or "?",
             "skills": skills,
         })
