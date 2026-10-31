@@ -66,6 +66,19 @@ def test_codex_walks_from_git_root():
         shutil.rmtree(tmp)
 
 
+def test_agy_cli_skill_paths():
+    tmp = env()
+    try:
+        base = os.path.join(hud.HOME, ".gemini", "antigravity-cli")
+        w(os.path.join(base, "skills", "cli-skill", "SKILL.md"), "---\nname: cli-skill\ndescription: x\n---\n")
+        w(os.path.join(base, "plugins", "pg", "skills", "pl-skill", "SKILL.md"), "---\nname: pl-skill\ndescription: x\n---\n")
+        idx = hud._skill_root_index(tmp)
+        assert idx["cli-skill"]["agents"] == ["Antigravity"], idx
+        assert idx["pl-skill"]["agents"] == ["Antigravity"], idx
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
