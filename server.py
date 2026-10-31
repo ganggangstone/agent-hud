@@ -806,6 +806,7 @@ SKILL_ROOTS_HOME = [
     (".copilot/skills", ["Copilot"]),
     (".gemini/skills", ["Gemini CLI"]),
     (".gemini/config/skills", ["Antigravity"]),  # agy는 ~/.agents/skills를 읽지 않는다
+    (".gemini/antigravity-cli/skills", ["Antigravity"]),  # agy CLI 전역(Antigravity 공식 문서)
 ]
 
 
@@ -1537,6 +1538,10 @@ def _skill_root_index(project_dir):
         _scan_skill_root(os.path.join(project_dir, rel.replace("/", os.sep)), rel, agents, found)
     for rel, agents in SKILL_ROOTS_HOME:
         _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, agents, found)
+    plugins = os.path.join(HOME, ".gemini", "antigravity-cli", "plugins")
+    for name in sorted(os.listdir(plugins)) if os.path.isdir(plugins) else []:
+        rel = f".gemini/antigravity-cli/plugins/{name}/skills"
+        _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, ["Antigravity"], found)
     return found
 
 
