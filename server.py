@@ -438,7 +438,7 @@ INSTRUCTION_SOURCES = [
     (".windsurfrules", "Windsurf"),
     (".roorules", "Roo Code"),
     (".roo/rules/", "Roo Code"),
-    ("GEMINI.md", "Gemini CLI"),
+    ("GEMINI.md", "Antigravity"),
     ("QWEN.md", "Qwen Code"),
     ("CONVENTIONS.md", "Aider"),
     ("CRUSH.md", "Crush"),
@@ -820,7 +820,6 @@ def session_instructions(project_dir):
     plan = {
         "Claude Code": _claude_instructions(project_dir),
         "Codex": _codex_instructions(project_dir),
-        "Gemini CLI": [os.path.join(HOME, ".gemini", "GEMINI.md"), P("GEMINI.md")],
         "Cursor": [P("AGENTS.md")],
         "Copilot": [P(".github", "copilot-instructions.md"), P("AGENTS.md")],
         "Antigravity": _antigravity_instructions(project_dir),
@@ -963,7 +962,6 @@ PROJECT_MARKERS = [
     os.path.join(".claude", "settings.json"), os.path.join(".claude", "settings.local.json"),
     os.path.join(".agents", "skills"), os.path.join(".cursor", "skills"),
     os.path.join(".codex", "skills"), os.path.join(".github", "skills"),
-    os.path.join(".gemini", "skills"),
 ]
 
 
@@ -1020,24 +1018,22 @@ def _instruction_rows(project_dir):
 # learn.chatgpt.com/docs/build-skills, cursor.com/docs/context/skills,
 # code.visualstudio.com/docs/copilot/customization/agent-skills, geminicli.com/docs/cli/skills
 # Antigravity(agy)는 CLI에 들어 있는 문서와 2026-09 센티널 실측으로 확인했다(ADR 10).
-SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]
+SKILL_AGENTS = ["Claude Code", "Codex", "Cursor", "Copilot", "Antigravity"]
 
 SKILL_ROOTS_PROJECT = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot", "Antigravity"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor", "Codex"]),     # Codex는 공식 문서에 없지만 0.166에서 측정했다
     (".github/skills", ["Copilot"]),
-    (".gemini/skills", ["Gemini CLI"]),
 ]
 
 SKILL_ROOTS_HOME = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
-    (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI"]),
+    (".agents/skills", ["Codex", "Cursor", "Copilot"]),
     (".cursor/skills", ["Cursor"]),
     (".codex/skills", ["Cursor"]),
     (".copilot/skills", ["Copilot"]),
-    (".gemini/skills", ["Gemini CLI"]),
     (".gemini/config/skills", ["Antigravity"]),  # agy는 ~/.agents/skills를 읽지 않는다
     (".gemini/antigravity-cli/skills", ["Antigravity"]),  # agy CLI 전역(Antigravity 공식 문서)
 ]
@@ -1081,9 +1077,9 @@ def _scan_skill_root(root, label, agents, found):
 
 
 # 그룹의 스킬을 프로젝트에 심볼릭 링크해서 켜고 끈다. 도구별 설정 형식이 전부 다르지만
-# (Claude Code만 프로젝트 단위 스위치가 있고 Gemini CLI는 형식이 또 다르다) **폴더를 훑는
+# (Claude Code만 프로젝트 단위 스위치가 있다) **폴더를 훑는
 # 것은 모두 똑같이 하므로**, 폴더에 있냐 없냐가 유일한 도구 공통 스위치다.
-# 링크를 따라가는 것은 Claude Code·Gemini CLI·Codex·Copilot에서 실측 확인했다(ADR 10).
+# 링크를 따라가는 것은 Claude Code·Codex·Copilot에서 실측 확인했다(ADR 10).
 # 이 둘이면 그 네 도구가 전부 켜진다. Cursor는 .claude/.agents 둘 다 읽는다.
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
 
@@ -1788,8 +1784,7 @@ def _section_state(skills):
 
 def _skills_disabled_elsewhere(project_dir):
     """다른 에이전트가 자기 설정으로 끈 스킬 -> (Codex SKILL.md 경로, {에이전트: 스킬 이름}).
-    HUD는 읽기만 한다. Codex는 ~/.codex/config.toml, Gemini CLI는 사용자·작업 폴더 settings.json의
-    skills.disabled, Copilot은 사용자·저장소 settings.json의 disabledSkills(각 공식 문서)."""
+    HUD는 읽기만 한다. Codex는 ~/.codex/config.toml, Copilot은 사용자·저장소 settings.json의 disabledSkills(각 공식 문서)."""
     config = _codex_config().get("skills")
     entries = config.get("config") if isinstance(config, dict) else None
     paths = {os.path.realpath(os.path.expanduser(e["path"])) for e in entries or []
@@ -1799,11 +1794,9 @@ def _skills_disabled_elsewhere(project_dir):
         for k in keys:
             v = v.get(k) if isinstance(v, dict) else None
         return {x for x in v if isinstance(x, str)} if isinstance(v, list) else set()
-    gem = names(os.path.join(HOME, ".gemini", "settings.json"), "skills", "disabled") | \
-        names(os.path.join(project_dir, ".gemini", "settings.json"), "skills", "disabled")
     cop = names(os.path.join(HOME, ".copilot", "settings.json"), "disabledSkills") | \
         names(os.path.join(project_dir, ".github", "copilot", "settings.json"), "disabledSkills")
-    return paths, {"Gemini CLI": gem, "Copilot": cop}
+    return paths, {"Copilot": cop}
 
 
 def _skill_root_index(project_dir):
@@ -1914,7 +1907,7 @@ def collect_instructions(ctx):
     rows = [
         _file_row(os.path.join(CLAUDE_DIR, "CLAUDE.md"), os.path.join(CLAUDE_DIR, "CLAUDE.md")),
         _file_row(os.path.join(HOME, ".codex", "AGENTS.md"), os.path.join(HOME, ".codex", "AGENTS.md"), "Codex"),
-        _file_row(os.path.join(HOME, ".gemini", "GEMINI.md"), os.path.join(HOME, ".gemini", "GEMINI.md"), "Gemini CLI"),
+        _file_row(os.path.join(HOME, ".gemini", "GEMINI.md"), os.path.join(HOME, ".gemini", "GEMINI.md"), "Antigravity"),
         _file_row("CLAUDE.md", os.path.join(project_dir, "CLAUDE.md")),
     ]
     sub_rows, truncated = _instruction_rows(project_dir)
@@ -2586,7 +2579,7 @@ const T = {
   share_short: 'let other agents use it',
   help_tip: 'How this works',
   share_done: 'every agent can use it',
-  share_all_tip: 'When checked, a symlink to this skill is placed in the folders Codex, Cursor, Copilot, Gemini CLI and Antigravity look in inside this project (.agents/skills and others). No copy is made, the original stays put, and unchecking removes only the links. Claude Code reads it only while the plugin is on.',
+  share_all_tip: 'When checked, a symlink to this skill is placed in the folders Codex, Cursor, Copilot and Antigravity look in inside this project (.agents/skills and others). No copy is made, the original stays put, and unchecking removes only the links. Claude Code reads it only while the plugin is on.',
   partly: a => `${a} can use only some of the skills in this plugin`,
   add_project: '+ add a folder', add_project_tip: 'Any folder. It does not have to be a git repository',
   add_project_prompt: 'Full path of the folder to add:',
@@ -2731,7 +2724,7 @@ const T = {
   share_short: '다른 에이전트도 쓰게 만듦',
   help_tip: '어떻게 되는 건지',
   share_done: '모든 에이전트가 쓸 수 있음',
-  share_all_tip: '체크하면 이 프로젝트 안에서 Codex·Cursor·Copilot·Gemini CLI·Antigravity가 스킬을 찾아보는 폴더(.agents/skills 등)에 이 스킬의 심볼릭 링크를 넣습니다. 복사본은 생기지 않고 원본은 그 자리에 있으며, 체크를 풀면 링크만 지웁니다. Claude Code는 플러그인이 켜져 있어야 읽습니다.',
+  share_all_tip: '체크하면 이 프로젝트 안에서 Codex·Cursor·Copilot·Antigravity가 스킬을 찾아보는 폴더(.agents/skills 등)에 이 스킬의 심볼릭 링크를 넣습니다. 복사본은 생기지 않고 원본은 그 자리에 있으며, 체크를 풀면 링크만 지웁니다. Claude Code는 플러그인이 켜져 있어야 읽습니다.',
   partly: a => `${a}는 이 플러그인의 스킬 중 일부만 쓸 수 있습니다`,
   add_project: '+ 폴더 추가', add_project_tip: '아무 폴더나 됩니다. git 저장소가 아니어도 됩니다',
   add_project_prompt: '추가할 폴더의 전체 경로:',

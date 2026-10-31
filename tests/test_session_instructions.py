@@ -1,7 +1,7 @@
 """에이전트마다 세션을 시작할 때 늘 읽는 지침 파일을 고르는지 본다.
    - Claude Code: ~/.claude/CLAUDE.md 와 그 @가져오기, 프로젝트 루트의 CLAUDE.md·CLAUDE.local.md 와 그 @가져오기
    - Codex: ~/.codex/AGENTS.md(링크면 대상), 루트 AGENTS.override.md 가 있으면 그것, 없으면 AGENTS.md
-   - Gemini CLI: ~/.gemini/GEMINI.md, 루트 GEMINI.md
+   - Antigravity: ~/.gemini/GEMINI.md, 루트 AGENTS.md·GEMINI.md
    - Cursor·Copilot: 루트 AGENTS.md (Copilot 은 .github/copilot-instructions.md 도)
    - 하위 폴더의 파일과 없는 파일은 세지 않는다. 같은 파일은 한 번만 센다.
    - Claude Code는 claudeMdExcludes에 걸린 파일과 그 파일의 @가져오기를 세지 않는다. 다른 에이전트는 상관없다.
@@ -40,7 +40,6 @@ def main():
         got = hud.session_instructions(proj)
         assert got["Claude Code"] == [gclaude, princ, pclaude, rules, plocal], got["Claude Code"]
         assert got["Codex"] == [princ, poverride], got["Codex"]          # 링크는 대상으로, override 가 AGENTS.md 를 대신
-        assert got["Gemini CLI"] == [], got["Gemini CLI"]
         assert got["Cursor"] == [pagents], got["Cursor"]
         assert got["Copilot"] == [copilot, pagents], got["Copilot"]
         assert got["Antigravity"] == [pagents], got["Antigravity"]

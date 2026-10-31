@@ -147,8 +147,7 @@ def tokens_inventory(tmp):
     got = {a: (v["skills"], v["measured"], v["tokens"]) for a, v in tk["agents"].items()}
     # (볼 수 있는 스킬, 그중 센 스킬, 센 것의 합). 머리말 없는 nofm은 Claude Code·Cursor·Copilot이 볼 수 있지만 세지 못한다.
     # Claude Code: 꺼진 플러그인(beta)과 스위치로 끈 offloose는 빠진다. 나머지 에이전트는 그대로 본다.
-    assert got == {"Claude Code": (5, 4, 17), "Codex": (3, 3, 19), "Cursor": (5, 4, 25), "Copilot": (5, 4, 25),
-                   "Gemini CLI": (3, 3, 19), "Antigravity": (1, 1, 6)}, got
+    assert got == {"Claude Code": (5, 4, 17), "Codex": (3, 3, 19), "Cursor": (5, 4, 25), "Copilot": (5, 4, 25), "Antigravity": (1, 1, 6)}, got
     # 뱃지와 합계가 같은 숫자를 쓴다: 겹치지 않는 스킬 값의 합이 전체 합이다
     assert sum(s["tokens"] or 0 for r in state["rows"] for s in r["skills"]) == tk["total"]
     assert state["loaded"] == 5, "옛 loaded 값(호환): 켜진 플러그인 3 + dup + nofm"
@@ -224,7 +223,7 @@ def tokens_not_measured(tmp):
     assert all(s["tokens"] is None for r in state["rows"] for s in r["skills"])
     assert tk["skills"] == 8, "찾은 스킬 수는 측정과 상관없이 보여준다"
     assert {a: (v["skills"], v["measured"]) for a, v in tk["agents"].items()} == {
-        "Claude Code": (5, 0), "Codex": (3, 0), "Cursor": (5, 0), "Copilot": (5, 0), "Gemini CLI": (3, 0), "Antigravity": (1, 0)}, tk["agents"]
+        "Claude Code": (5, 0), "Codex": (3, 0), "Cursor": (5, 0), "Copilot": (5, 0), "Antigravity": (1, 0)}, tk["agents"]
     # 설치가 덜 된 venv(tiktoken 없음)도 같은 취급이다. 파이썬 오류 문장이 화면으로 가지 않는다.
     import venv
     venv.create(os.path.join(tmp, "bare-venv"), with_pip=False)

@@ -118,18 +118,18 @@ def check_worktrees(js):
 
 
 TOK_CHECKS = r"""
-const AGENTS = ['Claude Code', 'Gemini CLI', 'Codex'];
+const AGENTS = ['Claude Code', 'Antigravity', 'Codex'];
 const full = {state: 'ok', encoding: 'o200k_base', setup: 'x', skills: 8, measured: 8, total: 1234,
-  agents: {'Claude Code': {skills: 4, measured: 4, tokens: 17}, 'Gemini CLI': {skills: 3, measured: 3, tokens: 19}, 'Codex': {skills: 0, measured: 0, tokens: 0}}};
+  agents: {'Claude Code': {skills: 4, measured: 4, tokens: 17}, 'Antigravity': {skills: 3, measured: 3, tokens: 19}, 'Codex': {skills: 0, measured: 0, tokens: 0}}};
 const ok = full;
 const part = {...full, measured: 7, agents: {'Claude Code': {skills: 4, measured: 3, tokens: 17},
-  'Gemini CLI': {skills: 3, measured: 0, tokens: 0}, 'Codex': {skills: 1, measured: 1, tokens: 5}}};
+  'Antigravity': {skills: 3, measured: 0, tokens: 0}, 'Codex': {skills: 1, measured: 1, tokens: 5}}};
 const draw = (tk, agents = AGENTS) => { const c = new El('div'); renderTokens(c, tk, agents); return c.children[0]; };
 // 1. 전부 센 경우: 이름+설명 기준임을 밝힌다. 에이전트별 수는 머리글이 맡는다. "부분 합계"라는 말은 없다
 let box = draw(full);
 assert(box.textContent.includes('o200k_base') && box.textContent.includes('names and descriptions'), box.textContent);
 assert(box.textContent.includes('About 1,234 tokens of skill names') && box.textContent.includes('8 skills found'), box.textContent);
-assert(!/Claude Code|Gemini|Codex/.test(box.textContent), box.textContent);   // 에이전트별 줄은 머리글이 맡는다
+assert(!/Claude Code|Antigravity|Codex/.test(box.textContent), box.textContent);   // 에이전트별 줄은 머리글이 맡는다
 assert(!box.textContent.includes('could not be counted') && !box.textContent.includes('not counted'), box.textContent);
 assert(box.title.includes('estimate') && box.title.includes('not a bill'), box.title);
 // 1b. 일부만 센 경우: 전체 합계가 아니라 센 것의 합이라고 전체와 에이전트마다 밝힌다
@@ -138,7 +138,7 @@ assert(box.textContent.includes('About 1,234 tokens from 7 of the 8 skills found
 assert(!box.textContent.includes('8 skills found, counted'), box.textContent);
 assert(box.textContent.includes('1 not counted'), box.textContent);
 // 1c. 볼 수 있는 스킬이 있는데 하나도 못 셌으면 0이 아니라 "측정 안 함". 정말 0개일 때만 0
-box = draw({...full, skills: 1, measured: 0, total: 0, agents: {'Claude Code': {skills: 1, measured: 0, tokens: 0}, 'Gemini CLI': {skills: 0, measured: 0, tokens: 0}, 'Codex': {skills: 0, measured: 0, tokens: 0}}});
+box = draw({...full, skills: 1, measured: 0, total: 0, agents: {'Claude Code': {skills: 1, measured: 0, tokens: 0}, 'Antigravity': {skills: 0, measured: 0, tokens: 0}, 'Codex': {skills: 0, measured: 0, tokens: 0}}});
 assert(box.textContent.includes('1 skills found, but none of them could be counted'), box.textContent);
 assert(!/tokens of skill names|from \d+ of the|Claude Code/.test(box.textContent), box.textContent);
 box = draw({...full, skills: 0, measured: 0, total: 0, agents: {}});

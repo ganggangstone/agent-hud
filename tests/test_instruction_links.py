@@ -60,7 +60,7 @@ def test_targets_become_rows():
         claude = os.path.join(tmp, "CLAUDE.md"); open(claude, "w").write("@PRINCIPLES.md\n@AGENTS.md\n@missing.md\n")
         gem = os.path.join(tmp, "GEMINI.md"); os.symlink(src, gem)
         rows = [hud._file_row("CLAUDE.md", claude), hud._file_row("AGENTS.md", agents, "Codex"),
-                hud._file_row("GEMINI.md", gem, "Gemini CLI")]
+                hud._file_row("GEMINI.md", gem, "Antigravity")]
         out = hud._with_link_targets(rows)
         paths = [r["path"] for r in out]
         assert paths[:3] == [claude, agents, gem], paths
