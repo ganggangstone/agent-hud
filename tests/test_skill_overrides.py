@@ -109,6 +109,7 @@ def main():
 
         # 그룹 적용: 그룹에 없는 플러그인 밖 스킬은 끄고, 있는 것은 켠다
         json.dump({"app": {"plugins": [], "skills": ["g-on"]}}, open(hud.MODES_FILE, "w"))
+        before_group = local(proj)
         ok, err = hud.assign_set("app", proj)
         assert ok, err
         ov = local(proj)
@@ -117,10 +118,10 @@ def main():
         assert "a-only" not in ov, "Claude Code가 안 읽는 스킬까지 썼다"
         assert state(proj)[0] == 1, state(proj)[0]
 
-        # 적용 해제는 플러그인처럼 스킬 설정도 그대로 둔다
+        # 적용 해제는 플러그인과 스킬 설정을 적용 전 값으로 되돌린다(#29)
         ok, err = hud.assign_set("", proj)
         assert ok, err
-        assert local(proj) == ov, (local(proj), ov)
+        assert local(proj) == before_group, (local(proj), before_group)
     finally:
         shutil.rmtree(tmp)
     print("ok")

@@ -221,7 +221,7 @@ Codex·Gemini CLI·Antigravity는 그룹으로 연결한 프로젝트에서만 �
 ```bash
 python3 ~/.claude/tools/agent-hud/server.py groups          # 그룹 목록
 python3 ~/.claude/tools/agent-hud/server.py apply dev       # 현재 폴더에 "dev" 그룹 적용
-python3 ~/.claude/tools/agent-hud/server.py apply --off     # 그룹 스킬의 링크를 지운다(플러그인 켜짐/꺼짐은 그대로)
+python3 ~/.claude/tools/agent-hud/server.py apply --off     # 그룹 스킬 링크를 지우고 플러그인·스킬 설정을 적용 전 값으로 되돌린다
 ```
 
 `modes.json`을 직접 고쳐도 된다. 값을 목록 하나로만 쓰면 플러그인만 든 그룹이 된다.

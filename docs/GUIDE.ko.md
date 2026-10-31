@@ -53,7 +53,7 @@ agent-hud --help                                                  # 사용법
 
 ```bash
 agent-hud apply <그룹> [폴더]    # 스킬 링크와 .claude/settings.local.json을 바꿈
-agent-hud apply --off [폴더]     # 그룹 스킬 링크를 지움. 플러그인 설정은 그대로
+agent-hud apply --off [폴더]     # 그룹 스킬 링크를 지우고 플러그인·스킬 설정을 적용 전 값으로 되돌림
 agent-hud worktrees apply [폴더]  # 저장된 스킬 구성을 추가
 ```
 

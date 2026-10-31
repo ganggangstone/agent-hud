@@ -255,7 +255,7 @@ with Homebrew):
 ```bash
 python3 ~/.claude/tools/agent-hud/server.py groups          # list groups
 python3 ~/.claude/tools/agent-hud/server.py apply dev       # apply "dev" to the current folder
-python3 ~/.claude/tools/agent-hud/server.py apply --off     # remove the group's skill links (plugin on/off stays)
+python3 ~/.claude/tools/agent-hud/server.py apply --off     # remove the group's skill links and restore plugin and skill settings from before it was applied
 ```
 
 You can also edit `modes.json` directly. A value written as a single list is a group with

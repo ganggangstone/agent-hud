@@ -53,7 +53,7 @@ agent-hud --help                                                      # usage
 
 ```bash
 agent-hud apply <group> [folder]    # changes skill links and .claude/settings.local.json
-agent-hud apply --off [folder]      # removes group skill links, leaves plugin settings alone
+agent-hud apply --off [folder]      # removes group skill links and restores plugin and skill settings
 agent-hud worktrees apply [folder]  # adds the saved skill set
 ```
 

@@ -1922,15 +1922,45 @@ def modify_group(action, group, member, kind="plugin"):
     return write_sets(sets)
 
 
+def _local_switches(project_dir):
+    data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
+    return {k: dict(data.get(k)) if isinstance(data.get(k), dict) else {} for k in ("enabledPlugins", "skillOverrides")}
+
+
+def _restore_switches(project_dir, saved):
+    """그룹이 쓴 값만 적용 전 값으로 되돌린다. 적용 뒤 사용자가 직접 바꾼 값은 남긴다."""
+    data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
+    for section in ("enabledPlugins", "skillOverrides"):
+        before, wrote = saved["before"][section], saved.get("wrote", {}).get(section, {})
+        cur = data.get(section) if isinstance(data.get(section), dict) else {}
+        for key in set(before) | set(wrote):
+            if cur.get(key) != wrote.get(key):
+                continue
+            if key in before:
+                cur[key] = before[key]
+            else:
+                cur.pop(key, None)
+        if cur:
+            data[section] = cur
+        else:
+            data.pop(section, None)
+    return _write_local(project_dir, data)
+
+
 def assign_set(name, project_dir):
     """세트를 프로젝트에 적용한다. 스킬 링크도 플러그인 on/off도 이 프로젝트에만 걸린다
     (플러그인은 settings.local.json의 enabledPlugins에 쓴다).
-    name이 빈 문자열이면 이 프로젝트의 배정을 푼다."""
+    name이 빈 문자열이면 이 프로젝트의 배정을 풀고 플러그인과 스킬 스위치를 적용 전 값으로 되돌린다."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
     sets = read_sets()
     if name and name not in sets:
         return False, "unknown set"
+    restore_file = SETS_FILE + ".restore"
+    restore = read_json(restore_file, {})
+    saved = restore.get(project_dir)
+    if name and not saved:
+        saved = restore[project_dir] = {"before": _local_switches(project_dir)}
 
     # 1) 스킬: 이 세트 것만 남긴다. 어느 세트에도 없는 스킬 링크는 사용자가 직접 건 것이므로 둔다.
     wanted = set(sets.get(name, {}).get("skills", [])) if name else set()
@@ -1941,7 +1971,7 @@ def assign_set(name, project_dir):
         if not ok and sk in wanted:
             errors.append(f"{sk}: {err}")
 
-    # 2) 플러그인: 세트를 배정하지 않을 때는 건드리지 않는다.
+    # 2) 플러그인: 해제는 아래에서 적용 전 값으로 되돌린다.
     if name:
         # 설치된 플러그인 전부에 값을 적는다. 하나라도 빠뜨리면 그건 전역 값을 물려받아
         # "왜 이게 켜져 있지"가 된다.
@@ -1956,6 +1986,19 @@ def assign_set(name, project_dir):
                                           project_dir)
             if not ok:
                 errors.append(err)
+
+    if name:
+        saved["wrote"] = _local_switches(project_dir)
+    elif saved:
+        ok, err = _restore_switches(project_dir, saved)
+        if not ok:
+            errors.append(err)
+        restore.pop(project_dir, None)
+    if name or saved:
+        try:
+            write_json(restore_file, restore, ensure_ascii=False, indent=2)
+        except Exception as e:
+            errors.append(str(e))
 
     assigned = read_json(SETS_FILE, {})
     if name:
