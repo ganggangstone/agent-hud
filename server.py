@@ -982,7 +982,7 @@ SKILL_ROOTS_PROJECT = [
     (".claude/skills", ["Claude Code", "Cursor", "Copilot"]),
     (".agents/skills", ["Codex", "Cursor", "Copilot", "Gemini CLI", "Antigravity"]),
     (".cursor/skills", ["Cursor"]),
-    (".codex/skills", ["Cursor"]),
+    (".codex/skills", ["Cursor", "Codex"]),     # Codex는 공식 문서에 없지만 0.166에서 측정했다
     (".github/skills", ["Copilot"]),
     (".gemini/skills", ["Gemini CLI"]),
 ]
@@ -1767,7 +1767,12 @@ def _skill_root_index(project_dir):
     for rel, agents in SKILL_ROOTS_PROJECT:
         _scan_skill_root(os.path.join(project_dir, rel.replace("/", os.sep)), rel, agents, found)
     for rel, agents in SKILL_ROOTS_HOME:
+        if rel == ".codex/skills":
+            agents = ["Cursor"] + ([] if os.environ.get("CODEX_HOME") else ["Codex"])
         _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, agents, found)
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        _scan_skill_root(os.path.join(codex_home, "skills"), "$CODEX_HOME/skills", ["Codex"], found)
     plugins = os.path.join(HOME, ".gemini", "antigravity-cli", "plugins")
     for name in sorted(os.listdir(plugins)) if os.path.isdir(plugins) else []:
         rel = f".gemini/antigravity-cli/plugins/{name}/skills"
