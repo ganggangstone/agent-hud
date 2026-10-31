@@ -3807,10 +3807,14 @@ agent-hud apply <그룹> [폴더]   그룹을 폴더에 적용 (기본: 현재 �
 agent-hud apply --off [폴더]    적용 해제
 agent-hud worktrees [폴더]      같은 저장소의 worktree와 스킬 파일 상태
 agent-hud worktrees apply [폴더] 저장된 스킬 구성 추가 (세션 시작 전 선택 사항)
-agent-hud tokens setup         스킬 토큰 수를 세는 도구(tiktoken)를 이 도구 폴더 안에 설치"""
+agent-hud tokens setup         스킬 토큰 수를 세는 도구(tiktoken)를 이 도구 폴더 안에 설치
+agent-hud --version            버전 출력"""
 
 
 def main():
+    if sys.argv[1:2] in (["--version"], ["-V"]):
+        print(f"agent-hud {VERSION}")
+        sys.exit(0)
     if os.environ.get("CLAUDE_HUD_DISABLE") == "1":
         return
     global PROJECT_DIR
@@ -3832,6 +3836,10 @@ def main():
         group = "" if rest[0] == "--off" else rest[0]
         target = rest[1] if len(rest) > 1 else os.getcwd()
         sys.exit(cli_apply(group, target))
+    # 모르는 인자로 서버를 띄우면 확인용 명령이 끝나지 않는다
+    if argv and argv[0] != "open" and not (argv[0] == "--register" and len(argv) > 1):
+        print(USAGE, file=sys.stderr)
+        sys.exit(2)
     if len(sys.argv) > 2 and sys.argv[1] == "--register":
         PROJECT_DIR = os.path.abspath(sys.argv[2])
     registering = len(sys.argv) > 2 and sys.argv[1] == "--register"
