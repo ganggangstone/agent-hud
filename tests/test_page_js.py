@@ -215,6 +215,8 @@ def main():
     check_worktrees(max(blocks, key=len))
     check_tokens(max(blocks, key=len))
     check_skill_switch(max(blocks, key=len))
+    # 그룹 해제는 설정을 되돌린다(#29). 확인창이 예전 동작을 말하면 안 된다.
+    assert "Only the skill links are removed" not in hud.PAGE and "연결한 스킬만 지웁니다" not in hud.PAGE
     print(f"PASS ({len(blocks)} script block)")
 
 
