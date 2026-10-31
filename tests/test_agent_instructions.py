@@ -543,6 +543,20 @@ def test_gemini_row_removed():
         shutil.rmtree(tmp)
 
 
+def test_rules_folder_linked_outside_needs_approval():
+    tmp = env()
+    try:
+        p = os.path.join(tmp, "p"); os.makedirs(os.path.join(p, ".claude"))
+        outside = os.path.join(tmp, "outside"); out = w(os.path.join(outside, "a.md"))
+        os.symlink(outside, os.path.join(p, ".claude", "rules"))
+        got = hud.session_instructions(p)["Claude Code"]
+        assert not any(os.path.realpath(f) == out for f in got), got
+        w(os.path.join(hud.HOME, ".claude.json"), json.dumps({"projects": {p: {"hasClaudeMdExternalIncludesApproved": True}}}))
+        assert any(os.path.realpath(f) == out for f in hud.session_instructions(p)["Claude Code"])
+    finally:
+        shutil.rmtree(tmp)
+
+
 #TESTS
 
 if __name__ == "__main__":
