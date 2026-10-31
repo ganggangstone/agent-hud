@@ -104,6 +104,13 @@ def test_claude_md_excludes():
         assert rows[pclaude]["claude_excluded"] is False
         assert rows[gagents]["claude_excluded"] is False, "Codex 파일 행: 직접 제외하지 않았다"
 
+        # 다른 도구의 파일은 그 경로를 직접 제외했을 때만 표시한다. 링크 대상이 제외돼도 Claude Code와 무관하다.
+        ggemini = os.path.join(home, ".gemini", "GEMINI.md"); os.makedirs(os.path.dirname(ggemini)); os.symlink(gagents, ggemini)
+        w(os.path.join(proj, ".claude", "settings.local.json"), json.dumps({"claudeMdExcludes": [gclaude, gagents]}))
+        rows = {r["path"]: r for r in hud.collect_instructions({"project_dir": proj})["files"]}
+        assert rows[gagents]["claude_excluded"] is True
+        assert rows[ggemini]["claude_excluded"] is False
+
         # 계층 합치기와 ** 패턴. 패턴은 절대 경로에 맞춘다.
         w(os.path.join(home, ".claude", "settings.json"), json.dumps({"claudeMdExcludes": ["**/proj/shared.md"]}))
         w(os.path.join(proj, ".claude", "settings.json"), json.dumps({"claudeMdExcludes": ["**/proj/AGENT?.md"]}))

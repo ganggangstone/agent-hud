@@ -511,17 +511,41 @@ def _with_link_targets(rows):
     return rows + list(extra.values())
 
 
-def _imports_of(path, depth=0):
-    """path 와 그 @가져오기 대상(있는 것만, 두 단계까지). 링크는 대상 파일로 푼다."""
+def claude_md_excludes(project_dir):
+    """이 프로젝트에 적용되는 claudeMdExcludes -> 정규식 목록. 설정 계층의 배열은 합쳐진다(공식 문서)."""
+    patterns = []
+    for f in (os.path.join(CLAUDE_DIR, "settings.json"),
+              os.path.join(project_dir, ".claude", "settings.json"),
+              os.path.join(project_dir, LOCAL_SETTINGS)):
+        v = read_json(f).get("claudeMdExcludes")
+        if isinstance(v, list):
+            patterns += [_glob_regex(p) for p in v if isinstance(p, str)]
+    return patterns
+
+
+def _glob_regex(pattern):
+    """절대 경로에 맞추는 glob. ** 는 폴더 경계를 넘고 * 와 ? 는 넘지 않는다."""
+    rx = {"**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}
+    return re.compile("".join(rx.get(part) or re.escape(part) for part in re.split(r"(\*\*/|\*\*|\*|\?)", pattern)))
+
+
+def _claude_excluded(path, patterns):
+    """링크는 링크 경로와 대상 경로 어느 쪽으로도 제외된다(공식 문서)."""
+    return any(p.fullmatch(q) for p in patterns for q in (path, os.path.realpath(path)))
+
+
+def _imports_of(path, depth=0, excludes=()):
+    """path 와 그 @가져오기 대상(있는 것만, 두 단계까지). 링크는 대상 파일로 푼다.
+    제외된 파일은 그 @대상까지 읽히지 않는다."""
     real = os.path.realpath(path)
-    if not os.path.isfile(real):
+    if not os.path.isfile(real) or _claude_excluded(path, excludes):
         return []
     out = [real]
     link = _link_info(path)
     if link and link["kind"] == "import" and depth < 2:
         for t in link["targets"]:
             if t["ok"]:
-                out += _imports_of(t["path"], depth + 1)
+                out += _imports_of(t["path"], depth + 1, excludes)
     return out
 
 
@@ -539,11 +563,12 @@ def session_instructions(project_dir):
         "Copilot": [P(".github", "copilot-instructions.md"), P("AGENTS.md")],
         "Antigravity": [],
     }
+    excludes = claude_md_excludes(project_dir)
     out = {}
     for agent, paths in plan.items():
         seen = []
         for p in paths:
-            for f in (_imports_of(p) if agent == "Claude Code" else ([os.path.realpath(p)] if os.path.isfile(p) else [])):
+            for f in (_imports_of(p, excludes=excludes) if agent == "Claude Code" else ([os.path.realpath(p)] if os.path.isfile(p) else [])):
                 if f not in seen:
                     seen.append(f)
         out[agent] = seen
@@ -1518,8 +1543,15 @@ def collect_instructions(ctx):
     ]
     sub_rows, truncated = _instruction_rows(project_dir)
     rows = _with_link_targets(rows + sub_rows)
+    excludes = claude_md_excludes(project_dir)
+    claude_reads = session_instructions(project_dir)["Claude Code"]
     for r in rows:   # 어느 칸에 그릴지: 이 프로젝트 안이면 project, 아니면 이 컴퓨터 전체
         r["scope"] = "project" if r["path"].startswith(project_dir.rstrip(os.sep) + os.sep) else "global"
+        # 직접 제외했거나, 제외된 파일의 @대상으로만 닿는 파일. 다른 에이전트가 읽는 것과는 별개다.
+        # 다른 도구의 파일은 그 경로를 직접 제외했을 때만이다. 링크 대상이 제외돼도 Claude Code와는 무관하다.
+        direct = (_claude_excluded(r["path"], excludes) if r["tool"] in ("Claude Code", "")
+                  else any(p.fullmatch(r["path"]) for p in excludes))
+        r["claude_excluded"] = direct or (bool(r.get("via")) and os.path.realpath(r["path"]) not in claude_reads)
     agents = _list_agents(os.path.join(CLAUDE_DIR, "agents")) + _list_agents(os.path.join(project_dir, ".claude", "agents"))
     for a in agents:
         READABLE_PATHS.add(a["path"])
@@ -2091,6 +2123,8 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  claude_excluded: 'excluded from Claude Code',
+  claude_excluded_tip: 'Claude Code does not read this file in this project (claudeMdExcludes). Other agents are not affected.',
   comp: {agents: 'agents', mcp: 'MCP', commands: 'commands', hooks: 'hooks', lsp: 'LSP',
     monitors: 'monitors', bin: 'binaries', settings: 'settings'},
   comp_count: (label, n) => `${n} ${label}`,
@@ -2149,7 +2183,7 @@ const T = {
     skill_on_tip: 'The AI reads this skill\'s name and description at the start of every session in this project. Click so it loads only when you type /name (from the next session)',
     skill_off_tip: 'The AI cannot use this skill in this project. Click to turn it back on (from the next session)',
     skill_manual_tip: 'The AI does not know this skill exists until you type /name in the chat. Click to exclude it (from the next session)',
-    skill_manual_md_tip: 'This skill\'s own SKILL.md says disable-model-invocation: true, so it works this way in every project. Change that file to change it',
+    skill_manual_md_tip: 'This skill\'s own SKILL.md says disable-model-invocation: true, so it works this way in every project. Click to exclude it from this project (from the next session). To let the AI use it on its own, change that file',
     skill_toggle_failed: 'Could not switch that skill: ',
     skills_count: n => n + (n === 1 ? ' skill' : ' skills'),
     group_tag: g => 'group: ' + g,
@@ -2227,6 +2261,8 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  claude_excluded: 'Claude Code에서 제외',
+  claude_excluded_tip: '이 프로젝트에서 Claude Code는 이 파일을 읽지 않습니다 (claudeMdExcludes). 다른 에이전트와는 상관없습니다.',
   comp: {agents: '서브에이전트', mcp: 'MCP', commands: '커맨드', hooks: '훅', lsp: 'LSP',
     monitors: '모니터', bin: '실행파일', settings: '기본설정'},
   comp_count: (label, n) => `${label} ${n}개`,
@@ -2285,7 +2321,7 @@ const T = {
     skill_on_tip: '이 프로젝트에서는 세션을 시작할 때마다 AI가 이 스킬의 이름과 설명을 읽습니다. 누르면 /이름 칠 때만 읽게 됩니다 (다음 세션부터)',
     skill_off_tip: '이 프로젝트에서는 AI가 이 스킬을 못 씁니다. 누르면 다시 켜집니다 (다음 세션부터)',
     skill_manual_tip: '채팅에 /이름 을 치기 전까지 AI는 이 스킬이 있는 줄 모릅니다. 누르면 제외됩니다 (다음 세션부터)',
-    skill_manual_md_tip: '이 스킬의 SKILL.md에 disable-model-invocation: true가 적혀 있어 모든 프로젝트에서 이렇게 동작합니다. 바꾸려면 그 파일을 고칩니다',
+    skill_manual_md_tip: '이 스킬의 SKILL.md에 disable-model-invocation: true가 적혀 있어 모든 프로젝트에서 이렇게 동작합니다. 누르면 이 프로젝트에서 제외됩니다 (다음 세션부터). 자동으로 쓰게 하려면 그 파일을 고칩니다',
     skill_toggle_failed: '스킬을 켜고 끄지 못했습니다: ',
     skills_count: n => '스킬 ' + n + '개',
     group_tag: g => '그룹: ' + g,
@@ -2606,6 +2642,12 @@ async function toggle(name, enable, dotEl){
   polling = true;
   await tick();
 }
+// off가 먼저다. 머리말이 수동 전용이어도 off면 목록과 / 메뉴 어디에도 나오지 않는다(공식 문서).
+function skillSwitch(s){
+  const st = s.override === 'off' ? 'off' : s.manual_only || s.override === 'user-invocable-only' ? 'manual' : s.enabled ? 'on' : 'off';
+  return { st, next: { on: 'user-invocable-only', manual: 'off', off: 'on' }[st] };
+}
+
 async function toggleSkill(name, value, el){
   polling = false; el.classList.add('busy');
   try{
@@ -3026,7 +3068,7 @@ async function tick(){
         const caret = document.createElement('span');
         caret.textContent = f.exists ? '▸ ' : '';
         left.appendChild(caret);
-        left.insertAdjacentHTML('beforeend', `${depth ? '<span class="dim">↳ </span>' : ''}<span class="dot ${f.exists?'on':'off'}" style="cursor:default"></span>${home(f.name)}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}`);
+        left.insertAdjacentHTML('beforeend', `${depth ? '<span class="dim">↳ </span>' : ''}<span class="dot ${f.exists && !(f.claude_excluded && (!f.tool || f.tool === 'Claude Code'))?'on':'off'}" style="cursor:default"></span>${home(f.name)}${f.tool ? `<span class="tooltag">${f.tool}</span>` : ''}${f.claude_excluded ? `<span class="tooltag" title="${t().claude_excluded_tip}">${t().claude_excluded}</span>` : ''}`);
         // 파일에 적힌 연결을 글자 그대로: 링크는 → 대상, 가져오기는 @대상. 대상이 없으면 흐리게 지운다.
         if(f.link){
           const refs = f.link.kind === 'symlink' ? [{text: '→ ' + base(f.link.target), ok: f.link.ok, path: f.link.target}]
@@ -3198,19 +3240,12 @@ async function tick(){
               if(!isPlugin && s.enabled !== undefined){
                 // 플러그인 밖 스킬만 스위치가 있다. 플러그인 스킬은 플러그인째 켜고 끈다.
                 const ssw = document.createElement('span');
-                if(s.manual_only){
-                  // 머리말이 정한 것이라 프로젝트 설정으로는 못 바꾼다. 사실만 보여 준다.
-                  ssw.className = 'switch sw-manual'; ssw.style.cursor = 'default';
-                  ssw.textContent = t().manual; ssw.title = t().skill_manual_md_tip;
-                } else {
-                  // 켜짐 → 수동 → 꺼짐 → 켜짐. name-only 는 쓰는 사람이 드물어 스위치에 안 넣었다.
-                  const st = s.override === 'user-invocable-only' ? 'manual' : (s.enabled ? 'on' : 'off');
-                  const next = { on: 'user-invocable-only', manual: 'off', off: 'on' }[st];
-                  ssw.className = 'switch sw-' + st;
-                  ssw.textContent = t()[st];
-                  ssw.title = { on: t().skill_on_tip, manual: t().skill_manual_tip, off: t().skill_off_tip }[st];
-                  ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, next, ssw); };
-                }
+                // 켜짐 → 수동 → 꺼짐 → 켜짐. name-only 는 쓰는 사람이 드물어 스위치에 안 넣었다.
+                const {st, next} = skillSwitch(s);
+                ssw.className = 'switch sw-' + st;
+                ssw.textContent = t()[st];
+                ssw.title = s.manual_only && st === 'manual' ? t().skill_manual_md_tip : { on: t().skill_on_tip, manual: t().skill_manual_tip, off: t().skill_off_tip }[st];
+                ssw.onclick = e => { e.stopPropagation(); toggleSkill(s.name, next, ssw); };
                 srow.appendChild(ssw);
               }
 
