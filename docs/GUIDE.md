@@ -18,7 +18,7 @@ HUD can switch things on and off **only for Claude Code**. For other agents it o
 | Agent | Turn a skill off from HUD | Add a skill with a group link | Instruction totals |
 |---|---|---|---|
 | Claude Code | Yes [measured] | Yes [measured] | Yes, including parent folders, `.claude/CLAUDE.md`, rules, the `AGENTS.md` fallback, `claudeMdExcludes` and `@` imports [measured] |
-| Codex | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Partial. Counted per folder from the Git root [docs]. Size limit and fallback file names are not applied ([#23](../../../issues/23)) |
+| Codex | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Yes. Per folder from the Git root, with fallback names and the size limit [measured]. An empty `AGENTS.override.md` blocks `AGENTS.md` in the same folder [measured] |
 | Gemini CLI | No. Skills it disabled itself are read and shown | Yes (`.agents/skills`) [docs] | Partial. Global and root `GEMINI.md` only, `@` imports not followed |
 | Antigravity | No | Yes (`.agents/skills`) [docs] | Yes. Instructions in the start folder and `always_on` rules [measured], global instructions and rules [docs] |
 | Cursor | No | Yes, but it also reads global folders, so it cannot be split per project [docs] | Partial. Root `AGENTS.md` only [unverified: rule file totals, [#35](../../../issues/35)] |

@@ -708,16 +708,58 @@ def _first_nonempty(*paths):
     return []
 
 
+def _codex_config():
+    """Codex 사용자 설정. Python 3.11 전이거나 파일이 없거나 깨졌으면 빈 값으로 본다."""
+    home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+    try:
+        import tomllib
+        with open(os.path.join(home, "config.toml"), "rb") as f:
+            return tomllib.load(f)
+    except (ImportError, FileNotFoundError):
+        return {}
+    except (OSError, ValueError) as e:
+        print(f"Codex 설정을 읽지 못했습니다: {e}", file=sys.stderr)
+        return {}
+
+
+def _codex_byte_limit(config):
+    v = config.get("project_doc_max_bytes")
+    return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 32768
+
+
 def _codex_instructions(project_dir):
-    """전역 하나, 그리고 Git 루트부터 프로젝트 폴더까지 폴더마다 하나. 빈 파일은 건너뛴다.
-    루트를 못 찾으면 프로젝트 폴더만 본다(Codex 공식 문서)."""
+    """Codex 0.166 측정 규칙. 전역은 비어 있지 않은 첫 파일. 프로젝트는 Git 루트부터 폴더마다 처음 발견한
+    파일 하나이고, 비어 있으면 그 폴더 지침은 없다. 대체 이름은 그 뒤에 보고, 크기 한도는 프로젝트 쪽에만 든다."""
     home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
     out = _first_nonempty(os.path.join(home, "AGENTS.override.md"), os.path.join(home, "AGENTS.md"))
+    config = _codex_config()
+    fallback = config.get("project_doc_fallback_filenames")
+    names = ["AGENTS.override.md", "AGENTS.md"] + ([n for n in fallback if isinstance(n, str)] if isinstance(fallback, list) else [])
+    budget = _codex_byte_limit(config)
     dirs = _dirs_from_root(project_dir)
     roots = [i for i, d in enumerate(dirs) if os.path.exists(os.path.join(d, ".git"))]
     for d in dirs[roots[-1]:] if roots else [os.path.abspath(project_dir)]:
-        out += _first_nonempty(os.path.join(d, "AGENTS.override.md"), os.path.join(d, "AGENTS.md"))
+        found = next((os.path.join(d, n) for n in names if os.path.isfile(os.path.join(d, n))), None)
+        if found and budget > 0 and os.path.getsize(found) > 0:
+            out.append(found)
+            budget -= os.path.getsize(found)
     return out
+
+
+def _codex_cut_texts(files, texts):
+    """프로젝트 쪽 지침을 크기 한도에 맞춰 자른 본문과 잘렸는지. 넘치면 파일 중간에서 잘린다(측정)."""
+    home = os.path.realpath(os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")) + os.sep
+    budget = _codex_byte_limit(_codex_config())
+    out, truncated = [], False
+    for f in files:
+        t = texts[f]
+        if t is not None and not f.startswith(home):
+            raw = t.encode("utf-8")
+            if len(raw) > budget:
+                t, truncated = raw[:budget].decode("utf-8", "ignore"), True
+            budget = max(0, budget - len(raw))
+        out.append(t)
+    return out, truncated
 
 
 # 에이전트마다 세션을 시작할 때 늘 읽는 지침 파일. 하위 폴더의 파일은 그 폴더를 건드릴 때만
@@ -761,14 +803,18 @@ def session_load(project_dir, tk):
                         texts[f] = fh.read(INSTRUCTION_READ_MAX)
                 except OSError:
                     texts[f] = None
-    state, counts = count_tokens([t for t in texts.values() if t is not None]) if any(v is not None for v in texts.values()) else ("ok", {})
+    codex_texts, codex_truncated = _codex_cut_texts(files["Codex"], texts)
+    wanted = [t for t in list(texts.values()) + codex_texts if t is not None]
+    state, counts = count_tokens(wanted) if wanted else ("ok", {})
     out = {}
     for agent in SKILL_AGENTS:
         sk = (tk.get("agents") or {}).get(agent) or {"skills": 0, "measured": 0, "tokens": 0}
-        instr = [texts[f] for f in files[agent]]
+        instr = codex_texts if agent == "Codex" else [texts[f] for f in files[agent]]
         ok = tk.get("state") == "ok" and state == "ok" and sk["measured"] == sk["skills"] and all(t is not None and t in counts for t in instr)
         out[agent] = {"instructions": len(instr), "skills": sk["skills"],
                       "tokens": (sk["tokens"] or 0) + sum(counts[t] for t in instr) if ok else None}
+        if agent == "Codex" and codex_truncated:
+            out[agent]["truncated"] = True
     return out
 
 
@@ -1689,17 +1735,10 @@ def _skills_disabled_elsewhere(project_dir):
     """다른 에이전트가 자기 설정으로 끈 스킬 -> (Codex SKILL.md 경로, {에이전트: 스킬 이름}).
     HUD는 읽기만 한다. Codex는 ~/.codex/config.toml, Gemini CLI는 사용자·작업 폴더 settings.json의
     skills.disabled, Copilot은 사용자·저장소 settings.json의 disabledSkills(각 공식 문서)."""
-    paths = set()
-    try:
-        import tomllib      # Python 3.11부터. 없으면 Codex 설정은 못 읽는다.
-        home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
-        with open(os.path.join(home, "config.toml"), "rb") as f:
-            entries = ((tomllib.load(f).get("skills") or {}).get("config")) or []
-        paths = {os.path.realpath(os.path.expanduser(e["path"])) for e in entries
-                 if isinstance(e, dict) and e.get("enabled") is False and isinstance(e.get("path"), str)}
-    except (ImportError, OSError, ValueError, AttributeError) as e:
-        if not isinstance(e, (ImportError, FileNotFoundError)):
-            print(f"Codex 설정을 읽지 못했습니다: {e}", file=sys.stderr)
+    config = _codex_config().get("skills")
+    entries = config.get("config") if isinstance(config, dict) else None
+    paths = {os.path.realpath(os.path.expanduser(e["path"])) for e in entries or []
+             if isinstance(e, dict) and e.get("enabled") is False and isinstance(e.get("path"), str)}
     def names(path, *keys):
         v = read_json(path, {})
         for k in keys:
@@ -2463,6 +2502,7 @@ const T = {
     new_group_first_prompt: 'Which plugin should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
+  hl_truncated: '(cut at the size limit)',
   related_doc: 'related document',
   related_doc_tip: 'Mentioned by path in this file. Read only when needed, so it is not in the startup totals. Found automatically from the text, so it may be wrong.',
   old_service_warning: 'Settings for an older install.sh service (com.agent-hud) are still here. If it runs alongside this Homebrew install, both use the same data folder. This command stops and removes it.',
@@ -2604,6 +2644,7 @@ const T = {
     new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
+  hl_truncated: '(크기 한도에서 잘림)',
   related_doc: '관련 문서',
   related_doc_tip: '이 파일 본문에 경로로 적힌 문서입니다. 필요할 때만 읽히므로 시작 합계에는 없습니다. 글자에서 자동으로 찾은 것이라 틀릴 수 있습니다.',
   old_service_warning: '예전 install.sh 서비스(com.agent-hud) 설정이 남아 있습니다. 이 Homebrew 설치본과 함께 돌면 같은 데이터 폴더를 씁니다. 이 명령으로 끄고 지울 수 있습니다.',
@@ -2718,7 +2759,7 @@ function renderHeadline(){
   const rows = Object.entries(ld).filter(([, v]) => v.instructions + v.skills > 0);
   if(!rows.length){ el.textContent = t().headline_none; return; }
   el.innerHTML = `<div class="hl-title">${t().headline_title}</div>` + rows.map(([a, v]) =>
-    `<div class="hl-row"><span class="hl-agent">${shortAgent(a)}</span><span>${t().hl_instr(v.instructions)}</span><span>${t().hl_skills(v.skills)}</span><span class="${v.tokens === null ? 'dim' : 'hl-tok'}">${v.tokens === null ? t().hl_tok_na : t().hl_tok(v.tokens)}</span></div>`).join('');
+    `<div class="hl-row"><span class="hl-agent">${shortAgent(a)}</span><span>${t().hl_instr(v.instructions)}${v.truncated ? ' ' + t().hl_truncated : ''}</span><span>${t().hl_skills(v.skills)}</span><span class="${v.tokens === null ? 'dim' : 'hl-tok'}">${v.tokens === null ? t().hl_tok_na : t().hl_tok(v.tokens)}</span></div>`).join('');
 }
 
 let theme = localStorage.getItem('agent-hud-theme') || 'dark';
