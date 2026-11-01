@@ -2,6 +2,23 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.6
+
+**꺼진 플러그인의 스킬을 링크해도 Claude Code 집계가 맞다.** Claude Code는 `.claude/skills`의 링크를 플러그인과 별개로 읽는다.
+이 링크를 별도 행과 스위치로 보여 주고 측정대로 센다. 플러그인 스킬의 공유 체크박스는 `.agents/skills`에만 걸고, `.claude/skills`만
+관리하는 프로젝트에서는 플러그인 스킬의 공유를 막는다. (#40)
+
+**Claude Code를 나중에 설치하면 빠진 링크를 알려 준다.** `~/.claude` 없이 공유했던 프로젝트에 `.claude/skills` 링크가 없거나 끊어져
+있으면 안내하고, 누를 때만 연결한다. 프로젝트별 공유 폴더 설정을 읽고 쓰는 동안 잠가 고른 값을 잃지 않는다. (#41)
+
+**The Claude Code count is right for linked skills of a disabled plugin.** Claude Code reads links in `.claude/skills` separately
+from the plugin. They now get their own row and switch and are counted as measured. The share checkbox for a plugin skill only
+uses `.agents/skills`, and sharing a plugin skill is blocked in projects that manage only `.claude/skills`. (#40)
+
+**Installing Claude Code later tells you which links are missing.** If a project shared without `~/.claude` has missing or broken
+`.claude/skills` links, the HUD says so and connects them only when you click. Per-project share folder settings are locked while
+being read and written, so a choice isn't lost. (#41)
+
 ## v0.6.5
 
 **Claude Code 없이도 그룹과 공유가 동작한다.** 플러그인이 없어도 스킬로 그룹을 만들 수 있고, 바꿀 값이 없으면
