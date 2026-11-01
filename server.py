@@ -1047,6 +1047,10 @@ def _same_bytes(a, b):
         return False
 
 
+def _same_skill_file(a, b):
+    return os.path.realpath(a) == os.path.realpath(b) or _same_bytes(a, b)
+
+
 def _scan_skill_root(root, label, agents, found):
     """링크거나 내용이 똑같은 스킬만 한 행으로 합친다. 내용이 다르면 행을 나누고, 에이전트는 먼저 찾은
     쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서)."""
@@ -1842,16 +1846,19 @@ def collect_skills(ctx):
     marketplaces = read_json(os.path.join(CLAUDE_DIR, "plugins", "known_marketplaces.json"))
     sets = read_sets()
 
-    def decorate(skill, fallback_agents):
-        hit = index.get(skill["id"])
-        agents = hit["agents"] if hit else list(fallback_agents)
+    copies = _plugin_copies(index)
+
+    def decorate(skill, hit, base_agents=()):
+        agents = list(base_agents) + [a for a in (hit["agents"] if hit else []) if a not in base_agents]
         real_md = os.path.realpath(os.path.join(skill["path"], "SKILL.md"))
         agents = [a for a in agents if not ((a == "Codex" and real_md in codex_off) or skill.get("name") in by_name_off.get(a, ()))]
         skill["agents"] = agents
         skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
         skill["roots"] = hit["roots"] if hit else []
         skill["shared"] = skill_is_shared(project_dir, skill["id"], sources.get(skill["id"]))
-        skill["linkable"] = skill["id"] in sources
+        # 링크는 원본을 건다. 이름만 같은 다른 파일을 걸게 되면 체크박스를 주지 않는다.
+        skill["linkable"] = skill["id"] in sources and _same_skill_file(
+            os.path.join(sources[skill["id"]], "SKILL.md"), os.path.join(skill["path"], "SKILL.md"))
         READABLE_PATHS.add(os.path.join(skill["path"], "SKILL.md"))
         return skill
 
@@ -1863,9 +1870,9 @@ def collect_skills(ctx):
         mp_src = (marketplaces.get(mp_name) or {}).get("source", {})
         skills = _list_skills(os.path.join(install_path, "skills")) if install_path else []
         for sk in skills:
-            # 플러그인 폴더 자체는 Claude Code만 읽는다. 그룹을 프로젝트에 링크했다면
-            # 같은 이름이 스킬 폴더에도 있어 index 쪽 값이 이긴다.
-            decorate(sk, ["Claude Code"])
+            # 플러그인 폴더 자체는 Claude Code만 읽는다. 스킬 폴더에 링크나 복사본이 있으면
+            # 그 폴더를 읽는 에이전트를 더한다.
+            decorate(sk, index.get(copies.get(os.path.join(sk["path"], "SKILL.md"))), ["Claude Code"])
             sk["manual_only"] = _manual_only(os.path.join(sk["path"], "SKILL.md"))
         rows.append({
             "name": name,
@@ -1879,14 +1886,13 @@ def collect_skills(ctx):
         })
 
     # 플러그인에 속하지 않은 스킬들. Claude Code가 읽는 것에는 스위치가 있다(skillOverrides).
-    plugin_ids = {sk["id"] for r in rows for sk in r["skills"]}
     overrides = skill_overrides(project_dir)[0]
     loose = []
-    for sid, hit in _loose_entries(index, plugin_ids):
+    for sid, hit in _loose_entries(index):
         # 행 id에는 겹친 이름을 가르는 @폴더가 붙을 수 있으니 실제 폴더 이름과 비교한다
         name, desc, issues = _skill_meta(hit["path"], os.path.basename(os.path.dirname(hit["path"])))
         sk = decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
-                       "path": os.path.dirname(hit["path"])}, [])
+                       "path": os.path.dirname(hit["path"])}, hit)
         if "Claude Code" in sk["agents"]:
             sk["override"] = overrides.get(name) if overrides.get(name) in SKILL_OVERRIDE_VALUES else "on"
             sk["enabled"] = sk["override"] not in SKILL_HIDDEN
@@ -2045,15 +2051,28 @@ def skill_overrides(project_dir):
     return {**shared, **local}, shared
 
 
-def _loose_entries(index, plugin_ids):
-    return [(sid, hit) for sid, hit in sorted(index.items()) if sid not in plugin_ids]
+def _plugin_copies(index):
+    """스킬 폴더에 놓인 플러그인 스킬의 링크나 복사본 -> {플러그인 SKILL.md: index 키}.
+    이름만 같고 내용이 다른 스킬은 Claude Code가 별개로 읽으므로 넣지 않는다(센티널 실측)."""
+    out = {}
+    for skills in plugin_skills().values():
+        for sid, path in skills.items():
+            md = os.path.join(path, "SKILL.md")
+            for key, hit in index.items():
+                if hit["name"] == sid and _same_skill_file(hit["path"], md):
+                    out[md] = key
+    return out
+
+
+def _loose_entries(index):
+    copies = set(_plugin_copies(index).values())
+    return [(sid, hit) for sid, hit in sorted(index.items()) if sid not in copies]
 
 
 def loose_claude_skills(project_dir):
     """이 프로젝트에서 Claude Code가 읽는 플러그인 밖 스킬 -> {스킬 이름: 폴더 이름}."""
-    plugin_ids = {sid for skills in plugin_skills().values() for sid in skills}
     out = {}
-    for sid, hit in _loose_entries(_skill_root_index(project_dir), plugin_ids):
+    for sid, hit in _loose_entries(_skill_root_index(project_dir)):
         if "Claude Code" in hit["agents"]:
             out[_skill_meta(hit["path"], os.path.basename(os.path.dirname(hit["path"])))[0]] = sid
     return out

@@ -33,6 +33,7 @@ def main():
     tmp = os.path.realpath(tempfile.mkdtemp())
     try:
         home = os.path.join(tmp, "home")
+        os.environ.pop("CODEX_HOME", None)   # 켜져 있으면 Codex가 ~/.codex/skills를 안 읽는다
         hud.HOME = home
         hud.CLAUDE_DIR = os.path.join(home, ".claude")
         hud.MODES_FILE = os.path.join(tmp, "modes.json")
