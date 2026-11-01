@@ -216,8 +216,8 @@ editing". Groups exist only in Agent HUD and are stored in `modes.json`.
 A group can hold plugin skills, skills in your user skill folders (`~/.claude/skills`,
 `~/.agents/skills` and so on), and skills that live inside one of the projects in the
 sidebar. For the last kind, other projects get a link to that project's folder, so moving or
-deleting that project breaks the link. When two skills share a name, a plugin skill wins
-over a user skill, and a user skill over a project one.
+deleting that project breaks the link. When skills share a name but differ in content, you pick
+the file from the list.
 
 ## Setting up groups
 

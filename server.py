@@ -276,16 +276,20 @@ def collect_groups(ctx):
     groups = []
     for gname, entry in sets.items():
         plugins = [m for m in entry["plugins"] if m in installed]
-        skills = [sk for sk in entry["skills"] if sk in sources]
+        pinned = entry.get("sources", {})
+        skills = [sk for sk in entry["skills"] if pinned.get(sk) or sk in sources]
         groups.append({
             "name": gname,
             "assigned": gname == assigned,
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
-                     + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk, sources[sk])} for sk in skills],
+                     + [{"name": sk, "kind": "skill", "source": pinned.get(sk) or sources[sk],
+                         "on": skill_is_shared(project_dir, sk, pinned.get(sk) or sources[sk])} for sk in skills],
             "still_visible": _still_visible(project_dir, entry) if gname == assigned else {},
         })
     return {"title": "Groups", "groups": groups,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
+            "skill_choices": {n: [{"source": d, "label": d.replace(HOME, "~", 1)} for d in dirs]
+                              for n, dirs in skill_candidates().items() if len(dirs) > 1},
             "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
 
 
@@ -1215,6 +1219,23 @@ def skill_sources(project_dir):
     return out
 
 
+def skill_candidates():
+    """{스킬 이름: [원본 폴더]}. skill_sources와 같은 곳을 찾되 내용이 다른 같은 이름을 모두 둔다."""
+    found = [d for skills in plugin_skills().values() for d in skills.items()]
+    for rel, _agents in SKILL_ROOTS_HOME:
+        root = os.path.join(HOME, rel.replace("/", os.sep))
+        for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+            if os.path.isfile(os.path.join(root, name, "SKILL.md")):
+                found.append((name, os.path.join(root, name)))
+    found += [(name, d) for name, (d, _proj) in project_skills().items()]
+    out = {}
+    for name, d in found:
+        dirs = out.setdefault(name, [])
+        if not any(_same_skill_file(os.path.join(x, "SKILL.md"), os.path.join(d, "SKILL.md")) for x in dirs):
+            dirs.append(d)
+    return out
+
+
 def skill_is_shared(project_dir, name, src=None):
     """이 프로젝트가 관리하는 스킬 폴더 모두에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
     자체면 된다(원본이 이 프로젝트 안에 있는 경우)."""
@@ -1225,15 +1246,16 @@ def skill_is_shared(project_dir, name, src=None):
                             for d in link_dirs(project_dir))
 
 
-def link_skill(name, on, project_dir):
+def link_skill(name, on, project_dir, src=None, also=()):
     """스킬 하나를 이 프로젝트의 관리 폴더로 열거나, 모든 폴더에서 닫는다.
     원본이 어디에 있든(플러그인·~/.claude·~/.agents) 비어 있는 폴더만 채운다 --
-    그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다."""
+    그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다.
+    src는 그룹이 고른 원본. also는 끌 때 함께 지워도 되는, 다른 그룹이 건 원본들."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
     if not _valid_skill_name(name):
         return False, "invalid skill name"
-    src = skill_sources(project_dir).get(name)
+    src = src or skill_sources(project_dir).get(name)
     if not src:
         return False, "unknown skill"
     managed = link_dirs(project_dir)
@@ -1254,7 +1276,7 @@ def link_skill(name, on, project_dir):
                 if result not in ("created", "linked", "original"):
                     return False, "skill link could not be created: " + result
             elif os.path.islink(dst):
-                if local_path(dst) != local_path(src):
+                if local_path(dst) not in {local_path(p) for p in (src, *also)}:
                     return False, "existing link has a different source"
                 os.unlink(dst)  # 링크만 지운다
     except Exception as e:
@@ -2172,6 +2194,8 @@ def read_sets():
             out[name] = {"plugins": list(v), "skills": []}
         else:
             out[name] = {"plugins": list(v.get("plugins", [])), "skills": list(v.get("skills", []))}
+            if isinstance(v.get("sources"), dict) and v["sources"]:     # {스킬: 고른 원본 폴더}
+                out[name]["sources"] = dict(v["sources"])
     return out
 
 
@@ -2183,7 +2207,7 @@ def write_sets(sets):
         return False, str(e)
 
 
-def modify_group(action, group, member, kind="plugin"):
+def modify_group(action, group, member, kind="plugin", source=None):
     group = (group or "").strip()
     if not group:
         return False, "set name required"
@@ -2192,15 +2216,23 @@ def modify_group(action, group, member, kind="plugin"):
         return False, "unknown plugin"
     if kind == "skill" and member not in skill_sources(PROJECT_DIR):
         return False, "unknown skill"
+    if source and (kind != "skill" or source not in skill_candidates().get(member, [])):
+        return False, "unknown skill source"
     sets = read_sets()
     if action == "add":
         entry = sets.setdefault(group, {"plugins": [], "skills": []})
         if member not in entry[key]:
             entry[key].append(member)
+        if source:
+            entry.setdefault("sources", {})[member] = source
     elif action == "remove":
         entry = sets.get(group)
         if entry and member in entry[key]:
             entry[key].remove(member)
+            if kind == "skill" and member in entry.get("sources", {}):
+                del entry["sources"][member]
+                if not entry["sources"]:
+                    del entry["sources"]
             if not entry["plugins"] and not entry["skills"]:
                 del sets[group]
     else:
@@ -2264,9 +2296,19 @@ def assign_set(name, project_dir):
     wanted = set(sets.get(name, {}).get("skills", [])) if name else set()
     managed = {sk for v in sets.values() for sk in v["skills"]}
     errors = []
+    pins = sets.get(name, {}).get("sources", {}) if name else {}
+    sources = skill_sources(project_dir)
     for sk in sorted(managed):
-        ok, err = link_skill(sk, sk in wanted, project_dir)
-        if not ok and sk in wanted:
+        known = [v["sources"][sk] for v in sets.values() if sk in v.get("sources", {})]
+        if sk in sources:
+            known.append(sources[sk])
+        if sk not in wanted and not known:
+            continue    # 지워진 스킬이다. 지울 링크를 찾을 원본도 없다
+        src = pins.get(sk) if sk in wanted else None
+        if sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources.get(sk, "")) == "conflict" for d in link_dirs(project_dir)):
+            link_skill(sk, False, project_dir, src=known[0], also=known)  # 다른 그룹이 건 링크를 바꾼다
+        ok, err = link_skill(sk, sk in wanted, project_dir, src=src or (known[0] if sk not in wanted else None), also=known)
+        if not ok:
             errors.append(f"{sk}: {err}")
 
     # 2) 플러그인: 해제는 아래에서 적용 전 값으로 되돌린다. .claude/skills를 관리하지 않으면 Claude 설정도 쓰지 않는다.
@@ -2308,7 +2350,7 @@ def assign_set(name, project_dir):
         write_json(SETS_FILE, assigned, ensure_ascii=False, indent=2)
     except Exception as e:
         errors.append(str(e))
-    return (not errors), "; ".join(errors)[:300]
+    return (not errors), ("partly applied: " + "; ".join(errors))[:300] if errors else ""
 
 
 SHARED_SETTINGS = os.path.join(".claude", "settings.json")
@@ -2636,7 +2678,7 @@ const T = {
     add_member_ph: '+ add a plugin or skill…',
     member_plugin_tip: 'ALWAYS in this project',
     member_skill_tip: 'Linked into this project',
-    assign_failed: 'Could not apply that group: ',
+    assign_failed: 'There was a problem applying that group: ',
     on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name', name_only: 'NAME ONLY',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
@@ -2786,7 +2828,7 @@ const T = {
     add_member_ph: '+ 플러그인 또는 스킬 추가…',
     member_plugin_tip: '이 프로젝트에서 항상',
     member_skill_tip: '이 프로젝트에 걸려 있음',
-    assign_failed: '그룹을 적용하지 못했습니다: ',
+    assign_failed: '그룹을 적용하는 중 문제가 생겼습니다: ',
     on: '항상', off: '제외', manual: '/이름 칠 때만 사용', name_only: '이름만',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
@@ -3205,10 +3247,10 @@ async function toggleSkill(name, value, el){
   polling = true;
   await tick();
 }
-async function editGroup(action, group, member, kind){
+async function editGroup(action, group, member, kind, source){
   polling = false;
   try{
-    const r = await fetch('/api/group', {method:'POST', body: JSON.stringify({action, group, member, kind: kind || 'plugin'})});
+    const r = await fetch('/api/group', {method:'POST', body: JSON.stringify({action, group, member, kind: kind || 'plugin', source})});
     const d = await r.json();
     if(!d.ok) alert(t().group_update_failed + (d.error || t().error));
   } catch(e){ alert(t().group_update_failed + e); }
@@ -3614,8 +3656,14 @@ async function tick(){
           const grp = document.createElement('optgroup'); grp.label = label;
           for(const it of items){
             if(g.members.some(m => m.name === it && m.kind === kind)) continue;
-            const o = document.createElement('option'); o.value = kind + ':' + it; o.textContent = it;
-            grp.appendChild(o);
+            // 이름이 같고 내용이 다른 스킬은 파일별로 고른다
+            const files = kind === 'skill' && (p.skill_choices||{})[it];
+            for(const file of files || [null]){
+              const o = document.createElement('option'); o.value = kind + ':' + it;
+              o.textContent = file ? `${it} (${file.label})` : it;
+              if(file) o.dataset.source = file.source;
+              grp.appendChild(o);
+            }
           }
           if(grp.children.length) addSel.appendChild(grp);
         };
@@ -3625,7 +3673,7 @@ async function tick(){
           if(!addSel.value) return;
           const [kind, ...rest] = addSel.value.split(':');
           addSel.blur();  // 포커스가 남아 있으면 render가 갱신을 건너뛰어, 추가한 줄이 안 보인다
-          editGroup('add', g.name, rest.join(':'), kind);
+          editGroup('add', g.name, rest.join(':'), kind, addSel.selectedOptions[0].dataset.source);
         };
         addRow.appendChild(addSel);
         wrap.appendChild(addRow);
@@ -4143,7 +4191,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send_json({"ok": False, "error": "bad request"}, 400)
             ok, err = modify_group(payload.get("action", ""), payload.get("group", ""),
                                    payload.get("member", "") or payload.get("plugin", ""),
-                                   payload.get("kind", "plugin"))
+                                   payload.get("kind", "plugin"), payload.get("source"))
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/activate":
             length = int(self.headers.get("Content-Length", 0))
