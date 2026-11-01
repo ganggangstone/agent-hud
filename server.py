@@ -283,7 +283,8 @@ def collect_groups(ctx):
             "assigned": gname == assigned,
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
                      + [{"name": sk, "kind": "skill", "source": pinned.get(sk) or sources[sk],
-                         "on": skill_is_shared(project_dir, sk, pinned.get(sk) or sources[sk])} for sk in skills],
+                         "on": all(_skill_path_state(project_dir, d, sk, pinned.get(sk) or sources[sk]) in ("linked", "original")
+                                   for d in link_dirs(project_dir))} for sk in skills],
             "still_visible": _still_visible(project_dir, entry) if gname == assigned else {},
         })
     return {"title": "Groups", "groups": groups,
@@ -1112,6 +1113,7 @@ def _scan_skill_root(root, label, agents, found):
 # 이 둘이면 그 네 도구가 전부 켜진다. Cursor는 .claude/.agents 둘 다 읽는다.
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
 LINK_DIRS_FILE = os.path.join(TOOL_DIR, "link-dirs.json")   # {프로젝트: [관리할 폴더]}
+NO_CLAUDE_SEEN = "__no_claude_seen__"   # 그 파일에서 ~/.claude 없이 본 프로젝트 목록. 나중에 설치했는지 가른다
 
 
 def link_dirs(project_dir):
@@ -1128,6 +1130,8 @@ def set_link_dirs(project_dir, dirs):
         return False, "choose supported skill directories"
     data = read_json(LINK_DIRS_FILE, {})
     data[project_dir] = [d for d in GROUP_LINK_DIRS if d in dirs]
+    if project_dir in data.get(NO_CLAUDE_SEEN, []):
+        data[NO_CLAUDE_SEEN].remove(project_dir)
     try:
         write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -1245,6 +1249,80 @@ def skill_candidates():
     return out
 
 
+def _share_dirs(project_dir, src):
+    """공유 체크박스가 링크할 폴더. 플러그인 스킬은 Claude Code가 이미 플러그인으로 읽을 수 있고, .claude/skills에
+    걸면 꺼 둔 플러그인의 스킬이 켜지므로 다른 에이전트의 폴더에만 건다."""
+    dirs = link_dirs(project_dir)
+    plugin_paths = {local_path(p) for skills in plugin_skills().values() for p in skills.values()}
+    if local_path(src) in plugin_paths and ".agents/skills" in dirs:
+        return [".agents/skills"]
+    return dirs
+
+
+def _missing_in_claude(project_dir):
+    """.agents/skills에 있는데 .claude/skills에 없는 스킬 -> {이름: 원본}. 플러그인 스킬은 플러그인으로 읽을 수 있어 뺀다."""
+    root = os.path.join(project_dir, ".agents", "skills")
+    plugin_paths = {local_path(p) for skills in plugin_skills().values() for p in skills.values()}
+    out = {}
+    for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+        src = local_path(os.path.join(root, name))
+        if src not in plugin_paths and _skill_file_readable(src) and \
+                _skill_path_state(project_dir, ".claude/skills", name, src) == "missing":
+            out[name] = src
+    return out
+
+
+def claude_connect_state(project_dir):
+    """Claude Code 없이 쓰던 프로젝트에 그 뒤 Claude Code가 생겼으면 연결할 것 -> {"names", "group"}, 아니면 None."""
+    data = read_json(LINK_DIRS_FILE, {})
+    if project_dir in data:
+        return None
+    seen = data.get(NO_CLAUDE_SEEN, [])
+    if not os.path.isdir(os.path.join(HOME, ".claude")):
+        if project_dir not in seen:
+            _write_no_claude_seen(data, seen + [project_dir])
+        return None
+    if project_dir not in seen:
+        return None
+    names = sorted(_missing_in_claude(project_dir))
+    group = read_json(SETS_FILE, {}).get(project_dir, "")
+    if not names and not group:     # 할 일이 없으면 전환이 끝난 것이다
+        _write_no_claude_seen(data, [p for p in seen if p != project_dir])
+        return None
+    return {"names": names, "group": group}
+
+
+def _write_no_claude_seen(data, seen):
+    data[NO_CLAUDE_SEEN] = seen
+    try:
+        write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"could not save {LINK_DIRS_FILE}: {e}", file=sys.stderr)
+
+
+def connect_claude(project_dir, keep=False):
+    """사용자가 고른 대로 처리한다. keep이면 지금 폴더를 고른 값으로 기록해 다시 묻지 않는다."""
+    if keep:
+        return set_link_dirs(project_dir, [".agents/skills"])
+    state = claude_connect_state(project_dir)
+    if state is None:
+        return True, ""
+    errors = []
+    if state["group"]:
+        ok, err = assign_set(state["group"], project_dir)
+        if not ok:
+            errors.append(err)
+    for name, src in _missing_in_claude(project_dir).items():
+        ok, err = link_skill(name, True, project_dir, src=src, dirs=[".claude/skills"])
+        if not ok:
+            errors.append(f"{name}: {err}")
+    if errors:
+        return False, "; ".join(errors)[:300]
+    data = read_json(LINK_DIRS_FILE, {})
+    _write_no_claude_seen(data, [p for p in data.get(NO_CLAUDE_SEEN, []) if p != project_dir])
+    return True, ""
+
+
 def skill_is_shared(project_dir, name, src=None):
     """이 프로젝트가 관리하는 스킬 폴더 모두에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
     자체면 된다(원본이 이 프로젝트 안에 있는 경우)."""
@@ -1252,14 +1330,14 @@ def skill_is_shared(project_dir, name, src=None):
     if not _valid_skill_name(name):
         return False
     return bool(src) and all(_skill_path_state(project_dir, d, name, src) in ("linked", "original")
-                            for d in link_dirs(project_dir))
+                            for d in _share_dirs(project_dir, src))
 
 
-def link_skill(name, on, project_dir, src=None, also=()):
+def link_skill(name, on, project_dir, src=None, also=(), dirs=None):
     """스킬 하나를 이 프로젝트의 관리 폴더로 열거나, 모든 폴더에서 닫는다.
     원본이 어디에 있든(플러그인·~/.claude·~/.agents) 비어 있는 폴더만 채운다 --
     그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다.
-    src는 그룹이 고른 원본. also는 끌 때 함께 지워도 되는, 다른 그룹이 건 원본들."""
+    src는 그룹이 고른 원본. also는 끌 때 함께 지워도 되는, 다른 그룹이 건 원본들. dirs는 켤 때 링크할 폴더."""
     if not project_dir or not os.path.isdir(project_dir):
         return False, "project not found"
     if not _valid_skill_name(name):
@@ -1267,7 +1345,7 @@ def link_skill(name, on, project_dir, src=None, also=()):
     src = src or skill_sources(project_dir).get(name)
     if not src:
         return False, "unknown skill"
-    managed = link_dirs(project_dir)
+    managed = _share_dirs(project_dir, src) if dirs is None else dirs
     try:
         for rel in GROUP_LINK_DIRS:
             dst = _link_path(project_dir, rel, name)
@@ -1845,7 +1923,8 @@ def _attach_tokens(rows):
     seen = {}
     for row, sk in skills:
         sk["tokens"] = counts.get(text[id(sk)])
-        e = seen.setdefault(os.path.realpath(os.path.join(sk["path"], "SKILL.md")),
+        # 플러그인과 그 링크는 같은 파일이어도 Claude Code가 따로 읽는다(센티널 실측)
+        e = seen.setdefault((os.path.realpath(os.path.join(sk["path"], "SKILL.md")), bool(row["name"])),
                             {"tokens": sk["tokens"], "agents": set()})
         e["agents"] |= {a for a in sk["agents"] if not (a == "Claude Code" and _claude_off(row, sk))}
     measured = [e for e in seen.values() if e["tokens"] is not None]
@@ -1997,6 +2076,7 @@ def collect_skills(ctx):
         "link_dirs": [{"dir": rel, "on": rel in managed, "agents": agents}
                       for rel, agents in SKILL_ROOTS_PROJECT if rel in GROUP_LINK_DIRS],
         "link_dirs_auto_off": project_dir not in read_json(LINK_DIRS_FILE, {}) and ".claude/skills" not in managed,
+        "claude_connect": claude_connect_state(project_dir),
     }
 
 
@@ -2136,13 +2216,13 @@ def skill_overrides(project_dir):
 
 def _plugin_copies(index):
     """스킬 폴더에 놓인 플러그인 스킬의 링크나 복사본 -> {플러그인 SKILL.md: index 키}.
-    이름만 같고 내용이 다른 스킬은 Claude Code가 별개로 읽으므로 넣지 않는다(센티널 실측)."""
+    이름만 같고 내용이 다른 스킬과, Claude Code가 읽는 폴더의 링크는 플러그인과 별개로 읽히므로 넣지 않는다(센티널 실측)."""
     out = {}
     for skills in plugin_skills().values():
         for sid, path in skills.items():
             md = os.path.join(path, "SKILL.md")
             for key, hit in index.items():
-                if hit["name"] == sid and _same_skill_file(hit["path"], md):
+                if hit["name"] == sid and "Claude Code" not in hit["agents"] and _same_skill_file(hit["path"], md):
                     out[md] = key
     return out
 
@@ -2316,7 +2396,8 @@ def assign_set(name, project_dir):
         src = pins.get(sk) if sk in wanted else None
         if sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources.get(sk, "")) in ("conflict", "broken") for d in link_dirs(project_dir)):
             link_skill(sk, False, project_dir, src=known[0], also=known)  # 다른 그룹이 건 링크를 바꾼다
-        ok, err = link_skill(sk, sk in wanted, project_dir, src=src or (known[0] if sk not in wanted else None), also=known)
+        ok, err = link_skill(sk, sk in wanted, project_dir, src=src or (known[0] if sk not in wanted else None),
+                             also=known, dirs=link_dirs(project_dir))
         if not ok:
             errors.append(f"{sk}: {err}")
         elif sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources[sk]) == "occupied" and not _same_skill_file(
@@ -2718,6 +2799,10 @@ const T = {
   comp_count: (label, n) => `${n} ${label}`,
   comp_tip: n => `Also in this plugin: ${n}. Only skills can be shared with other agents`,
   share_to: names => 'let ' + names.join(', ') + ' use it too',
+  claude_connect: n => `Claude Code was found. ${n} skills in this project are not in .claude/skills:`,
+  claude_connect_group: g => `Claude Code was found. Apply group "${g}" again to set it up for Claude Code as well.`,
+  claude_connect_yes: 'Connect to Claude Code', claude_connect_no: 'Keep as is',
+  claude_connect_no_tip: 'Keeps .agents/skills only for this project. You can change it with the checkboxes above.',
   link_dirs_label: 'Share and group skills through:',
   link_dirs_tip: 'Sharing and groups create links only in the folders checked here. Unchecking keeps existing links. With .claude/skills unchecked, groups do not write Claude Code settings either.',
   link_dirs_auto_off: 'Claude Code was not found on this computer, so .claude/skills is off for this project. Check it if you or a teammate use Claude Code here.',
@@ -2869,6 +2954,10 @@ const T = {
   comp_count: (label, n) => `${label} ${n}개`,
   comp_tip: n => `이 플러그인에 같이 든 것: ${n}. 다른 에이전트에 보낼 수 있는 것은 스킬뿐입니다`,
   share_to: names => names.join('·') + '도 쓰게 하기',
+  claude_connect: n => `Claude Code를 찾았습니다. 이 프로젝트의 스킬 ${n}개가 .claude/skills에 없습니다:`,
+  claude_connect_group: g => `Claude Code를 찾았습니다. "${g}" 그룹을 다시 적용하면 Claude Code에도 맞춰집니다.`,
+  claude_connect_yes: 'Claude Code에도 연결', claude_connect_no: '그대로 두기',
+  claude_connect_no_tip: '이 프로젝트는 .agents/skills만 씁니다. 위의 체크박스로 바꿀 수 있습니다.',
   link_dirs_label: '스킬을 공유하고 그룹을 적용할 폴더:',
   link_dirs_tip: '공유와 그룹은 여기서 체크한 폴더에만 링크를 만듭니다. 체크를 풀어도 있는 링크는 그대로 둡니다. .claude/skills를 풀면 그룹이 Claude Code 설정도 쓰지 않습니다.',
   link_dirs_auto_off: '이 컴퓨터에서 Claude Code를 찾지 못해 이 프로젝트의 .claude/skills를 꺼 두었습니다. 본인이나 팀원이 여기서 Claude Code를 쓴다면 체크하세요.',
@@ -3269,6 +3358,16 @@ async function editGroup(action, group, member, kind, source){
     const d = await r.json();
     if(!d.ok) alert(t().group_update_failed + (d.error || t().error));
   } catch(e){ alert(t().group_update_failed + e); }
+  polling = true;
+  await tick();
+}
+async function connectClaude(keep){
+  polling = false;
+  try{
+    const r = await fetch('/api/claudeconnect', {method:'POST', body: JSON.stringify({keep, project: currentProjectDir})});
+    const d = await r.json();
+    if(!d.ok) alert(t().link_failed + (d.error || t().error));
+  } catch(e){ alert(t().link_failed + e); }
   polling = true;
   await tick();
 }
@@ -3825,6 +3924,29 @@ async function tick(){
         }
         c.appendChild(box);
       }
+      if(p.claude_connect){
+        // 설치 뒤에 빠진 링크. 저장소에 파일이 말없이 생기지 않도록 누를 때만 만든다.
+        const cc = p.claude_connect;
+        const box = document.createElement('div'); box.className = 'guide';
+        const head = document.createElement('div');
+        head.textContent = cc.group ? t().claude_connect_group(cc.group) : t().claude_connect(cc.names.length);
+        box.appendChild(head);
+        if(cc.names.length){
+          const list = document.createElement('div');
+          list.textContent = cc.names.slice(0, 5).join(', ') + (cc.names.length > 5 ? ' ' + t().group_more(cc.names.length - 5) : '');
+          list.title = cc.names.join(', ');
+          box.appendChild(list);
+        }
+        const actions = document.createElement('div'); actions.style.marginTop = '6px';
+        const yes = document.createElement('span'); yes.className = 'btn'; yes.textContent = t().claude_connect_yes;
+        yes.onclick = () => connectClaude(false);
+        const no = document.createElement('span'); no.className = 'btn'; no.style.marginLeft = '8px'; no.textContent = t().claude_connect_no;
+        no.title = t().claude_connect_no_tip;
+        no.onclick = () => connectClaude(true);
+        actions.appendChild(yes); actions.appendChild(no);
+        box.appendChild(actions);
+        c.appendChild(box);
+      }
       if(!p.rows.length){
         const e = document.createElement('div'); e.className = 'empty';
         e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
@@ -4233,6 +4355,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if project not in known_projects():
                 return self._send_json({"ok": False, "error": "unknown project"}, 400)
             ok, err = assign_set(payload.get("group", ""), project)
+            self._send_json({"ok": ok, "error": err})
+        elif self.path == "/api/claudeconnect":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = connect_claude(project, bool(payload.get("keep")))
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/linkdirs":
             length = int(self.headers.get("Content-Length", 0))

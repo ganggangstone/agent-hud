@@ -36,7 +36,8 @@ def main():
             ok, err = hud.link_skill(name, True, proj)
             assert ok, err
             assert hud.skill_is_shared(proj, name), f"{name}: 모든 폴더에 안 걸렸다"
-            for d in hud.GROUP_LINK_DIRS:
+            # 플러그인 스킬은 .agents/skills에만 건다. .claude/skills에 걸면 꺼 둔 플러그인이 켜진다(#40)
+            for d in [".agents/skills"] if name == "from-plugin" else hud.GROUP_LINK_DIRS:
                 p = hud._link_path(proj, d, name)
                 assert os.path.islink(p), f"{name}: {d}에 링크가 없다"
                 assert os.path.isfile(os.path.join(p, "SKILL.md")), "링크 너머가 안 읽힌다"
