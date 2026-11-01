@@ -1104,6 +1104,28 @@ def _scan_skill_root(root, label, agents, found):
 # 링크를 따라가는 것은 Claude Code·Codex·Copilot에서 실측 확인했다(ADR 10).
 # 이 둘이면 그 네 도구가 전부 켜진다. Cursor는 .claude/.agents 둘 다 읽는다.
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
+LINK_DIRS_FILE = os.path.join(TOOL_DIR, "link-dirs.json")   # {프로젝트: [관리할 폴더]}
+
+
+def link_dirs(project_dir):
+    """이 프로젝트에서 스킬을 공유할 폴더. 고른 값이 없으면 ~/.claude가 있을 때만 .claude/skills를 넣는다.
+    사용 여부를 확정할 수 없는 신호라 기본값으로만 쓴다. 프로젝트에 커밋된 .claude/는 동의로 보지 않는다."""
+    saved = read_json(LINK_DIRS_FILE, {}).get(project_dir)
+    if isinstance(saved, list) and saved and all(d in GROUP_LINK_DIRS for d in saved):
+        return [d for d in GROUP_LINK_DIRS if d in saved]
+    return list(GROUP_LINK_DIRS) if os.path.isdir(os.path.join(HOME, ".claude")) else [".agents/skills"]
+
+
+def set_link_dirs(project_dir, dirs):
+    if not isinstance(dirs, list) or not dirs or any(d not in GROUP_LINK_DIRS for d in dirs):
+        return False, "choose supported skill directories"
+    data = read_json(LINK_DIRS_FILE, {})
+    data[project_dir] = [d for d in GROUP_LINK_DIRS if d in dirs]
+    try:
+        write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return False, str(e)
+    return True, ""
 
 
 # 플러그인은 스킬만 담지 않는다. 공식 문서 기준 구성 요소와, 그중 무엇이 다른 에이전트로
@@ -1194,17 +1216,17 @@ def skill_sources(project_dir):
 
 
 def skill_is_shared(project_dir, name, src=None):
-    """이 프로젝트의 모든 스킬 폴더에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
+    """이 프로젝트가 관리하는 스킬 폴더 모두에서 그 스킬이 보이나. 링크가 걸려 있거나, 그 자리가 원본
     자체면 된다(원본이 이 프로젝트 안에 있는 경우)."""
     src = src or skill_sources(project_dir).get(name)
     if not _valid_skill_name(name):
         return False
     return bool(src) and all(_skill_path_state(project_dir, d, name, src) in ("linked", "original")
-                            for d in GROUP_LINK_DIRS)
+                            for d in link_dirs(project_dir))
 
 
 def link_skill(name, on, project_dir):
-    """스킬 하나를 이 프로젝트의 모든 에이전트에게 열거나 닫는다.
+    """스킬 하나를 이 프로젝트의 관리 폴더로 열거나, 모든 폴더에서 닫는다.
     원본이 어디에 있든(플러그인·~/.claude·~/.agents) 비어 있는 폴더만 채운다 --
     그래서 방향(claude->agents, agents->claude)을 따질 필요가 없다."""
     if not project_dir or not os.path.isdir(project_dir):
@@ -1214,10 +1236,13 @@ def link_skill(name, on, project_dir):
     src = skill_sources(project_dir).get(name)
     if not src:
         return False, "unknown skill"
+    managed = link_dirs(project_dir)
     try:
         for rel in GROUP_LINK_DIRS:
             dst = _link_path(project_dir, rel, name)
             state = _skill_path_state(project_dir, rel, name, src)
+            if rel not in managed and (on or state == "blocked"):
+                continue
             if state == "blocked":
                 return False, "skill directory is linked or inaccessible"
             if on:
@@ -1643,7 +1668,7 @@ def collect_worktrees(project):
             config = override.get("config", policy.get("config"))
             row["config"] = config
             row["result"] = policy.get("results", {}).get(row["path"])
-            config = config or {"skills": [sk for sk in skills if sk.get("selected")], "dirs": GROUP_LINK_DIRS}
+            config = config or {"skills": [sk for sk in skills if sk.get("selected")], "dirs": link_dirs(project)}
             row["skills"] = [{"name": sk["name"], "dir": d,
                               "state": _skill_path_state(row["path"], d, sk["name"], sk["source"])}
                              for d in config["dirs"] for sk in config["skills"]] if config and row["available"] else []
@@ -1865,13 +1890,15 @@ def collect_skills(ctx):
     sets = read_sets()
 
     copies = _plugin_copies(index)
+    managed = link_dirs(project_dir)
+    reachable = {a for rel, agents in SKILL_ROOTS_PROJECT if rel in managed for a in agents}
 
     def decorate(skill, hit, base_agents=()):
         agents = list(base_agents) + [a for a in (hit["agents"] if hit else []) if a not in base_agents]
         real_md = os.path.realpath(os.path.join(skill["path"], "SKILL.md"))
         agents = [a for a in agents if not ((a == "Codex" and real_md in codex_off) or skill.get("name") in by_name_off.get(a, ()))]
         skill["agents"] = agents
-        skill["missing"] = [a for a in SKILL_AGENTS if a not in agents]
+        skill["missing"] = [a for a in SKILL_AGENTS if a not in agents and a in reachable]
         skill["roots"] = hit["roots"] if hit else []
         skill["shared"] = skill_is_shared(project_dir, skill["id"], sources.get(skill["id"]))
         # 링크는 원본을 건다. 이름만 같은 다른 파일을 걸게 되면 체크박스를 주지 않는다.
@@ -1936,6 +1963,9 @@ def collect_skills(ctx):
         "project_dir": project_dir,
         "known_projects": known_projects(),
         "worktrees": collect_worktrees(project_dir),
+        "link_dirs": [{"dir": rel, "on": rel in managed, "agents": agents}
+                      for rel, agents in SKILL_ROOTS_PROJECT if rel in GROUP_LINK_DIRS],
+        "link_dirs_auto_off": project_dir not in read_json(LINK_DIRS_FILE, {}) and ".claude/skills" not in managed,
     }
 
 
@@ -2239,8 +2269,8 @@ def assign_set(name, project_dir):
         if not ok and sk in wanted:
             errors.append(f"{sk}: {err}")
 
-    # 2) 플러그인: 해제는 아래에서 적용 전 값으로 되돌린다.
-    if name:
+    # 2) 플러그인: 해제는 아래에서 적용 전 값으로 되돌린다. .claude/skills를 관리하지 않으면 Claude 설정도 쓰지 않는다.
+    if name and ".claude/skills" in link_dirs(project_dir):
         # 설치된 플러그인 전부에 값을 적는다. 하나라도 빠뜨리면 그건 전역 값을 물려받아
         # "왜 이게 켜져 있지"가 된다.
         members = set(sets[name]["plugins"])
@@ -2632,6 +2662,9 @@ const T = {
   comp_count: (label, n) => `${n} ${label}`,
   comp_tip: n => `Also in this plugin: ${n}. Only skills can be shared with other agents`,
   share_to: names => 'let ' + names.join(', ') + ' use it too',
+  link_dirs_label: 'Share and group skills through:',
+  link_dirs_tip: 'Sharing and groups create links only in the folders checked here. Unchecking keeps existing links. With .claude/skills unchecked, groups do not write Claude Code settings either.',
+  link_dirs_auto_off: 'Claude Code was not found on this computer, so .claude/skills is off for this project. Check it if you or a teammate use Claude Code here.',
   share_short: 'let other agents use it',
   help_tip: 'How this works',
   share_done: 'every agent can use it',
@@ -2779,6 +2812,9 @@ const T = {
   comp_count: (label, n) => `${label} ${n}개`,
   comp_tip: n => `이 플러그인에 같이 든 것: ${n}. 다른 에이전트에 보낼 수 있는 것은 스킬뿐입니다`,
   share_to: names => names.join('·') + '도 쓰게 하기',
+  link_dirs_label: '스킬을 공유하고 그룹을 적용할 폴더:',
+  link_dirs_tip: '공유와 그룹은 여기서 체크한 폴더에만 링크를 만듭니다. 체크를 풀어도 있는 링크는 그대로 둡니다. .claude/skills를 풀면 그룹이 Claude Code 설정도 쓰지 않습니다.',
+  link_dirs_auto_off: '이 컴퓨터에서 Claude Code를 찾지 못해 이 프로젝트의 .claude/skills를 꺼 두었습니다. 본인이나 팀원이 여기서 Claude Code를 쓴다면 체크하세요.',
   share_short: '다른 에이전트도 쓰게 만듦',
   help_tip: '어떻게 되는 건지',
   share_done: '모든 에이전트가 쓸 수 있음',
@@ -3176,6 +3212,16 @@ async function editGroup(action, group, member, kind){
     const d = await r.json();
     if(!d.ok) alert(t().group_update_failed + (d.error || t().error));
   } catch(e){ alert(t().group_update_failed + e); }
+  polling = true;
+  await tick();
+}
+async function setLinkDirs(dirs){
+  polling = false;
+  try{
+    const r = await fetch('/api/linkdirs', {method:'POST', body: JSON.stringify({dirs, project: currentProjectDir})});
+    const d = await r.json();
+    if(!d.ok) alert(t().link_failed + (d.error || t().error));
+  } catch(e){ alert(t().link_failed + e); }
   polling = true;
   await tick();
 }
@@ -3677,6 +3723,30 @@ async function tick(){
         g.innerHTML = t().guide_rows.map(([k, v]) => `<div class="guide-row"><b>${k}</b><span>${v}</span></div>`).join('');
         c.appendChild(g);
       }
+      if(p.link_dirs){
+        // 공유와 그룹이 어느 폴더에 링크를 만드는지. 쓰지 않는 에이전트의 폴더를 여기서 뺀다.
+        const box = document.createElement('div'); box.className = 'guide';
+        box.title = t().link_dirs_tip;
+        box.appendChild(document.createTextNode(t().link_dirs_label + ' '));
+        for(const d of p.link_dirs){
+          const label = document.createElement('label'); label.className = 'share'; label.style.marginLeft = '10px';
+          const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = d.on;
+          // 마지막 하나는 끌 수 없다. 공유할 곳이 없으면 체크박스가 아무 일도 못 한다.
+          cb.disabled = d.on && p.link_dirs.filter(x => x.on).length === 1;
+          cb.onchange = () => {
+            cb.blur();
+            setLinkDirs(p.link_dirs.filter(x => x.dir === d.dir ? cb.checked : x.on).map(x => x.dir));
+          };
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(`${d.dir} (${d.agents.map(shortAgent).join(', ')})`));
+          box.appendChild(label);
+        }
+        if(p.link_dirs_auto_off){
+          const note = document.createElement('div'); note.textContent = t().link_dirs_auto_off;
+          box.appendChild(note);
+        }
+        c.appendChild(box);
+      }
       if(!p.rows.length){
         const e = document.createElement('div'); e.className = 'empty';
         e.innerHTML = `<span>📦</span><span>${t().no_skills}</span>`;
@@ -4085,6 +4155,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if project not in known_projects():
                 return self._send_json({"ok": False, "error": "unknown project"}, 400)
             ok, err = assign_set(payload.get("group", ""), project)
+            self._send_json({"ok": ok, "error": err})
+        elif self.path == "/api/linkdirs":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                return self._send_json({"ok": False, "error": "bad request"}, 400)
+            project = payload.get("project", "") or PROJECT_DIR
+            if project not in known_projects():
+                return self._send_json({"ok": False, "error": "unknown project"}, 400)
+            ok, err = set_link_dirs(project, payload.get("dirs"))
             self._send_json({"ok": ok, "error": err})
         elif self.path == "/api/linkskill":
             length = int(self.headers.get("Content-Length", 0))

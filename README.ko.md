@@ -206,6 +206,8 @@ Agent HUD의 ON/OFF 스위치는 Claude Code 설정만 수정한다. 다른 에�
 
 적용한 그룹 아래에 그룹에 없는데 계속 읽히는 스킬을 에이전트별로 보여준다.
 
+링크를 만들 폴더는 플러그인·스킬 탭에서 프로젝트마다 고른다. 고르지 않으면 `~/.claude`가 있을 때만 `.claude/skills`를 쓴다. `.claude/skills`를 빼면 그룹이 Claude Code 설정도 쓰지 않는다.
+
 여러 에이전트를 같이 쓴다면 스킬을 `~/.claude/skills`에 두고 그룹으로 연결하는 게 좋다.
 Codex·Antigravity는 그룹으로 연결한 프로젝트에서만 그 스킬을 읽고, Claude Code는
 프로젝트마다 켜고 끌 수 있다. `~/.agents/skills`에 둔 스킬은 Codex가 모든

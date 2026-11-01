@@ -147,6 +147,7 @@ def main():
 
         # HOME을 옮겨 사용자 스킬 폴더를 가짜로 만든다
         os.environ["HOME"] = env_home
+        os.makedirs(os.path.join(env_home, ".claude"), exist_ok=True)   # Claude Code를 쓰는 사용자
 
         r = run(["groups"], home, cwd=proj)
         assert r.returncode == 0, r.stderr

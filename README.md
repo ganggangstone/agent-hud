@@ -240,6 +240,8 @@ project skill links, which can change the skills other agents discover.
 
 Under an applied group, the dashboard lists by agent the skills outside the group that are still read.
 
+Choose the folders that get links per project in the Plugins & skills tab. If you don't choose, `.claude/skills` is used only when `~/.claude` exists. Without `.claude/skills`, groups don't write Claude Code settings either.
+
 If you use more than one agent, keep your skills in `~/.claude/skills` and link them with
 groups. Codex and Antigravity then read a skill only in the projects a group
 linked it into, and Claude Code can switch it per project. A skill in `~/.agents/skills` is

@@ -24,6 +24,7 @@ def main():
     try:
         home = os.path.join(tmp, "home"); os.makedirs(home)
         hud.HOME = home
+        os.makedirs(os.path.join(home, ".claude"), exist_ok=True)   # Claude Code를 쓰는 사용자
         a, b, c = (os.path.join(tmp, n) for n in ("A", "B", "C"))
         for p in (a, b, c):
             os.makedirs(p)
