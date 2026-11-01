@@ -2,6 +2,16 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.7
+
+**그룹을 Codex에서도 쓸 수 있다.** Codex 0.166은 프로젝트 설정으로 전역 스킬을 끄지 못한다. 적용한 그룹 아래에 그룹 밖 스킬을 그 실행에서만
+끄는 `codex -c ...` 명령을 복사하는 버튼을 넣었다. Codex 플러그인과 내장 스킬도 함께 끈다. 그냥 `codex`를 실행하면 다시 읽고, 스킬이
+늘면 명령을 다시 복사해야 한다. (#42)
+
+**Groups now work in Codex.** Codex 0.166 can't disable global skills from project config. An applied group now has a button that
+copies a `codex -c ...` command hiding skills outside the group for that run only, including Codex plugins and built-ins. Plain
+`codex` still reads them, and you need to copy the command again when skills are added. (#42)
+
 ## v0.6.6
 
 **꺼진 플러그인의 스킬을 링크해도 Claude Code 집계가 맞다.** Claude Code는 `.claude/skills`의 링크를 플러그인과 별개로 읽는다.
