@@ -2,6 +2,45 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.5
+
+**Claude Code 없이도 그룹과 공유가 동작한다.** 플러그인이 없어도 스킬로 그룹을 만들 수 있고, 바꿀 값이 없으면
+`.claude/settings.local.json`을 만들지 않는다. 플러그인·스킬 탭에서 프로젝트마다 공유 폴더(`.claude/skills`, `.agents/skills`)를
+고른다. 고르지 않으면 `~/.claude`가 있을 때만 `.claude/skills`를 쓴다. 관리하지 않는 폴더에는 링크와 Claude 설정을 쓰지 않고
+공유 판정에서도 뺀다.
+
+**그룹이 다른 에이전트에서 하는 일을 보여준다.** 그룹은 Claude Code에서만 나머지를 끈다. 적용한 그룹 아래에 다른 에이전트가
+계속 읽는 스킬을 표시한다.
+
+**같은 이름 스킬을 측정한 동작대로 보여준다.** Codex 0.166은 내용이 다른 같은 이름 스킬을 모두 읽고, Antigravity는 프로젝트 쪽만
+읽는다. Claude Code는 플러그인 스킬과 이름만 같은 스킬을 별개로 읽으므로 별도 행과 스위치로 표시한다. 내용까지 같은 복사본과
+링크는 플러그인 행에 합친다. 겹친 이름에 뜨던 거짓 이름 불일치 경고도 없앴다.
+
+**그룹이 원본 파일을 기억한다.** 이름이 같고 내용이 다르면 파일을 골라 넣는다. 끊어진 링크는 다음 그룹의 원본으로 바꾼다. 링크를 못
+지웠거나 다른 폴더가 자리에 있으면 지우지 않고 일부만 적용됐다고 알린다.
+
+**링크로 묶인 스킬 폴더를 인식한다.** `.agents/skills`가 `.claude/skills`를 가리키는 프로젝트는 공유 체크박스가 꺼져 보이고 켜기가
+막혔다. 프로젝트 밖이나 다른 폴더로 가는 링크는 계속 막는다.
+
+**Works without Claude Code.** You can start a group from a skill when there are no plugins, and `.claude/settings.local.json`
+is not created when there is nothing to change. Choose the share folders (`.claude/skills`, `.agents/skills`) per project in
+the Plugins & skills tab. If you don't choose, `.claude/skills` is used only when `~/.claude` exists. Folders you don't manage
+get no links or Claude settings and are left out of the share check.
+
+**Groups show what they do for other agents.** A group turns things off only in Claude Code. An applied group now lists the
+skills other agents still read.
+
+**Same-named skills match measured behavior.** Codex 0.166 reads every same-named skill with different content, and Antigravity
+reads only the project one. Claude Code reads a plugin skill and a same-named skill separately, so the latter gets its own row
+and switch. Identical copies and links stay on the plugin row. The false name-mismatch warning on these rows is gone.
+
+**Groups remember the source file.** When same-named skills differ you pick the file. A broken link is replaced with the next
+group's source. If a link can't be removed or a different folder is in the way, nothing is deleted and the group reports that
+it was only partly applied.
+
+**Linked skill folders are recognized.** A project whose `.agents/skills` points at `.claude/skills` showed its share checkboxes
+as off and couldn't turn them on. Links to other places stay blocked.
+
 ## v0.6.4
 
 **지침 탭에 관련 문서를 보여준다.** 지침 파일 본문에 경로나 링크로 적힌 문서를 그 파일 아래에 보여준다. 필요할 때
