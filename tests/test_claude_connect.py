@@ -1,7 +1,7 @@
 """Claude Code 없이 쓰다가 설치한 프로젝트에 빠진 링크를 안내하고 연결하는지 본다(#41).
    자동으로 연결하지 않는다. 처음부터 Claude Code가 있던 프로젝트와 폴더를 직접 고른 프로젝트에는 안내하지 않는다.
    python3 tests/test_claude_connect.py"""
-import importlib.util, os, shutil, tempfile
+import importlib.util, os, shutil, tempfile, threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("hud", os.path.join(ROOT, "server.py"))
@@ -85,6 +85,39 @@ def main():
         assert notice(empty) is None
         make_skill(os.path.join(empty, ".agents", "skills"), "later")
         assert notice(empty) is None, "이미 끝난 전환을 다시 묻는다"
+
+        # 끊어진 링크도 빠진 것이다. 지우지 않고 알리며, 고칠 때까지 안내를 남긴다
+        shutil.rmtree(hud.CLAUDE_DIR)
+        broken = new_project(tmp, "broken")
+        hud.known_projects = lambda: [broken]
+        assert notice(broken) is None
+        os.makedirs(hud.CLAUDE_DIR)
+        dead = os.path.join(broken, ".claude", "skills", "own-broken")
+        os.makedirs(os.path.dirname(dead))
+        os.symlink(os.path.join(tmp, "nowhere"), dead)
+        assert notice(broken)["names"] == ["own-broken"], "끊어진 링크를 놓쳤다"
+        ok, err = hud.connect_claude(broken)
+        assert not ok and "own-broken" in err, "연결 못 한 스킬을 성공으로 처리했다"
+        assert os.path.islink(dead) and notice(broken)["names"] == ["own-broken"], "안내가 사라졌다"
+        os.unlink(dead)
+        ok, err = hud.connect_claude(broken)
+        assert ok, err
+        assert notice(broken) is None
+
+        # 폴링과 설정 저장이 겹쳐도 사용자가 고른 값을 잃지 않는다
+        shutil.rmtree(hud.CLAUDE_DIR)
+        many = [new_project(tmp, f"race{i}") for i in range(40)]
+        hud.known_projects = lambda: many
+        def poll(p):
+            hud.claude_connect_state(p)
+        def choose(p):
+            assert hud.set_link_dirs(p, [".agents/skills"])[0]
+        pool = [threading.Thread(target=f, args=(p,)) for p in many for f in (poll, choose)]
+        for th in pool: th.start()
+        for th in pool: th.join()
+        saved = hud.read_json(hud.LINK_DIRS_FILE, {})
+        assert all(p in saved for p in many), "동시에 쓰다가 고른 값을 잃었다"
+        os.makedirs(hud.CLAUDE_DIR)
 
         # 처음부터 Claude Code가 있던 프로젝트는 묻지 않는다
         always = new_project(tmp, "always")

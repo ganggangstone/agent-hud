@@ -98,6 +98,14 @@ def main():
         ok, err = hud.assign_set("", proj)
         assert ok, err
         assert not os.path.lexists(claude_link) and not os.path.lexists(agents_link), "해제해도 링크가 남았다"
+
+        # .claude/skills만 관리해도 공유 체크박스가 꺼진 플러그인을 켜지 않는다. 걸 곳이 없으니 체크박스도 없다
+        assert hud.set_link_dirs(proj, [".claude/skills"])[0]
+        s, plugin, loose = state(proj)
+        assert not plugin["ps"]["linkable"], "다른 에이전트 폴더를 안 쓰는데 공유 체크박스를 준다"
+        ok, err = hud.link_skill("ps", True, proj)
+        assert ok, err
+        assert not os.path.lexists(claude_link), "공유 체크박스가 Claude Code에서 켰다"
         print("PASS")
     finally:
         shutil.rmtree(tmp)
