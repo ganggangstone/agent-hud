@@ -282,10 +282,28 @@ def collect_groups(ctx):
             "assigned": gname == assigned,
             "members": [{"name": m, "kind": "plugin", "on": bool(enabled.get(m, False))} for m in plugins]
                      + [{"name": sk, "kind": "skill", "on": skill_is_shared(project_dir, sk, sources[sk])} for sk in skills],
+            "still_visible": _still_visible(project_dir, entry) if gname == assigned else {},
         })
     return {"title": "Groups", "groups": groups,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
             "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
+
+
+def _still_visible(project_dir, entry):
+    """그룹에 없는데 다른 에이전트가 계속 읽는 스킬 -> {에이전트: [이름]}. 그룹은 Claude Code에서만
+    나머지를 끈다. 다른 에이전트의 끄기 설정은 전역이라 프로젝트 하나를 위해 바꾸지 않는다."""
+    group = set(entry["skills"])
+    for plugin in entry["plugins"]:
+        group.update(plugin_skills().get(plugin, {}))
+    codex_off, by_name_off = _skills_disabled_elsewhere(project_dir)
+    out = {}
+    for hit in _skill_root_index(project_dir).values():
+        if hit["name"] in group:
+            continue
+        for a in hit["agents"]:
+            if a != "Claude Code" and not ((a == "Codex" and hit["real"] in codex_off) or hit["name"] in by_name_off.get(a, ())):
+                out.setdefault(a, set()).add(hit["name"])
+    return {a: sorted(out[a]) for a in SKILL_AGENTS if a in out}
 
 
 def _frontmatter(path):
@@ -2008,6 +2026,8 @@ def set_plugins(changes, project_dir):
     unknown = [n for n in changes if n not in known]
     if unknown:
         return False, "unknown plugin: " + ", ".join(unknown[:3])
+    if not changes:     # 플러그인이 없는 사용자에게 Claude 설정 파일을 만들지 않는다
+        return True, ""
     data = read_json(os.path.join(project_dir, LOCAL_SETTINGS), {})
     data.setdefault("enabledPlugins", {}).update({k: bool(v) for k, v in changes.items()})
     return _write_local(project_dir, data)
@@ -2015,6 +2035,8 @@ def set_plugins(changes, project_dir):
 
 def _write_local(project_dir, data):
     path = os.path.join(project_dir, LOCAL_SETTINGS)
+    if read_json(path, {}) == data:     # 바꿀 값이 없으면 파일을 만들지 않는다
+        return True, ""
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
@@ -2588,10 +2610,12 @@ const T = {
     on: 'ALWAYS', off: 'EXCLUDED', manual: 'ONLY WHEN YOU TYPE /name', name_only: 'NAME ONLY',
     remove: 'remove ✕', remove_tip: (m,g) => `take ${m} out of "${g}"`,
     remove_confirm: (m,g) => `Remove ${m} from group "${g}"?`,
-    groups_guide: 'A group is a set of plugins and skills you switch on together. Pick a group for a project and every switch in it flips at once instead of one by one.',
+    groups_guide: 'A group is a set of plugins and skills you switch on together. Pick a group for a project and every switch in it flips at once instead of one by one. In Claude Code, whatever is not in the group is turned off. Other agents get the group\u2019s skills, and nothing is turned off for them.',
+    group_still_visible: 'Not in this group, but these agents still read them:',
+    group_more: n => `+${n} more`,
     new_group: '+ create a new group', new_group_tip: 'e.g. one for coding, one for video',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
-    new_group_first_prompt: 'Which plugin should it start with?\n',
+    new_group_first_prompt: 'Which plugin or skill should it start with?\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
   import_unconfirmed: 'not confirmed',
@@ -2733,10 +2757,12 @@ const T = {
     on: '항상', off: '제외', manual: '/이름 칠 때만 사용', name_only: '이름만',
     remove: '빼기 ✕', remove_tip: (m,g) => `"${g}" 그룹에서 ${m} 빼기`,
     remove_confirm: (m,g) => `"${g}" 그룹에서 ${m} 뺄까요?`,
-    groups_guide: '그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 프로젝트에서 그룹 하나를 고르면 그 안의 스위치가 한꺼번에 바뀌어, 하나씩 누르지 않아도 됩니다.',
+    groups_guide: '그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 프로젝트에서 그룹 하나를 고르면 그 안의 스위치가 한꺼번에 바뀌어, 하나씩 누르지 않아도 됩니다. Claude Code에서는 그룹에 없는 것이 꺼집니다. 다른 에이전트에는 그룹의 스킬이 더해질 뿐 꺼지는 것은 없습니다.',
+    group_still_visible: '그룹에 없지만 이 에이전트들은 계속 읽습니다:',
+    group_more: n => `외 ${n}개`,
     new_group: '+ 새 그룹 만들기', new_group_tip: '예: 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
-    new_group_first_prompt: '어떤 플러그인부터 넣을까요?\n',
+    new_group_first_prompt: '어떤 플러그인이나 스킬부터 넣을까요?\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
   import_unconfirmed: '적용 미확인',
@@ -3463,8 +3489,8 @@ async function tick(){
       newBtn.onclick = () => {
         const name = prompt(t().new_group_name_prompt);
         if(!name) return;
-        const first = prompt(t().new_group_first_prompt + (p.all_plugins||[]).join('\n'));
-        if(first) editGroup('add', name.trim(), first.trim(), 'plugin');
+        const first = prompt(t().new_group_first_prompt + [...(p.all_plugins||[]), ...(p.all_skills||[])].join('\n'));
+        if(first) editGroup('add', name.trim(), first.trim(), (p.all_plugins||[]).includes(first.trim()) ? 'plugin' : 'skill');
       };
       headerRow.appendChild(newBtn);
       c.appendChild(headerRow);
@@ -3517,6 +3543,20 @@ async function tick(){
           rm.onclick = () => { if(confirm(t().remove_confirm(m.name, g.name))) editGroup('remove', g.name, m.name, m.kind); };
           mrow.appendChild(mleft); mrow.appendChild(rm);
           wrap.appendChild(mrow);
+        }
+
+        const stillVisible = Object.entries(g.still_visible||{});
+        if(stillVisible.length){
+          const head = document.createElement('div'); head.className = 'note sub';
+          head.textContent = t().group_still_visible;
+          wrap.appendChild(head);
+          for(const [agent, names] of stillVisible){
+            const line = document.createElement('div'); line.className = 'note sub';
+            const more = names.length > 5 ? ' ' + t().group_more(names.length - 5) : '';
+            line.textContent = `${agent} (${names.length}): ${names.slice(0, 5).join(', ')}${more}`;
+            line.title = names.join(', ');
+            wrap.appendChild(line);
+          }
         }
 
         const addRow = document.createElement('div'); addRow.className='row sub';

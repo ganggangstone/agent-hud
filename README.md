@@ -238,6 +238,8 @@ project skill links, which can change the skills other agents discover.
 | Claude Code | On | Plugins and skills outside a plugin are turned off |
 | Codex, Antigravity, Cursor, Copilot | Skills are read | Not turned off |
 
+Under an applied group, the dashboard lists by agent the skills outside the group that are still read.
+
 If you use more than one agent, keep your skills in `~/.claude/skills` and link them with
 groups. Codex and Antigravity then read a skill only in the projects a group
 linked it into, and Claude Code can switch it per project. A skill in `~/.agents/skills` is
