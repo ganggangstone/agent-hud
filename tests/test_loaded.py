@@ -77,6 +77,7 @@ def end_to_end():
 # ── 참고용 토큰 수 ─────────────────────────────────────────────────────────────
 # 기대값은 구현과 따로 순수 tiktoken(o200k_base)에 "이름\n설명"을 넣어 얻은 숫자다.
 LONG_DESC = " ".join(["hello world"] * 750)      # 8999자: 예전 read(8000)을 넘는다
+os.environ.pop("CODEX_HOME", None)   # 켜져 있으면 이 컴퓨터의 Codex 플러그인까지 센다
 TOK_HOME = os.environ.get("AGENT_HUD_TEST_TOKENIZER_HOME")
 
 

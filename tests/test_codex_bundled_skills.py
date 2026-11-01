@@ -63,6 +63,8 @@ def main():
         # 설정에서 끈 플러그인은 세지 않는다
         hud._codex_config = lambda: {"plugins": {"off@m": {"enabled": False}}}
         assert "off:off-skill" not in codex_names(proj)[1], "끈 플러그인을 셌다"
+        open(os.path.join(cache, "off", ".codex-remote-plugin-install.json"), "w").write("{}")
+        assert "off:off-skill" in codex_names(proj)[1], "원격 설치 플러그인은 설정으로 꺼지지 않는다"
 
         # CODEX_HOME을 쓰면 그쪽만 읽는다
         other = os.path.join(tmp, "other-codex")

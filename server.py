@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import glob, json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+import json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 from collections import deque
 from contextlib import contextmanager
 import fcntl
@@ -327,10 +327,6 @@ def _codex_command(project_dir, entry):
     for hit in _outside_group(project_dir, entry):
         if "Codex" in hit["agents"]:
             off |= {p for p in hit["codex_paths"] if os.path.realpath(p) not in codex_off}
-    # Codex 플러그인과 내장 스킬도 Codex가 읽는다. 스킬 폴더 목록에는 없어 여기서 찾는다
-    codex_home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
-    for pattern in (("plugins", "cache", "*", "*", "*", "skills", "*", "SKILL.md"), ("skills", ".system", "*", "SKILL.md")):
-        off |= {md for md in glob.glob(os.path.join(glob.escape(codex_home), *pattern)) if os.path.realpath(md) not in codex_off}
     if not off:
         return ""
     config = _codex_config().get("skills")
@@ -1107,15 +1103,51 @@ def _same_skill_file(a, b):
     return os.path.realpath(a) == os.path.realpath(b) or _same_bytes(a, b)
 
 
-def _scan_skill_root(root, label, agents, found):
+def _codex_hides(skill_md):
+    """Codex 0.166 측정: agents/openai.yaml의 allow_implicit_invocation: false면 스킬 목록에 없다."""
+    try:
+        with open(os.path.join(os.path.dirname(skill_md), "agents", "openai.yaml"), encoding="utf-8") as f:
+            return bool(re.search(r"^\s*allow_implicit_invocation:\s*false\b", f.read(), re.M))
+    except (OSError, ValueError):
+        return False
+
+
+def _scan_codex_bundled(found):
+    """Codex가 스킬 폴더 밖에서 읽는 내장 스킬과 플러그인 스킬. 플러그인은 버전 폴더 중 가장 최근 것만 본다."""
+    home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+    _scan_skill_root(os.path.join(home, "skills", ".system"), "Codex built-in", ["Codex"], found, "")
+    cache = os.path.join(home, "plugins", "cache")
+    settings = _codex_config().get("plugins")
+    settings = settings if isinstance(settings, dict) else {}
+    for market in sorted(os.listdir(cache)) if os.path.isdir(cache) else []:
+        plugins = os.path.join(cache, market)
+        for plugin in sorted(os.listdir(plugins)) if os.path.isdir(plugins) else []:
+            base = os.path.join(plugins, plugin)
+            state = settings.get(f"{plugin}@{market}")
+            # 원격 설치 플러그인은 설정의 enabled = false로 꺼지지 않는다(0.166 실측)
+            if isinstance(state, dict) and state.get("enabled") is False and \
+                    not os.path.exists(os.path.join(base, ".codex-remote-plugin-install.json")):
+                continue
+            versions = [os.path.join(base, v) for v in os.listdir(base) if os.path.isdir(os.path.join(base, v))] if os.path.isdir(base) else []
+            if versions:
+                _scan_skill_root(os.path.join(max(versions, key=os.path.getmtime), "skills"),
+                                 f"Codex plugin {plugin}", ["Codex"], found, plugin + ":")
+
+
+def _scan_skill_root(root, label, agents, found, prefix=None):
     """링크거나 내용이 똑같은 스킬만 한 행으로 합친다. 내용이 다르면 행을 나누고, 에이전트는 먼저 찾은
-    쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서). Codex는 내용이 다르면 모두 읽는다(0.166 실측)."""
+    쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서). Codex는 내용이 다르면 모두 읽는다(0.166 실측).
+    prefix를 주면 Codex 내장·플러그인 스킬로 보고, 선언한 이름에 prefix를 붙이며 목록에 안 나오는 것은 뺀다."""
     if not os.path.isdir(root):
         return
     for name in sorted(os.listdir(root)):
         md = os.path.join(root, name, "SKILL.md")
         if not os.path.isfile(md):
             continue
+        if prefix is not None:
+            if _codex_hides(md):
+                continue
+            name = prefix + _frontmatter(md)[0]
         real = os.path.realpath(md)
         # 3초마다 도는 코드라 이름이 겹칠 때만 찾고 읽는다
         same_name = [r for r in found.values() if r["name"] == name] if name in found else []
@@ -2020,6 +2052,7 @@ def _skill_root_index(project_dir):
     for name in sorted(os.listdir(plugins)) if os.path.isdir(plugins) else []:
         rel = f".gemini/antigravity-cli/plugins/{name}/skills"
         _scan_skill_root(os.path.join(HOME, rel.replace("/", os.sep)), "~/" + rel, ["Antigravity"], found)
+    _scan_codex_bundled(found)
     return found
 
 
@@ -2082,6 +2115,8 @@ def collect_skills(ctx):
     for sid, hit in _loose_entries(index):
         # 행 id에는 겹친 이름을 가르는 @폴더가 붙을 수 있으니 실제 폴더 이름과 비교한다
         name, desc, issues = _skill_meta(hit["path"], os.path.basename(os.path.dirname(hit["path"])))
+        if hit["roots"][0].startswith("Codex "):   # Codex는 선언한 이름을 쓰고 폴더 이름과 달라도 된다
+            name, issues = hit["name"], [i for i in issues if i["code"] != "name_mismatch"]
         sk = decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
                        "path": os.path.dirname(hit["path"])}, hit)
         if "Claude Code" in sk["agents"]:
