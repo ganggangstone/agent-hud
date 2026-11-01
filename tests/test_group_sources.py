@@ -91,12 +91,48 @@ def main():
         ok, err = hud.assign_set("h", proj)
         assert ok, err
 
+        # 프로젝트마다 내용이 다른 같은 이름도 고를 수 있다
+        a, b = os.path.join(tmp, "A"), os.path.join(tmp, "B")
+        in_a = make_skill(os.path.join(a, ".agents", "skills"), "review", "from A")
+        in_b = make_skill(os.path.join(b, ".agents", "skills"), "review", "from B")
+        hud.known_projects = lambda: [proj, a, b]
+        choices = hud.collect_groups({"project_dir": proj})["skill_choices"]
+        assert sorted(c["source"] for c in choices["review"]) == sorted([in_a, in_b]), choices
+
+        # 고정한 원본이 사라져 끊어진 링크도 다음 그룹의 원본으로 바꾼다
+        gone = make_skill(os.path.join(tmp, "gone"), "fade", "old")
+        fresh = make_skill(os.path.join(home, ".claude", "skills"), "fade", "new")
+        hud.known_projects = lambda: [proj, os.path.join(tmp, "gone-project")]
+        json.dump({"old": {"plugins": [], "skills": ["fade"], "sources": {"fade": gone}},
+                   "new": {"plugins": [], "skills": ["fade"], "sources": {"fade": fresh}}}, open(hud.MODES_FILE, "w"))
+        ok, err = hud.assign_set("old", proj)
+        assert ok, err
+        shutil.rmtree(gone)
+        ok, err = hud.assign_set("new", proj)
+        assert ok, err
+        assert os.path.realpath(os.path.join(proj, ".agents", "skills", "fade")) == fresh, "끊어진 링크를 못 바꿨다"
+        ok, err = hud.assign_set("", proj)
+        assert ok, err
+
+        # 다른 내용의 실제 폴더가 자리에 있으면 지우지 않고 알린다. 내용이 같으면 문제없다
+        held = make_skill(os.path.join(proj, ".agents", "skills"), "fade", "hand made")
+        json.dump({"new": {"plugins": [], "skills": ["fade"], "sources": {"fade": fresh}}}, open(hud.MODES_FILE, "w"))
+        ok, err = hud.assign_set("new", proj)
+        assert not ok and "fade" in err, "다른 파일이 읽히는데 성공으로 처리했다"
+        assert not os.path.islink(held), "사용자 폴더를 바꿨다"
+        shutil.copy(os.path.join(fresh, "SKILL.md"), os.path.join(held, "SKILL.md"))
+        ok, err = hud.assign_set("new", proj)
+        assert ok, err
+        shutil.rmtree(held)
+        hud.assign_set("", proj)
+
         # 옛 파일 형식도 읽는다
         json.dump({"old": ["p@m"], "older": {"plugins": [], "skills": ["same"]}}, open(hud.MODES_FILE, "w"))
         ok, err = hud.assign_set("older", proj)
         assert ok, err
         assert os.path.realpath(link) == from_plugin
         assert 'dataset.source' in hud.PAGE, "화면에서 파일을 고를 수 없다"
+        assert "new_group_file_prompt" in hud.PAGE, "새 그룹의 첫 스킬은 파일을 고를 수 없다"
         print("PASS")
     finally:
         shutil.rmtree(tmp)

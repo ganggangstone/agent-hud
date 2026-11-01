@@ -60,6 +60,19 @@ def main():
         assert not os.path.exists(local), "해제하면서 Claude 설정 파일을 만들었다"
         assert not group(proj).get("still_visible"), "해제한 그룹에 안내가 남았다"
 
+        # 그룹의 파일과 이름만 같은 다른 파일은 계속 읽히므로 알린다
+        real_src = os.path.join(home, ".agents", "skills", "want")
+        twin = os.path.join(home, ".codex", "skills")
+        make_skill(twin, "want")
+        open(os.path.join(twin, "want", "SKILL.md"), "a").write("다른 내용\n")
+        json.dump({"g": {"plugins": [], "skills": ["want"], "sources": {"want": real_src}}}, open(hud.MODES_FILE, "w"))
+        ok, err = hud.assign_set("g", proj)
+        assert ok, err
+        assert "want" in group(proj)["still_visible"]["Codex"], "같은 이름의 다른 파일을 숨겼다"
+        ok, err = hud.assign_set("", proj)
+        assert ok, err
+        shutil.rmtree(twin)
+
         # 이미 있는 설정 파일의 내용은 그대로 둔다
         os.makedirs(os.path.dirname(local), exist_ok=True)
         json.dump({"keep": 1}, open(local, "w"))
