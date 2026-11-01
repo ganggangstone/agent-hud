@@ -2,6 +2,14 @@
 
 각 항목은 한국어 먼저, 영어 다음. Each entry is Korean first, then English.
 
+## v0.6.8
+
+**Codex 스킬 수가 실제와 맞는다.** Codex 플러그인과 내장 스킬을 Codex 집계에 넣었다. 플러그인 스킬은 `플러그인:이름`으로 표시한다.
+`allow_implicit_invocation: false`인 스킬과 플러그인의 이전 버전은 Codex 목록에 없으므로 세지 않는다. (#43)
+
+**The Codex skill count matches Codex.** Codex plugins and built-in skills are now counted, and plugin skills show as `plugin:name`.
+Skills with `allow_implicit_invocation: false` and older plugin versions aren't in Codex's list, so they aren't counted. (#43)
+
 ## v0.6.7
 
 **그룹을 Codex에서도 쓸 수 있다.** Codex 0.166은 프로젝트 설정으로 전역 스킬을 끄지 못한다. 적용한 그룹 아래에 그룹 밖 스킬을 그 실행에서만
