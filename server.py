@@ -1329,7 +1329,18 @@ def _skill_file_readable(source):
         return False
 
 
+def _skill_dir(project, rel):
+    """.agents/skills -> ../.claude/skills처럼 체크아웃 안의 다른 스킬 폴더를 가리키는 링크면 그 폴더.
+    두 이름이 한 폴더이므로 그쪽 기준으로 보고 쓴다. 그 밖의 링크는 그대로 돌려줘 막히게 둔다."""
+    real, root = local_path(os.path.join(project, rel)), local_path(project)
+    for d in GROUP_LINK_DIRS:
+        if root and real == os.path.join(root, d.replace("/", os.sep)):
+            return d
+    return rel
+
+
 def _skill_path_state(project, rel, name, source):
+    rel = _skill_dir(project, rel)
     # A linked parent directory must never become a write-through to another checkout.
     cur = project
     for part in rel.split("/"):
@@ -1423,6 +1434,7 @@ def _create_skill_link(target, rel, name, source):
     target = local_path(target)
     if not target or not os.path.isdir(target):
         return "unavailable"
+    rel = _skill_dir(target, rel)
     state = _skill_path_state(target, rel, name, source)
     if state != "missing":
         return state
@@ -1871,7 +1883,8 @@ def collect_skills(ctx):
     overrides = skill_overrides(project_dir)[0]
     loose = []
     for sid, hit in _loose_entries(index, plugin_ids):
-        name, desc, issues = _skill_meta(hit["path"], sid)
+        # 행 id에는 겹친 이름을 가르는 @폴더가 붙을 수 있으니 실제 폴더 이름과 비교한다
+        name, desc, issues = _skill_meta(hit["path"], os.path.basename(os.path.dirname(hit["path"])))
         sk = decorate({"id": sid, "name": name, "desc": desc, "issues": issues,
                        "path": os.path.dirname(hit["path"])}, [])
         if "Claude Code" in sk["agents"]:
@@ -2042,7 +2055,7 @@ def loose_claude_skills(project_dir):
     out = {}
     for sid, hit in _loose_entries(_skill_root_index(project_dir), plugin_ids):
         if "Claude Code" in hit["agents"]:
-            out[_skill_meta(hit["path"], sid)[0]] = sid
+            out[_skill_meta(hit["path"], os.path.basename(os.path.dirname(hit["path"])))[0]] = sid
     return out
 
 
