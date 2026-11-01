@@ -239,6 +239,7 @@ project skill links, which can change the skills other agents discover.
 | Codex, Antigravity, Cursor, Copilot | Skills are read | Not turned off |
 
 Under an applied group, the dashboard lists by agent the skills outside the group that are still read.
+Codex can't disable global skills from project config, so a button copies a `codex -c ...` command that hides them for that run only.
 
 Choose the folders that get links per project in the Plugins & skills tab. If you don't choose, `.claude/skills` is used only when `~/.claude` exists. Without `.claude/skills`, groups don't write Claude Code settings either.
 If you install Claude Code later, the dashboard lists the missing links and connects them only when you click.

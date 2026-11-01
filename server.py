@@ -6,7 +6,7 @@ Extensibility: add a new panel by writing one function of shape
 Add a new plugin group by editing modes.json, or via the "+" button in the
 dashboard UI itself — no code change needed either way.
 """
-import json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
+import glob, json, os, re, shlex, urllib.request, http.server, socketserver, threading, webbrowser, sys, time, subprocess, shutil, resource, struct, zlib
 from collections import deque
 from contextlib import contextmanager
 import fcntl
@@ -286,6 +286,7 @@ def collect_groups(ctx):
                          "on": all(_skill_path_state(project_dir, d, sk, pinned.get(sk) or sources[sk]) in ("linked", "original")
                                    for d in link_dirs(project_dir))} for sk in skills],
             "still_visible": _still_visible(project_dir, entry) if gname == assigned else {},
+            "codex_command": _codex_command(project_dir, entry) if gname == assigned else "",
         })
     return {"title": "Groups", "groups": groups,
             "all_plugins": sorted(installed), "all_skills": sorted(sources),
@@ -294,24 +295,53 @@ def collect_groups(ctx):
             "assigned": assigned, "project_dir": project_dir, "known_projects": known_projects()}
 
 
-def _still_visible(project_dir, entry):
-    """그룹에 없는데 다른 에이전트가 계속 읽는 스킬 -> {에이전트: [이름]}. 그룹은 Claude Code에서만
-    나머지를 끈다. 다른 에이전트의 끄기 설정은 전역이라 프로젝트 하나를 위해 바꾸지 않는다."""
+def _outside_group(project_dir, entry):
+    """스킬 폴더에서 찾은 것 중 그룹에 없는 항목."""
     sources = skill_sources(project_dir)
     group = {sk: [entry.get("sources", {}).get(sk) or sources.get(sk)] for sk in entry["skills"]}
     for plugin in entry["plugins"]:
         for sk, path in plugin_skills().get(plugin, {}).items():
             group.setdefault(sk, []).append(path)
+    # 이름만 같은 다른 파일은 그룹 것이 아니다
+    return [hit for hit in _skill_root_index(project_dir).values()
+            if not any(d and _same_skill_file(hit["path"], os.path.join(d, "SKILL.md")) for d in group.get(hit["name"], ()))]
+
+
+def _still_visible(project_dir, entry):
+    """그룹에 없는데 다른 에이전트가 계속 읽는 스킬 -> {에이전트: [이름]}. 그룹은 Claude Code에서만
+    나머지를 끈다. 다른 에이전트의 끄기 설정은 전역이라 프로젝트 하나를 위해 바꾸지 않는다."""
     codex_off, by_name_off = _skills_disabled_elsewhere(project_dir)
     out = {}
-    for hit in _skill_root_index(project_dir).values():
-        # 이름만 같은 다른 파일은 그룹 것이 아니다
-        if any(d and _same_skill_file(hit["path"], os.path.join(d, "SKILL.md")) for d in group.get(hit["name"], ())):
-            continue
+    for hit in _outside_group(project_dir, entry):
         for a in hit["agents"]:
             if a != "Claude Code" and not ((a == "Codex" and hit["real"] in codex_off) or hit["name"] in by_name_off.get(a, ())):
                 out.setdefault(a, set()).add(hit["name"])
     return {a: sorted(out[a]) for a in SKILL_AGENTS if a in out}
+
+
+def _codex_command(project_dir, entry):
+    """그룹 밖 스킬을 그 실행에서만 끄는 Codex 명령. 끌 것이 없으면 빈 문자열.
+    Codex 0.166 측정: 프로젝트 config.toml의 skills.config는 전역 스킬을 끄지 못하고 실행 시 -c는 끈다."""
+    codex_off, _ = _skills_disabled_elsewhere(project_dir)
+    off = set()
+    for hit in _outside_group(project_dir, entry):
+        if "Codex" in hit["agents"]:
+            off |= {p for p in hit["codex_paths"] if os.path.realpath(p) not in codex_off}
+    # Codex 플러그인과 내장 스킬도 Codex가 읽는다. 스킬 폴더 목록에는 없어 여기서 찾는다
+    codex_home = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
+    for pattern in (("plugins", "cache", "*", "*", "*", "skills", "*", "SKILL.md"), ("skills", ".system", "*", "SKILL.md")):
+        off |= {md for md in glob.glob(os.path.join(glob.escape(codex_home), *pattern)) if os.path.realpath(md) not in codex_off}
+    if not off:
+        return ""
+    config = _codex_config().get("skills")
+    entries = config.get("config") if isinstance(config, dict) else None
+    # -c는 사용자 설정의 목록을 대신하므로 이미 있는 항목도 함께 넘긴다
+    keep = [(e["path"], e["enabled"]) for e in entries or []
+            if isinstance(e, dict) and isinstance(e.get("path"), str) and isinstance(e.get("enabled"), bool)
+            and os.path.realpath(os.path.expanduser(e["path"])) not in off]
+    items = keep + [(p, False) for p in sorted(off)]
+    value = ",".join(f"{{path={json.dumps(p, ensure_ascii=False)},enabled={str(on).lower()}}}" for p, on in items)
+    return f"cd {shlex.quote(project_dir)} && codex -c {shlex.quote(f'skills.config=[{value}]')}"
 
 
 def _frontmatter(path):
@@ -1092,8 +1122,10 @@ def _scan_skill_root(root, label, agents, found):
         row = next((r for r in same_name if r["real"] == real or _same_bytes(r["path"], md)), None)
         if row is None:
             row = found[f"{name}@{label}" if same_name else name] = {
-                "name": name, "agents": [], "roots": [], "path": md, "real": real}
+                "name": name, "agents": [], "roots": [], "path": md, "real": real, "codex_paths": set()}
         row["roots"].append(label)
+        if "Codex" in agents:   # 내용이 같아 합친 행의 path는 다른 에이전트의 복사본일 수 있다
+            row["codex_paths"] |= {md, real}
         others = [r for r in same_name if r is not row]
         for a in agents:
             taken = [r for r in others if a in r["agents"]] if a != "Codex" else []
@@ -2783,6 +2815,9 @@ const T = {
     groups_guide: 'A group is a set of plugins and skills you switch on together. Pick a group for a project and every switch in it flips at once instead of one by one. In Claude Code, whatever is not in the group is turned off. Other agents get the group\u2019s skills, and nothing is turned off for them.',
     group_still_visible: 'Not in this group, but these agents still read them:',
     group_more: n => `+${n} more`,
+    group_codex_note: 'This command hides every skill outside the group, including Codex plugins and built-ins, for that run only. Plain codex still reads them.',
+    group_codex_copy: 'Copy Codex command',
+    group_codex_copied: 'Copied',
     new_group: '+ create a new group', new_group_tip: 'e.g. one for coding, one for video',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin or skill should it start with?\n',
@@ -2938,6 +2973,9 @@ const T = {
     groups_guide: '그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 프로젝트에서 그룹 하나를 고르면 그 안의 스위치가 한꺼번에 바뀌어, 하나씩 누르지 않아도 됩니다. Claude Code에서는 그룹에 없는 것이 꺼집니다. 다른 에이전트에는 그룹의 스킬이 더해질 뿐 꺼지는 것은 없습니다.',
     group_still_visible: '그룹에 없지만 이 에이전트들은 계속 읽습니다:',
     group_more: n => `외 ${n}개`,
+    group_codex_note: '이 명령으로 실행하면 그 실행에서만 Codex가 그룹 밖 스킬(Codex 플러그인과 내장 스킬 포함)을 읽지 않습니다. 그냥 codex를 실행하면 다시 읽습니다.',
+    group_codex_copy: 'Codex 명령 복사',
+    group_codex_copied: '복사됨',
     new_group: '+ 새 그룹 만들기', new_group_tip: '예: 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인이나 스킬부터 넣을까요?\n',
@@ -3778,6 +3816,18 @@ async function tick(){
             line.title = names.join(', ');
             wrap.appendChild(line);
           }
+        }
+        if(g.codex_command){
+          const line = document.createElement('div'); line.className = 'note sub';
+          line.textContent = t().group_codex_note + ' ';
+          const b = document.createElement('button'); b.className = 'btn'; b.textContent = t().group_codex_copy;
+          b.title = g.codex_command;
+          b.onclick = async () => {
+            try{ await navigator.clipboard.writeText(g.codex_command); b.textContent = t().group_codex_copied; }
+            catch(e){ window.prompt('', g.codex_command); }
+          };
+          line.appendChild(b);
+          wrap.appendChild(line);
         }
 
         const addRow = document.createElement('div'); addRow.className='row sub';
