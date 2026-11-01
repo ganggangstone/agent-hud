@@ -1114,6 +1114,7 @@ def _scan_skill_root(root, label, agents, found):
 GROUP_LINK_DIRS = [".claude/skills", ".agents/skills"]
 LINK_DIRS_FILE = os.path.join(TOOL_DIR, "link-dirs.json")   # {프로젝트: [관리할 폴더]}
 NO_CLAUDE_SEEN = "__no_claude_seen__"   # 그 파일에서 ~/.claude 없이 본 프로젝트 목록. 나중에 설치했는지 가른다
+_link_dirs_lock = threading.Lock()      # 화면 폴링도 이 파일에 쓰므로 읽기부터 쓰기까지 한 번에 한다
 
 
 def link_dirs(project_dir):
@@ -1128,12 +1129,13 @@ def link_dirs(project_dir):
 def set_link_dirs(project_dir, dirs):
     if not isinstance(dirs, list) or not dirs or any(d not in GROUP_LINK_DIRS for d in dirs):
         return False, "choose supported skill directories"
-    data = read_json(LINK_DIRS_FILE, {})
-    data[project_dir] = [d for d in GROUP_LINK_DIRS if d in dirs]
-    if project_dir in data.get(NO_CLAUDE_SEEN, []):
-        data[NO_CLAUDE_SEEN].remove(project_dir)
     try:
-        write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
+        with _link_dirs_lock:
+            data = read_json(LINK_DIRS_FILE, {})
+            data[project_dir] = [d for d in GROUP_LINK_DIRS if d in dirs]
+            if project_dir in data.get(NO_CLAUDE_SEEN, []):
+                data[NO_CLAUDE_SEEN].remove(project_dir)
+            write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
     except Exception as e:
         return False, str(e)
     return True, ""
@@ -1254,8 +1256,8 @@ def _share_dirs(project_dir, src):
     걸면 꺼 둔 플러그인의 스킬이 켜지므로 다른 에이전트의 폴더에만 건다."""
     dirs = link_dirs(project_dir)
     plugin_paths = {local_path(p) for skills in plugin_skills().values() for p in skills.values()}
-    if local_path(src) in plugin_paths and ".agents/skills" in dirs:
-        return [".agents/skills"]
+    if local_path(src) in plugin_paths:
+        return [d for d in dirs if d != ".claude/skills"]
     return dirs
 
 
@@ -1267,7 +1269,7 @@ def _missing_in_claude(project_dir):
     for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         src = local_path(os.path.join(root, name))
         if src not in plugin_paths and _skill_file_readable(src) and \
-                _skill_path_state(project_dir, ".claude/skills", name, src) == "missing":
+                _skill_path_state(project_dir, ".claude/skills", name, src) in ("missing", "broken"):
             out[name] = src
     return out
 
@@ -1280,22 +1282,25 @@ def claude_connect_state(project_dir):
     seen = data.get(NO_CLAUDE_SEEN, [])
     if not os.path.isdir(os.path.join(HOME, ".claude")):
         if project_dir not in seen:
-            _write_no_claude_seen(data, seen + [project_dir])
+            _mark_no_claude_seen(project_dir, True)
         return None
     if project_dir not in seen:
         return None
     names = sorted(_missing_in_claude(project_dir))
     group = read_json(SETS_FILE, {}).get(project_dir, "")
     if not names and not group:     # 할 일이 없으면 전환이 끝난 것이다
-        _write_no_claude_seen(data, [p for p in seen if p != project_dir])
+        _mark_no_claude_seen(project_dir, False)
         return None
     return {"names": names, "group": group}
 
 
-def _write_no_claude_seen(data, seen):
-    data[NO_CLAUDE_SEEN] = seen
+def _mark_no_claude_seen(project_dir, seen):
     try:
-        write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
+        with _link_dirs_lock:
+            data = read_json(LINK_DIRS_FILE, {})
+            rest = [p for p in data.get(NO_CLAUDE_SEEN, []) if p != project_dir]
+            data[NO_CLAUDE_SEEN] = rest + [project_dir] if seen else rest
+            write_json(LINK_DIRS_FILE, data, ensure_ascii=False, indent=2)
     except OSError as e:
         print(f"could not save {LINK_DIRS_FILE}: {e}", file=sys.stderr)
 
@@ -1318,8 +1323,7 @@ def connect_claude(project_dir, keep=False):
             errors.append(f"{name}: {err}")
     if errors:
         return False, "; ".join(errors)[:300]
-    data = read_json(LINK_DIRS_FILE, {})
-    _write_no_claude_seen(data, [p for p in data.get(NO_CLAUDE_SEEN, []) if p != project_dir])
+    _mark_no_claude_seen(project_dir, False)
     return True, ""
 
 
@@ -2012,7 +2016,7 @@ def collect_skills(ctx):
         skill["roots"] = hit["roots"] if hit else []
         skill["shared"] = skill_is_shared(project_dir, skill["id"], sources.get(skill["id"]))
         # 링크는 원본을 건다. 이름만 같은 다른 파일을 걸게 되면 체크박스를 주지 않는다.
-        skill["linkable"] = skill["id"] in sources and _same_skill_file(
+        skill["linkable"] = skill["id"] in sources and bool(_share_dirs(project_dir, sources[skill["id"]])) and _same_skill_file(
             os.path.join(sources[skill["id"]], "SKILL.md"), os.path.join(skill["path"], "SKILL.md"))
         READABLE_PATHS.add(os.path.join(skill["path"], "SKILL.md"))
         return skill
