@@ -1071,7 +1071,7 @@ def _same_skill_file(a, b):
 
 def _scan_skill_root(root, label, agents, found):
     """링크거나 내용이 똑같은 스킬만 한 행으로 합친다. 내용이 다르면 행을 나누고, 에이전트는 먼저 찾은
-    쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서)."""
+    쪽에 둔다. Claude Code만 전역이 프로젝트를 이긴다(공식 문서). Codex는 내용이 다르면 모두 읽는다(0.166 실측)."""
     if not os.path.isdir(root):
         return
     for name in sorted(os.listdir(root)):
@@ -1088,7 +1088,7 @@ def _scan_skill_root(root, label, agents, found):
         row["roots"].append(label)
         others = [r for r in same_name if r is not row]
         for a in agents:
-            taken = [r for r in others if a in r["agents"]]
+            taken = [r for r in others if a in r["agents"]] if a != "Codex" else []
             if a == "Claude Code" and taken and label.startswith("~/"):
                 for r in taken:
                     r["agents"].remove(a)
