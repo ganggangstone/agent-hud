@@ -296,13 +296,16 @@ def collect_groups(ctx):
 def _still_visible(project_dir, entry):
     """그룹에 없는데 다른 에이전트가 계속 읽는 스킬 -> {에이전트: [이름]}. 그룹은 Claude Code에서만
     나머지를 끈다. 다른 에이전트의 끄기 설정은 전역이라 프로젝트 하나를 위해 바꾸지 않는다."""
-    group = set(entry["skills"])
+    sources = skill_sources(project_dir)
+    group = {sk: [entry.get("sources", {}).get(sk) or sources.get(sk)] for sk in entry["skills"]}
     for plugin in entry["plugins"]:
-        group.update(plugin_skills().get(plugin, {}))
+        for sk, path in plugin_skills().get(plugin, {}).items():
+            group.setdefault(sk, []).append(path)
     codex_off, by_name_off = _skills_disabled_elsewhere(project_dir)
     out = {}
     for hit in _skill_root_index(project_dir).values():
-        if hit["name"] in group:
+        # 이름만 같은 다른 파일은 그룹 것이 아니다
+        if any(d and _same_skill_file(hit["path"], os.path.join(d, "SKILL.md")) for d in group.get(hit["name"], ())):
             continue
         for a in hit["agents"]:
             if a != "Claude Code" and not ((a == "Codex" and hit["real"] in codex_off) or hit["name"] in by_name_off.get(a, ())):
@@ -1227,7 +1230,13 @@ def skill_candidates():
         for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
             if os.path.isfile(os.path.join(root, name, "SKILL.md")):
                 found.append((name, os.path.join(root, name)))
-    found += [(name, d) for name, (d, _proj) in project_skills().items()]
+    for proj in known_projects():   # project_skills()는 이름마다 첫 프로젝트만 준다
+        for rel, _agents in SKILL_ROOTS_PROJECT:
+            root = os.path.join(proj, rel.replace("/", os.sep))
+            for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+                d = os.path.join(root, name)
+                if not os.path.islink(d) and os.path.isfile(os.path.join(d, "SKILL.md")):
+                    found.append((name, d))
     out = {}
     for name, d in found:
         dirs = out.setdefault(name, [])
@@ -2305,11 +2314,15 @@ def assign_set(name, project_dir):
         if sk not in wanted and not known:
             continue    # 지워진 스킬이다. 지울 링크를 찾을 원본도 없다
         src = pins.get(sk) if sk in wanted else None
-        if sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources.get(sk, "")) == "conflict" for d in link_dirs(project_dir)):
+        if sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources.get(sk, "")) in ("conflict", "broken") for d in link_dirs(project_dir)):
             link_skill(sk, False, project_dir, src=known[0], also=known)  # 다른 그룹이 건 링크를 바꾼다
         ok, err = link_skill(sk, sk in wanted, project_dir, src=src or (known[0] if sk not in wanted else None), also=known)
         if not ok:
             errors.append(f"{sk}: {err}")
+        elif sk in wanted and any(_skill_path_state(project_dir, d, sk, src or sources[sk]) == "occupied" and not _same_skill_file(
+                os.path.join(_link_path(project_dir, d, sk), "SKILL.md"), os.path.join(src or sources[sk], "SKILL.md"))
+                for d in link_dirs(project_dir)):
+            errors.append(f"{sk}: a different folder with this name is already in the project")     # 지우지 않는다
 
     # 2) 플러그인: 해제는 아래에서 적용 전 값으로 되돌린다. .claude/skills를 관리하지 않으면 Claude 설정도 쓰지 않는다.
     if name and ".claude/skills" in link_dirs(project_dir):
@@ -2688,6 +2701,7 @@ const T = {
     new_group: '+ create a new group', new_group_tip: 'e.g. one for coding, one for video',
     new_group_name_prompt: 'Name for the new group (e.g. "dev", "video"):',
     new_group_first_prompt: 'Which plugin or skill should it start with?\n',
+    new_group_file_prompt: 'Skills with this name differ in content. Enter the number of the file to use:\n',
     no_groups: 'No groups yet. A group is the plugins and skills you switch on together, for example one for coding and one for video.',
   not_found: 'not found',
   import_unconfirmed: 'not confirmed',
@@ -2838,6 +2852,7 @@ const T = {
     new_group: '+ 새 그룹 만들기', new_group_tip: '예: 개발용, 영상제작용',
     new_group_name_prompt: '새 그룹 이름 (예: "개발", "영상제작"):',
     new_group_first_prompt: '어떤 플러그인이나 스킬부터 넣을까요?\n',
+    new_group_file_prompt: '이 이름의 스킬은 내용이 서로 다릅니다. 사용할 파일의 번호를 입력하세요:\n',
     no_groups: '아직 그룹이 없습니다. 그룹은 함께 켜는 플러그인과 스킬의 묶음입니다. 예를 들어 개발용 하나, 영상제작용 하나.',
   not_found: '없음',
   import_unconfirmed: '적용 미확인',
@@ -3577,8 +3592,17 @@ async function tick(){
       newBtn.onclick = () => {
         const name = prompt(t().new_group_name_prompt);
         if(!name) return;
-        const first = prompt(t().new_group_first_prompt + [...(p.all_plugins||[]), ...(p.all_skills||[])].join('\n'));
-        if(first) editGroup('add', name.trim(), first.trim(), (p.all_plugins||[]).includes(first.trim()) ? 'plugin' : 'skill');
+        const first = (prompt(t().new_group_first_prompt + [...(p.all_plugins||[]), ...(p.all_skills||[])].join('\n')) || '').trim();
+        if(!first) return;
+        const isPlugin = (p.all_plugins||[]).includes(first);
+        const files = !isPlugin && (p.skill_choices||{})[first];
+        let source;
+        if(files){
+          const n = prompt(t().new_group_file_prompt + files.map((f, i) => `${i + 1}. ${f.label}`).join('\n'), '1');
+          source = files[Number(n) - 1]?.source;
+          if(!source) return;
+        }
+        editGroup('add', name.trim(), first, isPlugin ? 'plugin' : 'skill', source);
       };
       headerRow.appendChild(newBtn);
       c.appendChild(headerRow);
@@ -3626,6 +3650,12 @@ async function tick(){
           const kind = document.createElement('span'); kind.className = 'comp';
           kind.textContent = m.kind === 'plugin' ? t().kind_plugin : t().kind_skill;
           mleft.appendChild(kind);
+          const picked = m.kind === 'skill' && ((p.skill_choices||{})[m.name]||[]).find(f => f.source === m.source);
+          if(picked){
+            const from = document.createElement('span'); from.className = 'comp'; from.textContent = picked.label;
+            from.style.cssText = 'white-space:normal;overflow-wrap:anywhere;min-width:0';
+            mleft.appendChild(from);
+          }
           const rm = document.createElement('span'); rm.className='tag clickable danger'; rm.textContent=t().remove;
           rm.title = t().remove_tip(m.name, g.name);
           rm.onclick = () => { if(confirm(t().remove_confirm(m.name, g.name))) editGroup('remove', g.name, m.name, m.kind); };
